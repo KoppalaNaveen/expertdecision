@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+            <h2 class="fw-bold text-dark mb-1" style="font-size: 1.5rem; letter-spacing: -0.02em;">Notifications Center</h2>
+            <p class="text-muted mb-0" style="font-size: 0.875rem;">Real-time approval requests, review status updates, and platform activity for your account.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm fw-semibold d-flex align-items-center gap-2 px-3" onclick="markAllNotificationsRead(event)">
+                <i data-lucide="check-check" style="width: 16px; height: 16px;"></i> Mark All as Read
+            </button>
+            <button class="btn btn-outline-danger btn-sm fw-semibold d-flex align-items-center gap-2 px-3" onclick="clearAllNotifications(event)">
+                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Clear All
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="d-flex align-items-center justify-content-between mb-4 bg-white p-3 rounded-3 border shadow-sm flex-wrap gap-2">
+        <div class="d-flex gap-2 flex-wrap" id="notif-filter-tabs">
+            <button class="btn btn-sm btn-primary px-3 rounded-pill fw-semibold filter-tab active" data-filter="all">All Notifications (<span id="count-all">0</span>)</button>
+            <button class="btn btn-sm btn-outline-secondary px-3 rounded-pill fw-semibold filter-tab" data-filter="unread">Unread (<span id="count-unread">0</span>)</button>
+            <button class="btn btn-sm btn-outline-secondary px-3 rounded-pill fw-semibold filter-tab" data-filter="Review Request">Review Requests (<span id="count-review">0</span>)</button>
+            <button class="btn btn-sm btn-outline-secondary px-3 rounded-pill fw-semibold filter-tab" data-filter="Decision Submission">Submissions & Status (<span id="count-submission">0</span>)</button>
+            <button class="btn btn-sm btn-outline-secondary px-3 rounded-pill fw-semibold filter-tab" data-filter="Discussion">Discussions & System (<span id="count-other">0</span>)</button>
+        </div>
+        <div class="text-muted text-xs ms-auto" style="font-size: 12px;">
+            <i data-lucide="refresh-cw" class="spin-icon me-1" style="width: 13px; height: 13px;"></i> Live updates enabled
+        </div>
+    </div>
+
+    <!-- Notifications List Container -->
+    <div class="bg-white rounded-3 border shadow-sm overflow-hidden">
+        <div id="notifications-page-list">
+            <div class="p-5 text-center text-muted">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 2rem; height: 2rem;"></div>
+                <p class="mb-0 font-monospace text-xs">Loading notifications...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .notif-card {
+        transition: background-color 0.2s ease, transform 0.15s ease;
+        border-bottom: 1px solid #F1F5F9;
+        padding: 18px 24px;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    .notif-card:hover {
+        background-color: #F8FAFC;
+    }
+    .notif-card.unread {
+        background-color: #F0F9FF;
+        border-left: 4px solid #0EA5E9;
+    }
+    .notif-icon-box {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .bg-review { background-color: #EFF6FF; color: #2563EB; }
+    .bg-submission { background-color: #ECFDF5; color: #10B981; }
+    .bg-status { background-color: #FEF3C7; color: #D97706; }
+    .bg-discussion { background-color: #F3E8FF; color: #9333EA; }
+    .bg-system { background-color: #F1F5F9; color: #64748B; }
+</style>
+
+{% endblock %}
+
+{% block js %}
+<script>
+    const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
+    const API_BASE = "http://127.0.0.1:8000";
+    let allNotifications = [];
+    let currentFilter = "all";
+
+    document.addEventListener("DOMContentLoaded", function () {
+        fetchFullNotifications();
+        // Refresh every 10 seconds for real-time updates
+        setInterval(fetchFullNotifications, 10000);
+
+        // Filter tabs listener
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.filter-tab').forEach(t => {
+                    t.classList.remove('btn-primary', 'active');
+                    t.classList.add('btn-outline-secondary');
+                });
+                this.classList.remove('btn-outline-secondary');
+                this.classList.add('btn-primary', 'active');
+                currentFilter = this.dataset.filter;
+                renderNotifications();
+            });
+        });
+    });
+
+    async function fetchFullNotifications() {
+        if (!CURRENT_USER_ID) return;
+        try {
+            const res = await fetch(`${API_BASE}/notifications/${CURRENT_USER_ID}`);
+            if (res.ok) {
+                allNotifications = await res.json();
+                updateCounts();
+                renderNotifications();
+            }
+        } catch (err) {
+            console.error("Failed to fetch notifications:", err);
+        }
+    }
+
+    function updateCounts() {
+        const unreadCount = allNotifications.filter(n => !n.is_read).length;
+        document.getElementById('count-all').innerText = allNotifications.length;
+        document.getElementById('count-unread').innerText = unreadCount;
+        document.getElementById('count-review').innerText = allNotifications.filter(n => n.notification_type === 'Review Request').length;
+        document.getElementById('count-submission').innerText = allNotifications.filter(n => n.notification_type === 'Decision Submission' || n.notification_type === 'Decision Status').length;
+        document.getElementById('count-other').innerText = allNotifications.filter(n => n.notification_type === 'Discussion' || n.notification_type === 'System Update').length;
+
+        const countToDisplay = unreadCount > 0 ? unreadCount : allNotifications.length;
+        document.querySelectorAll('.sidebar-notif-count').forEach(el => {
+            if (countToDisplay > 0) {
+                el.innerText = countToDisplay > 99 ? '99+' : countToDisplay;
+                el.style.display = 'inline-block';
+            } else {
+                el.style.display = 'none';
+            }
+        });
+    }
+
+    function extractDecisionId(msg) {
+        const match = msg.match(/DEC-(\d+)/i);
+        return match ? match[1] : null;
+    }
+
+    function formatTime(isoStr) {
+        if (!isoStr) return "Just now";
+        const date = new Date(isoStr);
+        const diffMs = new Date() - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 1) return "Just now";
+        if (diffMins < 60) return `${diffMins}m ago`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function renderNotifications() {
+        const container = document.getElementById('notifications-page-list');
+        if (!container) return;
+
+        let filtered = allNotifications;
+        if (currentFilter === 'unread') {
+            filtered = allNotifications.filter(n => !n.is_read);
+        } else if (currentFilter === 'Review Request') {
+            filtered = allNotifications.filter(n => n.notification_type === 'Review Request');
+        } else if (currentFilter === 'Decision Submission') {
+            filtered = allNotifications.filter(n => n.notification_type === 'Decision Submission' || n.notification_type === 'Decision Status');
+        } else if (currentFilter === 'Discussion') {
+            filtered = allNotifications.filter(n => n.notification_type === 'Discussion' || n.notification_type === 'System Update' || n.notification_type === 'Review Update');
+        }
+
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="p-5 text-center text-muted">
+                    <i data-lucide="bell-off" style="width: 36px; height: 36px; color: #94A3B8; margin-bottom: 12px;"></i>
+                    <h5 class="fw-bold text-secondary mb-1">No Notifications Found</h5>
+                    <p class="mb-0 text-xs">There are no notifications matching your selected view.</p>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+            return;
+        }
+
+        let html = '';
+        filtered.forEach(n => {
+            let iconName = 'bell';
+            let bgClass = 'bg-system';
+
+            if (n.notification_type === 'Review Request') {
+                iconName = 'check-square';
+                bgClass = 'bg-review';
+            } else if (n.notification_type === 'Decision Submission') {
+                iconName = 'file-text';
+                bgClass = 'bg-submission';
+            } else if (n.notification_type === 'Decision Status' || n.notification_type === 'Review Update') {
+                iconName = 'clock';
+                bgClass = 'bg-status';
+            } else if (n.notification_type === 'Discussion') {
+                iconName = 'message-square';
+                bgClass = 'bg-discussion';
+            }
+
+            const decId = extractDecisionId(n.message);
+            const viewBtn = decId ? `<a href="/decision/${decId}" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">View Decision</a>` : '';
+
+            html += `
+                <div class="notif-card ${!n.is_read ? 'unread' : ''}">
+                    <div class="notif-icon-box ${bgClass}">
+                        <i data-lucide="${iconName}" style="width: 20px; height: 20px;"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge ${bgClass} font-monospace" style="font-size: 10px; font-weight: 700;">${n.notification_type}</span>
+                            <span class="text-muted" style="font-size: 11px;">${formatTime(n.created_at)}</span>
+                        </div>
+                        <p class="mb-2 text-dark font-sans" style="font-size: 13.5px; font-weight: 500; line-height: 1.4;">${n.message}</p>
+                        <div class="d-flex align-items-center gap-2">
+                            ${viewBtn}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    async function markAllNotificationsRead(e) {
+        if (e) e.preventDefault();
+        try {
+            await fetch(`${API_BASE}/notifications/${CURRENT_USER_ID}/mark-all-read`, { method: 'PUT' });
+            fetchFullNotifications();
+        } catch (err) {
+            console.error("Failed to mark all as read:", err);
+        }
+    }
+
+    async function clearAllNotifications(e) {
+        if (e) e.preventDefault();
+        if (!confirm("Are you sure you want to clear all notifications?")) return;
+        try {
+            await fetch(`${API_BASE}/notifications/${CURRENT_USER_ID}/clear-all`, { method: 'DELETE' });
+            fetchFullNotifications();
+        } catch (err) {
+            console.error("Failed to clear notifications:", err);
+        }
+    }
+</script>
+{% endblock %}

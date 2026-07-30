@@ -120,6 +120,7 @@
 
 <script>
     const API_URL = "http://127.0.0.1:8000";
+    const CURRENT_USER_ROLE = "{{ session.get('role_name', 'Employee') }}";
 </script>
 <script src="{{ url_for('static', filename='js/review.js') }}"></script>
 {% endblock %}

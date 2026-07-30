@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pending Approvals - EDRP Decision Platform</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8FAFC;
+            color: #0F172A;
+        }
+        .main-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        .card-custom {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            padding: 28px;
+        }
+        .table-custom {
+            width: 100%;
+            vertical-align: middle;
+        }
+        .table-custom th {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748B;
+            font-weight: 700;
+            padding: 12px 16px;
+            border-bottom: 2px solid #F1F5F9;
+        }
+        .table-custom td {
+            padding: 16px;
+            border-bottom: 1px solid #F1F5F9;
+            font-size: 14px;
+        }
+        .badge-status-pending {
+            background: #FFFBEB;
+            color: #F59E0B;
+            border: 1px solid #FDE68A;
+            font-weight: 700;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .badge-role {
+            background: #EFF6FF;
+            color: #2563EB;
+            font-weight: 700;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .btn-action-view {
+            background: #F1F5F9;
+            color: #475569;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .btn-action-approve {
+            background: #10B981;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .btn-action-approve:hover {
+            background: #059669;
+        }
+        .btn-action-reject {
+            background: #EF4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .btn-action-reject:hover {
+            background: #DC2626;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom px-4 py-3">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('dashboard') }}">
+                <div style="width: 32px; height: 32px; background: #2563EB; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+                    <i data-lucide="zap" style="width: 18px; height: 18px;"></i>
+                </div>
+                <span class="fw-bold fs-5 text-dark">EDRP Platform</span>
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-sm fw-semibold">Back to Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 fw-bold text-dark mb-1">Pending Account Approvals</h1>
+                <p class="text-muted small mb-0">Review and authorize new employee registration requests.</p>
+            </div>
+            <div>
+                <span class="badge bg-warning text-dark px-3 py-2 fs-6 rounded-pill" id="pendingCountBadge">{{ pending_users|length }} Pending</span>
+            </div>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <div class="card-custom">
+            <div class="table-responsive">
+                <table class="table-custom">
+                    <thead>
+                        <tr>
+                            <th>Employee ID</th>
+                            <th>Full Name</th>
+                            <th>Email Address</th>
+                            <th>Requested Role</th>
+                            <th>Registration Date</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingUsersTableBody">
+                        {% if pending_users %}
+                            {% for user in pending_users %}
+                            <tr id="userRow-{{ user.id }}">
+                                <td><span class="fw-bold text-primary">{{ user.employee_id }}</span></td>
+                                <td class="fw-semibold text-dark">{{ user.full_name }}</td>
+                                <td class="text-muted">{{ user.email }}</td>
+                                <td><span class="badge-role">{{ user.role_name }}</span></td>
+                                <td class="small text-muted">{{ user.created_at }}</td>
+                                <td><span class="badge-status-pending" id="statusBadge-{{ user.id }}">{{ user.status }}</span></td>
+                                <td class="text-end">
+                                    <button class="btn-action-view me-1" onclick="viewUserDetails({{ user.id }}, '{{ user.full_name }}', '{{ user.email }}', '{{ user.employee_id }}', '{{ user.role_name }}', '{{ user.created_at }}')">
+                                        <i data-lucide="eye" style="width: 14px; height: 14px; vertical-align: -2px;"></i> View
+                                    </button>
+                                    <button class="btn-action-approve me-1" onclick="processApproval({{ user.id }}, 'approve')">
+                                        <i data-lucide="check-circle" style="width: 14px; height: 14px; vertical-align: -2px;"></i> Approve
+                                    </button>
+                                    <button class="btn-action-reject" onclick="processApproval({{ user.id }}, 'reject')">
+                                        <i data-lucide="x-circle" style="width: 14px; height: 14px; vertical-align: -2px;"></i> Reject
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr id="emptyRow">
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i data-lucide="check-circle-2" class="mb-2" style="width: 32px; height: 32px; color: #10B981;"></i>
+                                    <p class="mb-0 fw-semibold">No pending account approvals.</p>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- View User Modal -->
+    <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">User Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <div style="width: 48px; height: 48px; background: #EFF6FF; color: #2563EB; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px;" id="modalAvatar">JD</div>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark" id="modalName">John Doe</h6>
+                            <span class="badge bg-primary rounded-pill mt-1" id="modalRole">Employee</span>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="small text-muted fw-bold text-uppercase">Employee ID</label>
+                            <div class="fw-bold text-dark fs-6" id="modalEmpId">EMP123456</div>
+                        </div>
+                        <div class="col-6">
+                            <label class="small text-muted fw-bold text-uppercase">Registration Date</label>
+                            <div class="fw-semibold text-dark fs-6" id="modalDate">2026-07-27</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="small text-muted fw-bold text-uppercase">Email Address</label>
+                            <div class="fw-semibold text-dark fs-6" id="modalEmail">john@company.com</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-3 fw-semibold" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        lucide.createIcons();
+
+        function viewUserDetails(id, name, email, empId, role, date) {
+            document.getElementById('modalName').textContent = name;
+            document.getElementById('modalEmail').textContent = email;
+            document.getElementById('modalEmpId').textContent = empId;
+            document.getElementById('modalRole').textContent = role;
+            document.getElementById('modalDate').textContent = date;
+            
+            const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            document.getElementById('modalAvatar').textContent = initials;
+
+            const modal = new bootstrap.Modal(document.getElementById('userModal'));
+            modal.show();
+        }
+
+        async function processApproval(userId, action) {
+            const container = document.getElementById('alertContainer');
+            try {
+                const res = await fetch('/api/pending-approvals/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, action: action })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    const row = document.getElementById(`userRow-${userId}`);
+                    if (row) {
+                        row.style.transition = 'all 0.3s';
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 300);
+                    }
+
+                    const isApprove = action === 'approve';
+                    container.innerHTML = `
+                        <div class="alert alert-${isApprove ? 'success' : 'warning'} alert-dismissible fade show fw-bold small mb-4 rounded-3" role="alert">
+                            ${data.message || (isApprove ? 'Account approved successfully.' : 'Account rejected successfully.')}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    `;
+
+                    // Update count
+                    const badge = document.getElementById('pendingCountBadge');
+                    let currentCount = parseInt(badge.textContent, 10) || 1;
+                    currentCount = Math.max(0, currentCount - 1);
+                    badge.textContent = `${currentCount} Pending`;
+
+                } else {
+                    container.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show fw-bold small mb-4 rounded-3" role="alert">
+                            ${data.detail || 'Failed to update user approval status.'}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                container.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show fw-bold small mb-4 rounded-3" role="alert">
+                        Network error occurred while processing action.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

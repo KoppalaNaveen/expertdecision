@@ -9,6 +9,7 @@ class RecentDecision(BaseModel):
     department: Optional[str] = None
     approver_name: Optional[str] = None
     created_at_str: Optional[str] = None
+    priority: Optional[str] = "Medium"
 
     class Config:
         from_attributes = True
@@ -21,6 +22,8 @@ class RecentReview(BaseModel):
     status: str
     comments: str | None = None
     time_ago: Optional[str] = None
+    task_type: Optional[str] = None
+    is_owner: Optional[bool] = None
 
     class Config:
         from_attributes = True
@@ -96,6 +99,13 @@ class DashboardResponse(BaseModel):
     recent_users: Optional[List[RecentUser]] = []
     recent_audit_logs: Optional[List[AuditLogEntry]] = []
     approval_flow: Optional[List[ApprovalFlowStat]] = []
+
+    # Real-time analytics & chart data
+    decision_trends: Optional[dict] = None
+    department_comparison: Optional[dict] = None
+    monthly_activity: Optional[dict] = None
+    security_events: Optional[List[dict]] = []
+    admin_tasks: Optional[List[dict]] = []
 
     class Config:
         from_attributes = True

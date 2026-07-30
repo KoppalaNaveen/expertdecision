@@ -4,13 +4,26 @@
 
 let allUsers = [];
 let currentPage = 1;
-const rowsPerPage = 8;
+const rowsPerPage = 12;
 
 // Role name lookup (by role_id) populated after fetch
 const roleMap = {};
 
 document.addEventListener("DOMContentLoaded", () => {
     fetchRoles().then(() => fetchUsers());
+
+    const btnSubmit = document.getElementById("btnAddUserSubmit");
+    if (btnSubmit) {
+        btnSubmit.addEventListener("click", (e) => {
+            submitAddUserForm(e);
+        });
+    }
+    const form = document.getElementById("addUserForm");
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            submitAddUserForm(e);
+        });
+    }
 });
 
 async function fetchRoles() {
@@ -19,6 +32,10 @@ async function fetchRoles() {
         if (!res.ok) return;
         const roles = await res.json();
         roles.forEach(r => { roleMap[r.id] = r.role_name; });
+        const select = document.getElementById("addRoleId");
+        if (select && roles.length > 0) {
+            select.innerHTML = roles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
+        }
     } catch (_) {}
 }
 
@@ -61,6 +78,7 @@ function handleSearch() {
 function renderTable() {
     const query      = (document.getElementById("userSearch")?.value || "").toLowerCase();
     const roleFilter = (document.getElementById("roleFilter")?.value || "").toLowerCase();
+    const isAdmin    = typeof CURRENT_USER_ROLE !== 'undefined' && ['Administrator', 'Admin', 'System Administrator'].includes(CURRENT_USER_ROLE);
 
     const filtered = allUsers.filter(u => {
         const roleName = (roleMap[u.role_id] || "").toLowerCase();
@@ -90,9 +108,34 @@ function renderTable() {
             const roleName   = roleMap[u.role_id] || "Unknown";
             const initials   = u.full_name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase();
             const roleClass  = "role-" + roleName.toLowerCase().replace(/\s/g, "");
-            const statusBadge = u.is_active
-                ? `<span class="badge" style="background:#ECFDF5;color:#059669;font-size:11px;font-weight:700;">Active</span>`
-                : `<span class="badge" style="background:#FEF2F2;color:#DC2626;font-size:11px;font-weight:700;">Inactive</span>`;
+            let statusBadge = "";
+            if (u.status === "Pending Approval" || u.approved === false) {
+                statusBadge = `<span class="badge" style="background:#FEF3C7;color:#D97706;font-size:11px;font-weight:700;"><i data-lucide="clock" style="width:11px;height:11px;" class="me-1"></i>Pending Approval</span>`;
+            } else if (u.status === "Rejected") {
+                statusBadge = `<span class="badge" style="background:#FEF2F2;color:#DC2626;font-size:11px;font-weight:700;">Rejected</span>`;
+            } else if (u.is_active) {
+                statusBadge = `<span class="badge" style="background:#ECFDF5;color:#059669;font-size:11px;font-weight:700;">Active</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background:#FEF2F2;color:#DC2626;font-size:11px;font-weight:700;">Inactive</span>`;
+            }
+            
+            const emailHtml = isAdmin
+                ? `<div class="text-muted" style="font-size:12px; color:#475569;">${u.email || ''}</div>`
+                : `<div class="text-muted" style="font-size:11px; font-style:italic; color:#cbd5e1;">Email Restricted</div>`;
+
+            let approveBtn = "";
+            if (isAdmin && (u.status === "Pending Approval" || u.approved === false)) {
+                approveBtn = `<button class="btn btn-sm btn-success px-2 ms-1" style="font-size:12px; font-weight:700;" onclick="approveUserDirectly(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Approve Account">
+                    <i data-lucide="check-circle" style="width:13px;height:13px;" class="me-1"></i>Approve
+                </button>`;
+            }
+
+            const deleteBtn = isAdmin
+                ? `<button class="btn btn-sm btn-outline-danger px-2 ms-1" style="font-size:12px;" onclick="deleteUserPermanently(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Delete account permanently">
+                    <i data-lucide="trash-2" style="width:13px;height:13px;" class="me-1"></i>Delete
+                   </button>`
+                : ``;
+
             return `
             <tr>
                 <td class="px-4 py-3">
@@ -100,7 +143,7 @@ function renderTable() {
                         <div class="user-avatar-sm">${initials}</div>
                         <div>
                             <div class="fw-semibold text-dark">${u.full_name}</div>
-                            <div class="text-muted" style="font-size:12px;">${u.email || ''}</div>
+                            ${emailHtml}
                         </div>
                     </div>
                 </td>
@@ -114,9 +157,11 @@ function renderTable() {
                 <td class="px-4 text-muted" style="font-size:13px;">${u.phone || '—'}</td>
                 <td class="px-4">${statusBadge}</td>
                 <td class="px-4 text-end">
-                    <a href="#" class="btn btn-sm btn-outline-primary px-3" style="font-size:12px;" title="View user details">
+                    ${approveBtn}
+                    <button class="btn btn-sm btn-outline-primary px-2.5 ms-1" style="font-size:12px;" onclick="viewUserDetails(${u.id})" title="View user details">
                         <i data-lucide="eye" style="width:13px;height:13px;" class="me-1"></i>View
-                    </a>
+                    </button>
+                    ${deleteBtn}
                 </td>
             </tr>`;
         }).join("");
@@ -137,3 +182,233 @@ function nextPage() {
     currentPage++;
     renderTable();
 }
+
+async function deleteUserPermanently(userId, userName) {
+    if (!confirm(`Are you sure you want to permanently delete user "${userName}"?\nThis action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        let res;
+        try {
+            res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+            if (!res.ok && res.status !== 404) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || "Failed to delete user");
+            }
+            if (!res.ok) {
+                res = await fetch(`${API_URL}/users/${userId}`, { method: "DELETE" });
+            }
+        } catch (_) {
+            res = await fetch(`${API_URL}/users/${userId}`, { method: "DELETE" });
+        }
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to delete user");
+        }
+
+        alert(`Account for "${userName}" deleted successfully.`);
+
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(`Account for "${userName}" has been deleted successfully.`, 'success', 'Account Deleted');
+        }
+
+        fetchUsers();
+    } catch (err) {
+        alert("Error deleting user: " + (err.message || "Failed to delete user"));
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(err.message || "Failed to delete user", 'error', 'Error Deleting Account');
+        }
+    }
+}
+
+let isSubmittingUser = false;
+
+async function submitAddUserForm(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (isSubmittingUser) return;
+
+    const form = document.getElementById("addUserForm");
+    const alertBox = document.getElementById("addUserAlert");
+    const submitBtn = document.getElementById("btnAddUserSubmit");
+
+    if (form && !form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
+    isSubmittingUser = true;
+    if (alertBox) alertBox.classList.add("d-none");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Creating...";
+    }
+
+    let rawRoleId = document.getElementById("addRoleId")?.value || "3";
+    let role_id = parseInt(rawRoleId);
+    if (isNaN(role_id)) {
+        const valLower = String(rawRoleId).toLowerCase();
+        if (valLower.includes("admin")) role_id = 1;
+        else if (valLower.includes("manager") || valLower.includes("lead")) role_id = 2;
+        else if (valLower.includes("reviewer")) role_id = 4;
+        else role_id = 3;
+    }
+
+    const payload = {
+        full_name: document.getElementById("addFullName").value.trim(),
+        email: document.getElementById("addEmail").value.trim(),
+        password: document.getElementById("addPassword").value,
+        role_id: role_id,
+        team_id: 1,
+        employee_id: document.getElementById("addEmployeeId").value.trim() || null,
+        designation: document.getElementById("addDesignation").value.trim() || null,
+        phone: document.getElementById("addPhone").value.trim() || null
+    };
+
+    try {
+        let res;
+        try {
+            res = await fetch(`/api/admin-create-user`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (res.status === 404) {
+                res = await fetch(`${API_URL}/users/admin_create`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+            }
+        } catch (_) {
+            res = await fetch(`${API_URL}/users/admin_create`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            let msg = "Failed to create user";
+            if (typeof errData.detail === "string") {
+                msg = errData.detail;
+            } else if (Array.isArray(errData.detail) && errData.detail.length > 0) {
+                msg = errData.detail.map(e => e.msg || e.detail || JSON.stringify(e)).join(", ");
+            }
+            throw new Error(msg);
+        }
+
+        const newUser = await res.json();
+
+        // Close modal reliably
+        const modalEl = document.getElementById("addUserModal");
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        if (modal) modal.hide();
+
+        // Cleanup modal backdrop if leftover
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+
+        document.getElementById("addUserForm").reset();
+        showCenterNotification(`User "${newUser.full_name}" created successfully with Employee ID: ${newUser.employee_id}`, 'success', 'User Created');
+        fetchUsers();
+    } catch (err) {
+        console.error("User creation error:", err);
+        alertBox.innerText = err.message || "Failed to create user";
+        alertBox.classList.remove("d-none");
+        showCenterNotification(err.message || "Failed to create user", 'error', 'Error Creating User');
+    } finally {
+        isSubmittingUser = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Create User";
+        }
+    }
+}
+
+// Bind to window for global access
+window.submitAddUserForm = submitAddUserForm;
+window.deleteUserPermanently = deleteUserPermanently;
+
+async function approveUserDirectly(userId, userName) {
+    if (!confirm(`Are you sure you want to approve the account for "${userName}"?`)) return;
+
+    try {
+        const res = await fetch(`${API_URL}/users/approve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: userId, action: "approve", actor_name: CURRENT_USER_ROLE || "Administrator" })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to approve user");
+        }
+        alert(`Account for "${userName}" approved successfully.`);
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(`Account for "${userName}" approved successfully!`, "success", "User Approved");
+        }
+        fetchUsers();
+    } catch (err) {
+        alert("Error approving user: " + err.message);
+    }
+}
+window.approveUserDirectly = approveUserDirectly;
+
+function viewUserDetails(userId) {
+    const u = allUsers.find(user => user.id === userId);
+    if (!u) {
+        alert("User details not found.");
+        return;
+    }
+
+    const roleName = roleMap[u.role_id] || "User";
+    const initials = u.full_name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase();
+    
+    const avatarEl = document.getElementById("viewUserAvatar");
+    if (avatarEl) avatarEl.innerText = initials;
+    
+    const nameEl = document.getElementById("viewFullName");
+    if (nameEl) nameEl.innerText = u.full_name;
+    
+    const roleBadge = document.getElementById("viewRoleBadge");
+    if (roleBadge) {
+        roleBadge.innerText = roleName;
+        roleBadge.className = "role-badge role-" + roleName.toLowerCase().replace(/\s/g, "");
+    }
+    
+    const empIdEl = document.getElementById("viewEmployeeId");
+    if (empIdEl) empIdEl.innerText = u.employee_id || "N/A";
+    
+    const statusEl = document.getElementById("viewStatus");
+    if (statusEl) statusEl.innerText = u.status || (u.is_active ? "Active" : "Inactive");
+    
+    const emailEl = document.getElementById("viewEmail");
+    if (emailEl) emailEl.innerText = u.email || "N/A";
+    
+    const desigEl = document.getElementById("viewDesignation");
+    if (desigEl) desigEl.innerText = u.designation || "N/A";
+    
+    const phoneEl = document.getElementById("viewPhone");
+    if (phoneEl) phoneEl.innerText = u.phone || "N/A";
+    
+    const verifiedEl = document.getElementById("viewEmailVerified");
+    if (verifiedEl) verifiedEl.innerText = u.email_verified ? "Yes (Verified)" : "No";
+    
+    const approvedEl = document.getElementById("viewApproved");
+    if (approvedEl) approvedEl.innerText = u.approved ? "Yes (Approved)" : "Pending/No";
+
+    const modalEl = document.getElementById("viewUserModal");
+    if (modalEl) {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
+}
+window.viewUserDetails = viewUserDetails;
+

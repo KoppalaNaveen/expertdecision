@@ -5,16 +5,16 @@ from jose import jwt
 from app.config.settings import settings
 
 
-def create_access_token(data: dict):
+def create_access_token(data: dict, expires_delta: timedelta = None):
     """
-    Create JWT access token.
+    Create JWT access token (default 72 hours / 3 days for persistent sessions).
     """
-
     to_encode = data.copy()
 
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(hours=72)
 
     to_encode.update(
         {

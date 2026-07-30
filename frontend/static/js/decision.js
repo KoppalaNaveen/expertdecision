@@ -4,6 +4,16 @@ let currentPage = 1;
 const rowsPerPage = 5;
 
 document.addEventListener("DOMContentLoaded", () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam) {
+        currentStatusFilter = tabParam;
+        const tabEl = document.getElementById(`${tabParam.toLowerCase()}-tab`);
+        if (tabEl) {
+            setFilter(tabParam, tabEl);
+        }
+    }
+
     fetchDecisions();
 
     const searchInput = document.getElementById("searchInput");
@@ -28,17 +38,25 @@ async function fetchDecisions() {
 
 function updateTabCounts() {
     let counts = {
-        'All': allDecisions.length,
+        'All': 0,
         'Draft': 0,
         'Pending': 0,
         'In Review': 0,
         'Approved': 0,
-        'Rejected': 0
+        'Rejected': 0,
+        'Archived': 0
     };
 
     allDecisions.forEach(d => {
-        if (counts.hasOwnProperty(d.status)) {
-            counts[d.status]++;
+        if (d.status === 'Archived') {
+            counts['Archived']++;
+        } else {
+            counts['All']++;
+            if (d.status === 'Draft') counts['Draft']++;
+            else if (d.status === 'Pending') counts['Pending']++;
+            else if (d.status === 'In Review' || d.status === 'Under Review') counts['In Review']++;
+            else if (d.status === 'Approved') counts['Approved']++;
+            else if (d.status === 'Rejected') counts['Rejected']++;
         }
     });
 
@@ -48,7 +66,8 @@ function updateTabCounts() {
         'count-pending': 'Pending',
         'count-review': 'In Review',
         'count-approved': 'Approved',
-        'count-rejected': 'Rejected'
+        'count-rejected': 'Rejected',
+        'count-archived': 'Archived'
     };
 
     for (let id in mapping) {
@@ -98,7 +117,14 @@ function renderTable() {
             (d.title && d.title.toLowerCase().includes(searchQuery)) || 
             (d.description && d.description.toLowerCase().includes(searchQuery));
         
-        const matchesStatus = currentStatusFilter === 'All' || d.status === currentStatusFilter;
+        let matchesStatus = false;
+        if (currentStatusFilter === 'All') {
+            matchesStatus = (d.status !== 'Archived');
+        } else if (currentStatusFilter === 'In Review') {
+            matchesStatus = (d.status === 'In Review' || d.status === 'Under Review');
+        } else {
+            matchesStatus = (d.status === currentStatusFilter);
+        }
         
         return matchesSearch && matchesStatus;
     });
@@ -112,14 +138,26 @@ function renderTable() {
     tbody.innerHTML = "";
     
     if (paginated.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">No decisions found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No decisions found.</td></tr>`;
     } else {
         paginated.forEach(d => {
             const dateStr = new Date(d.created_at).toLocaleDateString();
             let statusBadge = "bg-secondary";
-            if(d.status === "Approved") statusBadge = "bg-success";
-            if(d.status === "Rejected") statusBadge = "bg-danger";
-            if(d.status === "Under Review") statusBadge = "bg-warning text-dark";
+            if (d.status === "Approved") statusBadge = "bg-success";
+            if (d.status === "Rejected") statusBadge = "bg-danger";
+            if (d.status === "Under Review" || d.status === "In Review") statusBadge = "bg-warning text-dark";
+            if (d.status === "Archived") statusBadge = "bg-secondary text-white";
+
+            const isAdmin = typeof CURRENT_USER_ROLE !== 'undefined' && CURRENT_USER_ROLE && String(CURRENT_USER_ROLE).toLowerCase().includes('admin');
+            const canDelete = isAdmin || (d.status !== "Approved" && d.status !== "Rejected" && d.status !== "Archived");
+
+            let draftActions = "";
+            if (d.status === "Draft") {
+                draftActions = `
+                    <a href="/create_decision?edit=${d.id}" class="btn btn-sm btn-outline-secondary fw-semibold px-2 me-1" title="Edit Draft"><i class="bi bi-pencil me-1"></i>Edit</a>
+                    <button onclick="submitDraftFromTable(${d.id})" class="btn btn-sm btn-success fw-semibold px-2 me-1" title="Submit Decision"><i class="bi bi-send me-1"></i>Submit</button>
+                `;
+            }
 
             tbody.innerHTML += `
                 <tr>
@@ -137,7 +175,9 @@ function renderTable() {
                     <td class="text-muted small">${dateStr}</td>
                     <td><span class="badge ${statusBadge}">${d.status}</span></td>
                     <td class="text-end pe-4">
-                        <a href="/decision/${d.id}" class="btn btn-sm btn-outline-primary fw-semibold px-3">View</a>
+                        <a href="/decision/${d.id}" class="btn btn-sm btn-outline-primary fw-semibold px-2 me-1">View</a>
+                        ${draftActions}
+                        ${canDelete ? `<button onclick="deleteDecision(${d.id})" class="btn btn-sm btn-outline-danger fw-semibold px-2" title="Delete Decision"><i class="bi bi-trash me-1"></i>Delete</button>` : ''}
                     </td>
                 </tr>
             `;
@@ -147,6 +187,27 @@ function renderTable() {
     document.getElementById("paginationInfo").innerText = `Showing page ${currentPage} of ${totalPages} (${filtered.length} total)`;
     document.getElementById("btnPrev").disabled = currentPage === 1;
     document.getElementById("btnNext").disabled = currentPage === totalPages;
+}
+
+async function submitDraftFromTable(id) {
+    if (!confirm("Are you sure you want to submit this draft decision for review?")) return;
+    try {
+        const response = await fetch(`${API_URL}/decisions/${id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "Pending" })
+        });
+        if (!response.ok) throw new Error("Failed to submit decision");
+        
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("Decision submitted for review successfully!", 'success', 'Decision Submitted');
+        } else {
+            showToast("Success", "Decision submitted for review");
+        }
+        fetchDecisions();
+    } catch (error) {
+        showToast("Danger", error.message);
+    }
 }
 
 function prevPage() {
@@ -213,15 +274,28 @@ async function saveDecision() {
 }
 
 async function deleteDecision(id) {
-    if (!confirm("Are you sure you want to delete this decision?")) return;
+    if (!confirm("Are you sure you want to delete this decision?\nThis action cannot be undone.")) return;
 
     try {
-        const response = await fetch(`${API_URL}/decisions/${id}`, { method: "DELETE" });
-        if (!response.ok) throw new Error("Failed to delete decision");
+        const roleParam = typeof CURRENT_USER_ROLE !== 'undefined' ? encodeURIComponent(CURRENT_USER_ROLE) : '';
+        const userParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
+        const response = await fetch(`${API_URL}/decisions/${id}?user_id=${userParam}&role_name=${roleParam}`, { method: "DELETE" });
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to delete decision");
+        }
         
-        showToast("Success", "Decision deleted successfully");
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("Decision deleted successfully.", 'success', 'Decision Deleted');
+        } else {
+            showToast("Success", "Decision deleted successfully");
+        }
         fetchDecisions();
     } catch (error) {
-        showToast("Danger", error.message);
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(error.message || "Failed to delete decision", 'error', 'Error Deleting Decision');
+        } else {
+            showToast("Danger", error.message);
+        }
     }
 }

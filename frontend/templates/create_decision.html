@@ -31,7 +31,7 @@
 
 <!-- WIZARD PROGRESS BAR -->
 <div class="bg-white rounded-4 shadow-sm border p-4 mb-4">
-    <div class="d-flex justify-content-between position-relative px-5">
+    <div class="d-flex justify-content-between align-items-center position-relative px-5">
         <div class="position-absolute top-50 start-0 w-100 border-top z-n1" style="transform: translateY(-50%); border-width: 2px !important; border-color: #e2e8f0 !important; left: 10% !important; width: 80% !important;"></div>
         
         <!-- Step 1 Indicator -->
@@ -40,18 +40,42 @@
             <small class="fw-bold text-primary" id="step1-label" style="font-size: 12px;">Basic Info</small>
         </div>
         
+        <!-- Right Arrow Icon 1 -> 2 -->
+        <div class="bg-white px-2 z-1 mb-4 d-flex align-items-center justify-content-center" id="step-arrow-1-2" style="box-shadow: 0 0 0 4px white;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+        </div>
+
         <!-- Step 2 Indicator -->
         <div class="text-center bg-white px-3 z-1">
             <div class="rounded-circle d-flex align-items-center justify-content-center bg-light text-secondary mx-auto mb-2 step-indicator" id="step2-indicator" style="width: 40px; height: 40px; font-weight: bold; font-size: 16px; transition: all 0.3s; box-shadow: 0 0 0 4px white;">2</div>
             <small class="fw-semibold text-secondary" id="step2-label" style="font-size: 12px;">Alternatives</small>
         </div>
         
+        <!-- Right Arrow Icon 2 -> 3 -->
+        <div class="bg-white px-2 z-1 mb-4 d-flex align-items-center justify-content-center" id="step-arrow-2-3" style="box-shadow: 0 0 0 4px white;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+        </div>
+
         <!-- Step 3 Indicator -->
         <div class="text-center bg-white px-3 z-1">
             <div class="rounded-circle d-flex align-items-center justify-content-center bg-light text-secondary mx-auto mb-2 step-indicator" id="step3-indicator" style="width: 40px; height: 40px; font-weight: bold; font-size: 16px; transition: all 0.3s; box-shadow: 0 0 0 4px white;">3</div>
             <small class="fw-semibold text-secondary" id="step3-label" style="font-size: 12px;">Documents</small>
         </div>
         
+        <!-- Right Arrow Icon 3 -> 4 -->
+        <div class="bg-white px-2 z-1 mb-4 d-flex align-items-center justify-content-center" id="step-arrow-3-4" style="box-shadow: 0 0 0 4px white;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+        </div>
+
         <!-- Step 4 Indicator -->
         <div class="text-center bg-white px-3 z-1">
             <div class="rounded-circle d-flex align-items-center justify-content-center bg-light text-secondary mx-auto mb-2 step-indicator" id="step4-indicator" style="width: 40px; height: 40px; font-weight: bold; font-size: 16px; transition: all 0.3s; box-shadow: 0 0 0 4px white;">4</div>
@@ -147,7 +171,7 @@
         </div>
         
         <h4 class="fw-bold text-dark mb-4">Cost Comparison</h4>
-        <div class="table-responsive border rounded-3 mb-4">
+        <div class="table-responsive border rounded-3 mb-5">
             <table class="table table-hover align-middle mb-0">
                 <thead class="bg-light">
                     <tr>
@@ -163,6 +187,27 @@
                 </tbody>
             </table>
         </div>
+
+        <h4 class="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
+            <i class="bi bi-shield-exclamation text-warning"></i> Risk & Resource Assessment
+        </h4>
+        <div class="table-responsive border rounded-3 mb-4 shadow-sm">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="text-muted text-uppercase fw-semibold border-0" style="font-size: 11px; letter-spacing: 0.5px;">Alternative</th>
+                        <th class="text-muted text-uppercase fw-semibold border-0" style="font-size: 11px; letter-spacing: 0.5px;">Allocated Budget</th>
+                        <th class="text-muted text-uppercase fw-semibold border-0" style="font-size: 11px; letter-spacing: 0.5px;">Estimated Cost</th>
+                        <th class="text-muted text-uppercase fw-semibold border-0" style="font-size: 11px; letter-spacing: 0.5px;">Resource Demand</th>
+                        <th class="text-muted text-uppercase fw-semibold border-0" style="font-size: 11px; letter-spacing: 0.5px;">Overall Risk Rating</th>
+                        <th class="text-muted text-uppercase fw-semibold border-0" style="font-size: 11px; letter-spacing: 0.5px;">Risk Mitigation</th>
+                    </tr>
+                </thead>
+                <tbody id="altRiskTable">
+                    <!-- Javascript will populate this -->
+                </tbody>
+            </table>
+        </div>
     </div>
     
     <!-- STEP 3: DOCUMENTS -->
@@ -174,8 +219,8 @@
                 <i data-lucide="upload-cloud" class="text-primary" style="width:28px;"></i>
             </div>
             <h5 class="fw-bold text-dark mb-2">Drop files here or click to upload</h5>
-            <p class="text-muted text-sm mb-4">Supports PDF, DOCX, XLSX, PPTX up to 50 MB</p>
-            <input type="file" id="fileInput" class="d-none" multiple onchange="handleFileUpload(event)">
+            <p class="text-muted text-sm mb-4">Supports PDF, DOCX, XLSX, PPTX, CSV up to 200 MB</p>
+            <input type="file" id="fileInput" class="d-none" multiple accept=".pdf,.docx,.xlsx,.pptx,.csv" onchange="handleFileUpload(event)">
             <button type="button" class="btn btn-outline-primary fw-semibold px-4 rounded-pill">Choose Files</button>
         </div>
         
@@ -185,38 +230,75 @@
     
     <!-- STEP 4: REVIEWERS -->
     <div id="wizard-step-4" class="wizard-step d-none">
-        <h4 class="fw-bold text-dark mb-4">Assign Reviewers & Approvers</h4>
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div>
+                <h4 class="fw-bold text-dark mb-1">Assign Reviewers & Approvers</h4>
+                <p class="text-muted text-sm mb-0">Select individual reviewers or auto-assign available reviewers based on decision type approval flow.</p>
+            </div>
+            <button type="button" class="btn btn-outline-primary fw-semibold rounded-pill px-3 shadow-sm" onclick="autoAssignReviewers()">
+                <i class="bi bi-magic me-1"></i> Auto-assign Reviewers
+            </button>
+        </div>
         
-        <div class="row g-4 mb-4">
-            <div class="col-md-6">
-                <label class="form-label fw-semibold text-dark text-sm">Select Reviewer</label>
-                <div class="input-group">
-                    <select id="userSelect" class="form-select">
-                        <option value="">Loading users...</option>
-                    </select>
+        <!-- Decision Type Approval Flow Banner Card -->
+        <div class="card border border-primary-subtle bg-primary-subtle bg-opacity-10 p-3 rounded-4 mb-4 shadow-sm" id="approvalFlowCard">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                        <i class="bi bi-diagram-3-fill fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="badge bg-primary rounded-pill px-2.5 py-1" id="flowCategoryBadge" style="font-size: 10px; text-transform: uppercase;">Finance Approval Flow</span>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5" style="font-size: 10px;" id="flowBadgeStatus">Active Flow</span>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-1" id="flowTitle">Assigned Workflow: Financial Governance Flow</h6>
+                        <div class="text-muted small" id="flowDescription">Based on Decision Category: <strong>Finance</strong> and Priority: <strong>High</strong>, this decision is assigned an automated Financial Approval Workflow.</div>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold text-dark text-sm">Approval Type</label>
-                <select id="cdApprovalType" class="form-select">
-                    <option value="Sequential">Sequential</option>
-                    <option value="Parallel">Parallel</option>
-                </select>
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button type="button" class="btn btn-outline-primary w-100" onclick="addReviewer()">Add</button>
+                <button type="button" class="btn btn-primary fw-semibold rounded-pill px-3 py-2 shadow-sm d-flex align-items-center gap-2" onclick="applyDecisionApprovalFlow()">
+                    <i class="bi bi-lightning-charge-fill text-warning"></i> Auto-Assign Decision Approval Flow
+                </button>
             </div>
         </div>
         
-        <h6 class="fw-bold text-dark mb-3">Assigned Reviewers (<span id="reviewerCount">0</span>)</h6>
+        <div class="card border-0 bg-light p-3 rounded-3 mb-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold text-dark text-sm mb-1">Select Reviewer</label>
+                    <select id="userSelect" class="form-select border-primary-subtle">
+                        <option value="">Loading users...</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold text-dark text-sm mb-1">Approval Type</label>
+                    <select id="cdApprovalType" class="form-select border-primary-subtle">
+                        <option value="Sequential">Sequential</option>
+                        <option value="Parallel">Parallel</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-primary w-100 fw-semibold" onclick="addReviewer()">
+                        <i class="bi bi-plus-lg me-1"></i> Add
+                    </button>
+                </div>
+            </div>
+            <div class="text-muted text-xs mt-2">
+                <i class="bi bi-info-circle me-1"></i> The decision creator is automatically excluded from reviewer assignment. Reviewers cannot be added more than once.
+            </div>
+        </div>
+        
+        <h6 class="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
+            Assigned Reviewers <span class="badge bg-primary rounded-pill px-2" id="reviewerCount">0</span>
+        </h6>
         <div class="mb-4" id="selectedReviewersList">
-            <div class="text-muted small py-3 text-center border rounded-3 bg-light">No reviewers added yet.</div>
+            <div class="text-muted small py-4 text-center border rounded-3 bg-white">No reviewers added yet. Click "Auto-assign Reviewers" or select a reviewer above.</div>
         </div>
         
         <div class="row g-4">
             <div class="col-md-6">
                 <label class="form-label fw-semibold text-dark text-sm">Overall Review Deadline</label>
-                <input type="date" id="cdReviewDeadline" class="form-control ">
+                <input type="date" id="cdReviewDeadline" class="form-control">
             </div>
         </div>
     </div>
@@ -232,10 +314,10 @@
             </div>
         </div>
         
-        <!-- Summary Blocks -->
+        <!-- Summary Block: Basic Info -->
         <div class="border rounded-4 p-4 mb-4 bg-white shadow-sm position-relative">
             <button class="btn btn-link position-absolute top-0 end-0 mt-3 me-3 text-decoration-none fw-semibold" onclick="goToStep(1)">Edit</button>
-            <h5 class="fw-bold text-dark border-bottom pb-3 mb-4">Basic Information</h5>
+            <h5 class="fw-bold text-dark border-bottom pb-3 mb-4"><i class="bi bi-info-circle me-2 text-primary"></i>Basic Information</h5>
             <div class="row g-4">
                 <div class="col-md-6">
                     <small class="text-muted text-uppercase fw-semibold d-block mb-1" style="font-size: 11px;">Title</small>
@@ -256,12 +338,30 @@
             </div>
         </div>
         
-        <!-- Summary Block: Alternative -->
+        <!-- Summary Block: Alternatives Evaluation -->
         <div class="border rounded-4 p-4 mb-4 bg-white shadow-sm position-relative">
             <button class="btn btn-link position-absolute top-0 end-0 mt-3 me-3 text-decoration-none fw-semibold" onclick="goToStep(2)">Edit</button>
-            <h5 class="fw-bold text-dark border-bottom pb-3 mb-4">Selected Alternative</h5>
+            <h5 class="fw-bold text-dark border-bottom pb-3 mb-4"><i class="bi bi-layers me-2 text-primary"></i>Alternatives Evaluation</h5>
             <div class="row g-4" id="sumAlternativeBlock">
-                <div class="col-12 text-muted">No alternatives added.</div>
+                <div class="col-12 text-muted py-2">No alternatives added.</div>
+            </div>
+        </div>
+
+        <!-- Summary Block: Uploaded Supporting Documents -->
+        <div class="border rounded-4 p-4 mb-4 bg-white shadow-sm position-relative">
+            <button class="btn btn-link position-absolute top-0 end-0 mt-3 me-3 text-decoration-none fw-semibold" onclick="goToStep(3)">Edit</button>
+            <h5 class="fw-bold text-dark border-bottom pb-3 mb-4"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Uploaded Supporting Documents</h5>
+            <div id="sumDocumentsBlock">
+                <div class="text-muted py-2">No documents uploaded.</div>
+            </div>
+        </div>
+
+        <!-- Summary Block: Assigned Reviewers & Overall Deadline -->
+        <div class="border rounded-4 p-4 mb-4 bg-white shadow-sm position-relative">
+            <button class="btn btn-link position-absolute top-0 end-0 mt-3 me-3 text-decoration-none fw-semibold" onclick="goToStep(4)">Edit</button>
+            <h5 class="fw-bold text-dark border-bottom pb-3 mb-4"><i class="bi bi-people me-2 text-primary"></i>Assigned Reviewers & Overall Deadline</h5>
+            <div class="row g-4" id="sumReviewersBlock">
+                <div class="col-12 text-muted py-2">No reviewers assigned.</div>
             </div>
         </div>
     </div>
@@ -276,9 +376,14 @@
             Next Step <i data-lucide="arrow-right" style="width:18px;" class="ms-2"></i>
         </button>
         
-        <button type="button" id="btnSubmit" class="btn btn-success fw-semibold px-5 py-2 rounded-3 shadow-sm d-flex align-items-center d-none" onclick="submitDecision()">
-            Submit Decision <i data-lucide="check" style="width:18px;" class="ms-2"></i>
-        </button>
+        <div class="d-flex gap-2">
+            <button type="button" id="btnDraft" class="btn btn-outline-secondary fw-semibold px-4 py-2 rounded-3 shadow-sm d-flex align-items-center d-none" onclick="submitDecision('Draft')">
+                <i class="bi bi-file-earmark me-2"></i> Save as Draft
+            </button>
+            <button type="button" id="btnSubmit" class="btn btn-success fw-semibold px-5 py-2 rounded-3 shadow-sm d-flex align-items-center d-none" onclick="submitDecision('Pending')">
+                Submit Decision <i data-lucide="check" style="width:18px;" class="ms-2"></i>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -305,12 +410,24 @@
                 </div>
                 <div class="row g-3">
                     <div class="col-6">
-                        <label class="form-label fw-semibold">Cost ($)</label>
-                        <input type="number" id="miniAltCost" class="form-control">
+                        <label class="form-label fw-semibold">Estimated Cost ($)</label>
+                        <input type="number" id="miniAltCost" class="form-control" placeholder="e.g. 200">
                     </div>
                     <div class="col-6">
-                        <label class="form-label fw-semibold">Score (0-100)</label>
-                        <input type="number" id="miniAltScore" class="form-control">
+                        <label class="form-label fw-semibold">Allocated Budget ($)</label>
+                        <input type="number" id="miniAltBudget" class="form-control" placeholder="e.g. 500">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Feasibility Score (0-100)</label>
+                        <input type="number" id="miniAltScore" class="form-control" placeholder="e.g. 85">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Resource Demand</label>
+                        <select id="miniAltResource" class="form-select">
+                            <option value="Low">Low (1-2 members)</option>
+                            <option value="Medium">Medium (3-5 members)</option>
+                            <option value="High">High (6+ members)</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -353,6 +470,7 @@
         temp_file_ids: []
     };
     
+    const currentUserId = parseInt("{{ session.get('user_id', 2) }}", 10);
     let allUsers = [];
 
     async function loadUsers() {
@@ -361,9 +479,11 @@
             if (res.ok) {
                 allUsers = await res.json();
                 const select = document.getElementById("userSelect");
-                select.innerHTML = '<option value="">Select User...</option>';
+                select.innerHTML = '<option value="">Select Reviewer...</option>';
                 allUsers.forEach(u => {
-                    select.innerHTML += `<option value="${u.id}">${u.full_name} (${u.employee_id})</option>`;
+                    // Rule: Decision owner must NOT be assigned as reviewer
+                    if (u.id === currentUserId) return;
+                    select.innerHTML += `<option value="${u.id}">${u.full_name} (${u.employee_id || 'User'})</option>`;
                 });
             }
         } catch (e) {
@@ -373,17 +493,28 @@
 
     function addReviewer() {
         const userId = parseInt(document.getElementById("userSelect").value);
-        if (!userId) return;
+        if (!userId) {
+            alert("Please select a reviewer.");
+            return;
+        }
+        
+        // Rule: Decision owner cannot be assigned as a reviewer
+        if (userId === currentUserId) {
+            alert("The decision owner (user who created the decision) cannot be assigned as a reviewer.");
+            return;
+        }
+        
+        // Rule: The same reviewer must not be assigned more than once
+        if (decisionPayload.reviewers.some(r => r.reviewer_id === userId)) {
+            alert("This reviewer has already been assigned.");
+            return;
+        }
+
         const approvalType = document.getElementById("cdApprovalType").value;
         const deadline = document.getElementById("cdReviewDeadline").value;
         
         const user = allUsers.find(u => u.id === userId);
         if (!user) return;
-        
-        if (decisionPayload.reviewers.some(r => r.reviewer_id === userId)) {
-            alert("Reviewer already added");
-            return;
-        }
         
         decisionPayload.reviewers.push({
             reviewer_id: userId,
@@ -394,6 +525,10 @@
         
         renderReviewers();
         document.getElementById("userSelect").value = "";
+    }
+
+    function autoAssignReviewers() {
+        applyDecisionApprovalFlow();
     }
     
     function removeReviewer(userId) {
@@ -408,7 +543,7 @@
         countSpan.innerText = decisionPayload.reviewers.length;
         
         if (decisionPayload.reviewers.length === 0) {
-            list.innerHTML = '<div class="text-muted small py-3 text-center border rounded-3 bg-light">No reviewers added yet.</div>';
+            list.innerHTML = '<div class="text-muted small py-4 text-center border rounded-3 bg-white">No reviewers added yet. Click "Auto-assign Reviewers" or select a reviewer above.</div>';
             return;
         }
         
@@ -417,19 +552,18 @@
             const initials = r._name ? r._name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : "U";
             list.innerHTML += `
             <div class="d-flex align-items-center border rounded-3 p-3 mb-3 bg-white shadow-sm">
-                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold me-3" style="width: 48px; height: 48px;">${initials}</div>
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold me-3" style="width: 44px; height: 44px;">${initials}</div>
                 <div class="flex-grow-1">
-                    <h6 class="fw-bold mb-1">${r._name}</h6>
-                    <small class="text-muted">${r.approval_type}</small>
+                    <h6 class="fw-bold mb-1 text-dark">${r._name}</h6>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1" style="font-size: 11px;">${r.approval_type}</span>
                 </div>
-                <button type="button" class="btn btn-light text-muted border-0" onclick="removeReviewer(${r.reviewer_id})"><i data-lucide="x" style="width:16px;"></i></button>
+                <button type="button" class="btn btn-light text-danger border-0 rounded-circle p-2" onclick="removeReviewer(${r.reviewer_id})" title="Remove"><i data-lucide="x" style="width:18px;"></i></button>
             </div>`;
         });
         
         if (window.lucide) window.lucide.createIcons();
     }
     
-    // Original updateStepUI and nextStep functions etc...
     function updateStepUI() {
         // Hide all steps
         for(let i=1; i<=totalSteps; i++) {
@@ -457,16 +591,15 @@
             if(!ind) continue;
             
             if (i < currentStep) {
-                // Completed
+                // Completed step: change background to green, BUT step number MUST still be displayed inside the green circle!
                 ind.className = 'rounded-circle d-flex align-items-center justify-content-center text-white bg-success mx-auto mb-2 step-indicator';
-                ind.innerHTML = '<i class="bi bi-check" style="font-size:20px;"></i>';
+                ind.innerHTML = i;
                 ind.style.boxShadow = '0 0 0 4px white';
                 lbl.className = 'fw-bold text-success';
             } else if (i === currentStep || (currentStep === 5 && i === 4)) {
-                // Active (Step 5 keeps step 4 active or all green, let's make all green if 5)
                 if(currentStep === 5 && i < 5) {
                     ind.className = 'rounded-circle d-flex align-items-center justify-content-center text-white bg-success mx-auto mb-2 step-indicator';
-                    ind.innerHTML = '<i class="bi bi-check" style="font-size:20px;"></i>';
+                    ind.innerHTML = i;
                     lbl.className = 'fw-bold text-success';
                 } else {
                     ind.className = 'rounded-circle d-flex align-items-center justify-content-center text-white bg-primary mx-auto mb-2 step-indicator';
@@ -475,11 +608,37 @@
                     lbl.className = 'fw-bold text-primary';
                 }
             } else {
-                // Future
+                // Future step
                 ind.className = 'rounded-circle d-flex align-items-center justify-content-center bg-light text-secondary mx-auto mb-2 step-indicator border';
                 ind.innerHTML = i;
                 ind.style.boxShadow = '0 0 0 4px white';
                 lbl.className = 'fw-semibold text-secondary';
+            }
+        }
+        
+        // Dynamic Arrow Marks Styling (between steps 1-2, 2-3, 3-4)
+        for (let i = 1; i <= 3; i++) {
+            const arrowDiv = document.getElementById(`step-arrow-${i}-${i+1}`);
+            if (!arrowDiv) continue;
+            const svg = arrowDiv.querySelector('svg');
+            if (!svg) continue;
+            
+            if (currentStep > i) {
+                // Step completed -> turn arrow mark green & increase size
+                svg.setAttribute('width', '24');
+                svg.setAttribute('height', '24');
+                svg.setAttribute('stroke', '#10B981');
+                svg.setAttribute('stroke-width', '3.2');
+                arrowDiv.style.transform = 'scale(1.15)';
+                arrowDiv.style.transition = 'all 0.3s ease';
+            } else {
+                // Step not completed / returned -> revert arrow mark to normal color & size
+                svg.setAttribute('width', '20');
+                svg.setAttribute('height', '20');
+                svg.setAttribute('stroke', '#94A3B8');
+                svg.setAttribute('stroke-width', '2.5');
+                arrowDiv.style.transform = 'scale(1)';
+                arrowDiv.style.transition = 'all 0.3s ease';
             }
         }
         
@@ -488,14 +647,17 @@
         
         if (currentStep === totalSteps) {
             document.getElementById('btnNext').classList.add('d-none');
+            if (document.getElementById('btnDraft')) document.getElementById('btnDraft').classList.remove('d-none');
             document.getElementById('btnSubmit').classList.remove('d-none');
             populateSummary();
         } else if (currentStep === 4) {
             document.getElementById('btnNext').classList.remove('d-none');
+            if (document.getElementById('btnDraft')) document.getElementById('btnDraft').classList.add('d-none');
             document.getElementById('btnSubmit').classList.add('d-none');
             document.getElementById('btnNext').innerHTML = 'Review Summary <i class="bi bi-arrow-right ms-2"></i>';
         } else {
             document.getElementById('btnNext').classList.remove('d-none');
+            if (document.getElementById('btnDraft')) document.getElementById('btnDraft').classList.add('d-none');
             document.getElementById('btnSubmit').classList.add('d-none');
             document.getElementById('btnNext').innerHTML = 'Next Step <i class="bi bi-arrow-right ms-2"></i>';
         }
@@ -541,90 +703,419 @@
         updateStepUI();
     }
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function getApprovalFlowForDecisionType() {
+        const catSelect = document.getElementById('cdCategory');
+        const catText = catSelect && catSelect.selectedIndex >= 0 ? catSelect.options[catSelect.selectedIndex].text : 'Finance';
+        const prioVal = document.getElementById('cdPriority') ? document.getElementById('cdPriority').value : 'Medium';
+        
+        let maxCost = 0;
+        if (decisionPayload.alternatives && decisionPayload.alternatives.length > 0) {
+            maxCost = Math.max(...decisionPayload.alternatives.map(a => parseFloat(a.cost) || 0));
+        }
+
+        if (catText.includes('Finance') || maxCost >= 500) {
+            return {
+                category: "Finance Approval Flow",
+                title: "Assigned Workflow: Financial Governance Flow",
+                description: `Based on Decision Category: <strong>${catText}</strong> and Estimated Cost: <strong>$${maxCost}</strong>, this decision requires Reviewer approval first, followed by Manager sign-off.`,
+                flowType: "Finance",
+                approval_type: "Sequential",
+                requiredRoles: ["Reviewer", "Manager"]
+            };
+        } else if (catText.includes('Tech') || catText.includes('Architecture')) {
+            return {
+                category: "Technology Approval Flow",
+                title: "Assigned Workflow: Technical & Architecture Review Flow",
+                description: `Based on Decision Category: <strong>${catText}</strong>, this decision is assigned to Technical Lead Reviewer first, followed by Manager review.`,
+                flowType: "Technology",
+                approval_type: "Sequential",
+                requiredRoles: ["Reviewer", "Manager"]
+            };
+        } else if (catText.includes('Operations') || catText.includes('HR')) {
+            return {
+                category: "Operations Approval Flow",
+                title: "Assigned Workflow: Operational Governance Flow",
+                description: `Based on Decision Category: <strong>${catText}</strong>, this decision requires Reviewer verification first, followed by Operations Manager sign-off.`,
+                flowType: "Operations",
+                approval_type: "Sequential",
+                requiredRoles: ["Reviewer", "Manager"]
+            };
+        } else {
+            return {
+                category: "Standard Approval Flow",
+                title: "Assigned Workflow: Standard Management Sign-off",
+                description: `Based on Decision Category: <strong>${catText}</strong> and Priority: <strong>${prioVal}</strong>, Reviewer review is assigned first, followed by Manager approval.`,
+                flowType: "Standard",
+                approval_type: "Sequential",
+                requiredRoles: ["Reviewer", "Manager"]
+            };
+        }
+    }
+
+    function updateApprovalFlowCard() {
+        const flow = getApprovalFlowForDecisionType();
+        const catBadge = document.getElementById('flowCategoryBadge');
+        const titleEl = document.getElementById('flowTitle');
+        const descEl = document.getElementById('flowDescription');
+
+        if (catBadge) catBadge.innerText = flow.category;
+        if (titleEl) titleEl.innerText = flow.title;
+        if (descEl) descEl.innerHTML = flow.description;
+    }
+
+    function applyDecisionApprovalFlow() {
+        if (!allUsers || allUsers.length === 0) {
+            alert("Users are still loading. Please try again in a moment.");
+            return;
+        }
+
+        const flow = getApprovalFlowForDecisionType();
+        // Exclude current user AND any Administrators from auto-assign
+        const eligibleUsers = allUsers.filter(u => {
+            if (u.id === currentUserId) return false;
+            const rName = (u.role_name || "").toLowerCase();
+            const empId = (u.employee_id || "").toLowerCase();
+            if (rName.includes("admin") || rName.includes("administrator") || empId.startsWith("ad")) {
+                return false;
+            }
+            return true;
+        });
+
+        const selected = [];
+        flow.requiredRoles.forEach(roleReq => {
+            const matching = eligibleUsers.filter(u => {
+                const rName = (u.role_name || "").toLowerCase();
+                const empId = (u.employee_id || "").toLowerCase();
+                if (roleReq === "Reviewer") return rName.includes("reviewer") || empId.startsWith("rw") || rName.includes("user") || rName.includes("employee");
+                if (roleReq === "Manager") return rName.includes("manager") || empId.startsWith("mn");
+                return true;
+            }).filter(u => !selected.some(s => s.id === u.id));
+
+            if (matching.length > 0) {
+                selected.push(matching[0]);
+            } else {
+                const fallback = eligibleUsers.find(u => !selected.some(s => s.id === u.id));
+                if (fallback) selected.push(fallback);
+            }
+        });
+
+        decisionPayload.reviewers = [];
+        const deadline = document.getElementById("cdReviewDeadline") ? document.getElementById("cdReviewDeadline").value : null;
+
+        selected.forEach(u => {
+            decisionPayload.reviewers.push({
+                reviewer_id: u.id,
+                approval_type: flow.approval_type,
+                deadline: deadline ? deadline + "T23:59:59Z" : null,
+                _name: u.full_name
+            });
+        });
+
+        renderReviewers();
+        alert(`Successfully assigned decision type approval flow: [${flow.category}]\nFirst Approver: Reviewer\nSecond Approver: Manager`);
+    }
+
     // Mini Alt Modal logic
     let tempAltId = 1;
+
     function openMiniAltModal() {
         document.getElementById('miniAltTitle').value = '';
         document.getElementById('miniAltPros').value = '';
         document.getElementById('miniAltCons').value = '';
         document.getElementById('miniAltCost').value = '';
+        if (document.getElementById('miniAltBudget')) document.getElementById('miniAltBudget').value = '';
         document.getElementById('miniAltScore').value = '';
+        if (document.getElementById('miniAltResource')) document.getElementById('miniAltResource').value = 'Low';
         const m = new bootstrap.Modal(document.getElementById('miniAltModal'));
         m.show();
     }
     
     function saveMiniAlt() {
+        const titleInput = document.getElementById('miniAltTitle').value.trim();
+        if (!titleInput) {
+            alert("Please enter a title for the alternative.");
+            return;
+        }
+        const costVal = parseFloat(document.getElementById('miniAltCost').value) || 0;
+        const budgetVal = parseFloat(document.getElementById('miniAltBudget') ? document.getElementById('miniAltBudget').value : 0) || 0;
+        const resourceVal = document.getElementById('miniAltResource') ? document.getElementById('miniAltResource').value : 'Low';
+        const scoreVal = parseInt(document.getElementById('miniAltScore').value) || 0;
+        
         const alt = {
             id: tempAltId++,
-            title: document.getElementById('miniAltTitle').value,
-            pros: document.getElementById('miniAltPros').value,
-            cons: document.getElementById('miniAltCons').value,
-            cost: parseFloat(document.getElementById('miniAltCost').value) || 0,
-            feasibility_score: parseInt(document.getElementById('miniAltScore').value) || 0,
-            risk_level: "Medium"
+            title: titleInput,
+            pros: document.getElementById('miniAltPros').value.trim() || 'None',
+            cons: document.getElementById('miniAltCons').value.trim() || 'None',
+            cost: costVal,
+            budget: budgetVal,
+            resource_demand: resourceVal,
+            feasibility_score: scoreVal,
+            risk_level: (costVal > budgetVal || resourceVal === 'High') ? 'High Risk' : 'Low Risk'
         };
         decisionPayload.alternatives.push(alt);
         renderAlts();
         bootstrap.Modal.getInstance(document.getElementById('miniAltModal')).hide();
     }
+
+    function deleteAlt(index) {
+        decisionPayload.alternatives.splice(index, 1);
+        renderAlts();
+    }
     
     function renderAlts() {
         const t1 = document.getElementById('altAnalysisTable');
         const t2 = document.getElementById('altCostTable');
-        t1.innerHTML = ''; t2.innerHTML = '';
+        const t3 = document.getElementById('altRiskTable');
+        if (t1) t1.innerHTML = '';
+        if (t2) t2.innerHTML = '';
+        if (t3) t3.innerHTML = '';
         
+        if (!decisionPayload.alternatives || decisionPayload.alternatives.length === 0) {
+            if (t1) t1.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-info-circle me-1"></i>No alternatives added yet. Click <strong>+ Add Alternative</strong> to enter alternative details.</td></tr>';
+            if (t2) t2.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-info-circle me-1"></i>No cost comparison data available. Add alternatives above to compare costs.</td></tr>';
+            if (t3) t3.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted"><i class="bi bi-info-circle me-1"></i>No risk assessment data available. Add alternatives above to perform risk & resource analysis.</td></tr>';
+            return;
+        }
+
         decisionPayload.alternatives.forEach((a, i) => {
             const isRec = i === 0;
             const badge = isRec ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill ms-2" style="font-size:0.65rem;">Selected</span>' : '';
             
-            t1.innerHTML += `
-                <tr>
-                    <td><div class="fw-bold text-dark d-flex align-items-center">${a.title} ${badge}</div></td>
-                    <td><div class="text-success text-sm">${a.pros}</div></td>
-                    <td><div class="text-danger text-sm">${a.cons}</div></td>
-                    <td><div class="fw-bold">${a.feasibility_score}</div></td>
-                    <td><button class="btn btn-link text-muted p-0 border-0"><i data-lucide="edit-2" style="width:14px;"></i></button></td>
-                </tr>
-            `;
-            
-            t2.innerHTML += `
-                <tr>
-                    <td><div class="fw-bold text-dark d-flex align-items-center">${a.title} ${badge}</div></td>
-                    <td><div class="fw-semibold text-dark">$${a.cost.toLocaleString()}</div></td>
-                    <td><div class="${isRec ? 'text-success' : 'text-warning'} text-sm fw-medium">${isRec ? 'Within Budget' : 'Slightly Above'}</div></td>
-                    <td><div class="${isRec ? 'text-success' : 'text-danger'} text-sm fw-medium">${isRec ? 'High' : 'Low'}</div></td>
-                    <td><div class="text-muted text-sm">${isRec ? 'Recommended' : 'Needs Approval'}</div></td>
-                </tr>
-            `;
+            const costVal = parseFloat(a.cost) || 0;
+            const budgetVal = parseFloat(a.budget) || 0;
+            const resourceDemand = a.resource_demand || (costVal > budgetVal ? 'High' : 'Low');
+
+            let riskRatingHtml = "";
+            let riskMitigation = "";
+            const variance = budgetVal - costVal;
+
+            if ((budgetVal > 0 && costVal > budgetVal) || resourceDemand === 'High' || resourceDemand === 'Critical') {
+                riskRatingHtml = `<span class="badge text-white px-2.5 py-1 fw-bold shadow-sm" style="background-color: #EF4444 !important; border-radius: 6px; font-size: 11px;"><i class="bi bi-exclamation-triangle-fill me-1"></i>High Risk</span>`;
+                riskMitigation = `Exceeds budget by -$${Math.abs(variance).toLocaleString()}. Requires Manager Approval & Budget Variance Review.`;
+            } else if (budgetVal > 0 && costVal >= 0.8 * budgetVal || resourceDemand === 'Medium') {
+                riskRatingHtml = `<span class="badge text-dark px-2.5 py-1 fw-bold shadow-sm" style="background-color: #F59E0B !important; color: #1E293B !important; border-radius: 6px; font-size: 11px;"><i class="bi bi-shield-exclamation me-1"></i>Medium Risk</span>`;
+                riskMitigation = `Slightly above 80% budget limit. Requires Standard Resource Monitoring.`;
+            } else {
+                riskRatingHtml = `<span class="badge text-white px-2.5 py-1 fw-bold shadow-sm" style="background-color: #10B981 !important; border-radius: 6px; font-size: 11px;"><i class="bi bi-shield-check me-1"></i>Low Risk</span>`;
+                riskMitigation = budgetVal > 0 ? `Within safe budget (+$${variance.toLocaleString()} surplus) and low resource demand.` : `Low resource demand and evaluated safe risk profile.`;
+            }
+
+            let resourceBadge = "";
+            if (resourceDemand === 'Low') {
+                resourceBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size:11px;">Low (1-2 members)</span>`;
+            } else if (resourceDemand === 'Medium') {
+                resourceBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" style="font-size:11px;">Medium (3-5 members)</span>`;
+            } else {
+                resourceBadge = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style="font-size:11px;">High (6+ members)</span>`;
+            }
+
+            const isWithinBudget = budgetVal === 0 || costVal <= budgetVal;
+            const budgetImpactClass = isWithinBudget ? 'text-success' : 'text-danger';
+            const budgetImpactText = isWithinBudget ? 'Within Budget' : 'Exceeds Budget';
+            const costEfficiencyText = (a.feasibility_score >= 80 && isWithinBudget) ? 'High' : (a.feasibility_score >= 50 ? 'Medium' : 'Low');
+            const costEfficiencyClass = costEfficiencyText === 'High' ? 'text-success' : (costEfficiencyText === 'Medium' ? 'text-warning' : 'text-danger');
+            const notesText = (isRec && isWithinBudget) ? 'Recommended' : (isWithinBudget ? 'Viable Option' : 'Needs Approval');
+
+            if (t1) {
+                t1.innerHTML += `
+                    <tr>
+                        <td><div class="fw-bold text-dark d-flex align-items-center">${escapeHtml(a.title)} ${badge}</div></td>
+                        <td><div class="text-success text-sm">${escapeHtml(a.pros)}</div></td>
+                        <td><div class="text-danger text-sm">${escapeHtml(a.cons)}</div></td>
+                        <td><div class="fw-bold">${a.feasibility_score}</div></td>
+                        <td>
+                            <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="deleteAlt(${i})" title="Delete Alternative"><i data-lucide="trash-2" style="width:14px;"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            if (t2) {
+                t2.innerHTML += `
+                    <tr>
+                        <td><div class="fw-bold text-dark d-flex align-items-center">${escapeHtml(a.title)} ${badge}</div></td>
+                        <td><div class="fw-semibold text-dark">$${costVal.toLocaleString()}</div></td>
+                        <td><div class="${budgetImpactClass} text-sm fw-medium">${budgetImpactText}</div></td>
+                        <td><div class="${costEfficiencyClass} text-sm fw-medium">${costEfficiencyText}</div></td>
+                        <td><div class="text-muted text-sm">${notesText}</div></td>
+                    </tr>
+                `;
+            }
+
+            if (t3) {
+                t3.innerHTML += `
+                    <tr>
+                        <td><div class="fw-bold text-dark d-flex align-items-center">${escapeHtml(a.title)} ${badge}</div></td>
+                        <td><div class="fw-semibold text-primary">$${budgetVal.toLocaleString()}</div></td>
+                        <td><div class="fw-semibold text-dark">$${costVal.toLocaleString()}</div></td>
+                        <td>${resourceBadge}</td>
+                        <td>${riskRatingHtml}</td>
+                        <td><div class="text-muted text-xs">${riskMitigation}</div></td>
+                    </tr>
+                `;
+            }
         });
         if (window.lucide) window.lucide.createIcons();
     }
 
-    function populateSummary() {
-        document.getElementById('sumTitle').innerText = decisionPayload.title;
-        document.getElementById('sumCategory').innerText = "Finance"; // Hardcoded for demo matching select
-        document.getElementById('sumPriority').innerText = decisionPayload.priority_level;
-        document.getElementById('sumDepartment').innerText = decisionPayload.department;
+    const uploadedDocsList = [];
+
+    function removeTempDoc(docId) {
+        decisionPayload.temp_file_ids = decisionPayload.temp_file_ids.filter(id => id !== docId);
+        const idx = uploadedDocsList.findIndex(d => d.id === docId);
+        if (idx !== -1) uploadedDocsList.splice(idx, 1);
+        const el = document.getElementById(`doc-${docId}`);
+        if (el) el.remove();
+    }
+
+    function renderDocuments(doc) {
+        if (!uploadedDocsList.some(d => d.id === doc.id)) {
+            uploadedDocsList.push(doc);
+        }
+        const docList = document.getElementById('documentList');
+        const sizeMB = (doc.file_size / (1024 * 1024)).toFixed(2);
+        const iconName = doc.filename.endsWith('.pdf') ? 'file-text' : (doc.filename.endsWith('.xlsx') || doc.filename.endsWith('.csv') ? 'file-spreadsheet' : 'file');
+        const bgColor = doc.filename.endsWith('.pdf') ? 'bg-danger-subtle text-danger' : (doc.filename.endsWith('.xlsx') || doc.filename.endsWith('.csv') ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary');
         
+        docList.innerHTML += `
+            <div class="d-flex align-items-center border rounded-3 p-3 mb-3 bg-white shadow-sm" id="doc-${doc.id}">
+                <div class="rounded ${bgColor} d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px;">
+                    <i data-lucide="${iconName}" style="width:24px;"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-1">${escapeHtml(doc.filename)}</h6>
+                    <small class="text-muted">${sizeMB} MB • Uploaded</small>
+                </div>
+                <button type="button" class="btn btn-light text-muted me-2 border-0" onclick="window.open('http://127.0.0.1:8000/upload/' + ${doc.id}, '_blank')" title="View Document"><i data-lucide="eye" style="width:16px;"></i></button>
+                <button type="button" class="btn btn-light text-danger border-0" onclick="removeTempDoc(${doc.id})" title="Remove Document"><i data-lucide="trash-2" style="width:16px;"></i></button>
+            </div>
+        `;
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function populateSummary() {
+        document.getElementById('sumTitle').innerText = decisionPayload.title || '--';
+        const catSel = document.getElementById('cdCategory');
+        document.getElementById('sumCategory').innerText = catSel && catSel.selectedIndex >= 0 ? catSel.options[catSel.selectedIndex].text : "Finance";
+        document.getElementById('sumPriority').innerText = decisionPayload.priority_level || 'Medium';
+        document.getElementById('sumDepartment').innerText = decisionPayload.department || 'Finance & Operations';
+        
+        // 1. Render ALL Alternatives
         const sumAlt = document.getElementById('sumAlternativeBlock');
-        if(decisionPayload.alternatives.length > 0) {
-            const a = decisionPayload.alternatives[0];
-            sumAlt.innerHTML = `
+        if (sumAlt) {
+            sumAlt.innerHTML = '';
+            if (decisionPayload.alternatives && decisionPayload.alternatives.length > 0) {
+                decisionPayload.alternatives.forEach((a, i) => {
+                    const isRec = i === 0;
+                    sumAlt.innerHTML += `
+                        <div class="col-12 mb-3 pb-3 border-bottom">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="fw-bold text-dark fs-6 d-flex align-items-center">
+                                    Option #${i+1}: ${escapeHtml(a.title)}
+                                    ${isRec ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill ms-2" style="font-size: 10px;">Recommended</span>' : ''}
+                                </div>
+                                <span class="badge bg-primary bg-opacity-10 text-primary fw-bold px-3 py-1">Score: ${a.feasibility_score || 50}/100</span>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <small class="text-success fw-semibold d-block mb-1"><i class="bi bi-plus-circle me-1"></i>Pros</small>
+                                    <div class="text-secondary small">${escapeHtml(a.pros || 'None specified')}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <small class="text-danger fw-semibold d-block mb-1"><i class="bi bi-dash-circle me-1"></i>Cons</small>
+                                    <div class="text-secondary small">${escapeHtml(a.cons || 'None specified')}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block" style="font-size: 11px;">Estimated Cost</small>
+                                    <div class="fw-bold text-dark">$${parseFloat(a.cost || 0).toLocaleString()}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block" style="font-size: 11px;">Allocated Budget</small>
+                                    <div class="fw-bold text-primary">$${parseFloat(a.budget || 0).toLocaleString()}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block" style="font-size: 11px;">Resource Demand</small>
+                                    <div class="fw-semibold text-dark">${escapeHtml(a.resource_demand || 'Low')}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                sumAlt.innerHTML = `<div class="col-12 text-muted py-2">No alternatives entered.</div>`;
+            }
+        }
+
+        // 2. Render Uploaded Supporting Documents with Eye (View) buttons
+        const sumDocs = document.getElementById('sumDocumentsBlock');
+        if (sumDocs) {
+            sumDocs.innerHTML = '';
+            if (uploadedDocsList && uploadedDocsList.length > 0) {
+                uploadedDocsList.forEach(doc => {
+                    const sizeMB = (doc.file_size / (1024 * 1024)).toFixed(2);
+                    const extIcon = doc.filename.endsWith('.pdf') ? 'bi-file-pdf text-danger' : (doc.filename.endsWith('.xlsx') || doc.filename.endsWith('.csv') ? 'bi-file-spreadsheet text-success' : 'bi-file-earmark-text text-primary');
+                    
+                    sumDocs.innerHTML += `
+                        <div class="d-flex align-items-center justify-content-between border rounded-3 p-3 mb-2 bg-light shadow-sm">
+                            <div class="d-flex align-items-center gap-3">
+                                <i class="bi ${extIcon} fs-4"></i>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-0 text-sm">${escapeHtml(doc.filename)}</h6>
+                                    <small class="text-muted" style="font-size: 11px;">${sizeMB} MB • Attachment File</small>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-semibold px-3 d-flex align-items-center gap-1" onclick="window.open('http://127.0.0.1:8000/upload/' + ${doc.id}, '_blank')" title="View / Check Document">
+                                <i class="bi bi-eye-fill"></i> View File
+                            </button>
+                        </div>
+                    `;
+                });
+            } else {
+                sumDocs.innerHTML = `<div class="text-muted py-2">No supporting documents uploaded.</div>`;
+            }
+        }
+
+        // 3. Render Assigned Reviewers & Overall Review Deadline
+        const sumRevs = document.getElementById('sumReviewersBlock');
+        if (sumRevs) {
+            sumRevs.innerHTML = '';
+            const deadlineVal = document.getElementById('cdReviewDeadline') ? document.getElementById('cdReviewDeadline').value : '';
+            const deadlineStr = deadlineVal ? new Date(deadlineVal).toLocaleDateString('en-US', { dateStyle: 'medium' }) : 'No deadline specified';
+
+            let reviewersHtml = '';
+            if (decisionPayload.reviewers && decisionPayload.reviewers.length > 0) {
+                decisionPayload.reviewers.forEach((r, idx) => {
+                    const roleLabel = idx === 0 ? 'Step 1: First Approver (Reviewer)' : 'Step 2: Second Approver (Manager)';
+                    reviewersHtml += `
+                        <div class="d-flex align-items-center justify-content-between p-2.5 mb-2 border rounded bg-light">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="avatar-sm bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; font-size: 12px;">${(r._name || 'User').substring(0,2).toUpperCase()}</div>
+                                <div>
+                                    <div class="fw-bold text-dark text-sm">${escapeHtml(r._name || 'Assigned Approver')}</div>
+                                    <small class="text-muted d-block" style="font-size: 11px;">${roleLabel}</small>
+                                </div>
+                            </div>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle px-2.5 py-1" style="font-size: 11px;">${r.approval_type || 'Sequential'} Approval</span>
+                        </div>
+                    `;
+                });
+            } else {
+                reviewersHtml = '<div class="text-muted small">No reviewers assigned.</div>';
+            }
+
+            sumRevs.innerHTML = `
                 <div class="col-md-6">
-                    <small class="text-muted text-uppercase fw-semibold d-block mb-1" style="font-size: 11px;">Name</small>
-                    <div class="fw-bold text-dark">${a.title}</div>
+                    <small class="text-muted text-uppercase fw-semibold d-block mb-1" style="font-size: 11px;">Overall Review Deadline</small>
+                    <div class="fw-bold text-primary fs-6"><i class="bi bi-calendar-event me-1"></i>${deadlineStr}</div>
                 </div>
                 <div class="col-md-6">
-                    <small class="text-muted text-uppercase fw-semibold d-block mb-1" style="font-size: 11px;">Score</small>
-                    <div class="fw-bold text-dark">${a.feasibility_score}/100</div>
-                </div>
-                <div class="col-md-6">
-                    <small class="text-muted text-uppercase fw-semibold d-block mb-1" style="font-size: 11px;">Pros</small>
-                    <div class="text-muted text-sm">${a.pros}</div>
-                </div>
-                <div class="col-md-6">
-                    <small class="text-muted text-uppercase fw-semibold d-block mb-1" style="font-size: 11px;">Cons</small>
-                    <div class="text-muted text-sm">${a.cons}</div>
+                    <small class="text-muted text-uppercase fw-semibold d-block mb-2" style="font-size: 11px;">Assigned Reviewers Chain</small>
+                    ${reviewersHtml}
                 </div>
             `;
         }
@@ -633,10 +1124,17 @@
     async function handleFileUpload(event) {
         const files = event.target.files;
         if (!files || files.length === 0) return;
+        const maxSizeBytes = 200 * 1024 * 1024; // 200 MB
         
         for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.size > maxSizeBytes) {
+                showErrorOverlay(`File "${file.name}" exceeds the maximum allowed size of 200 MB.`);
+                continue;
+            }
+            
             const formData = new FormData();
-            formData.append('file', files[i]);
+            formData.append('file', file);
             formData.append('user_id', "{{ session.get('user_id', 1) }}");
             
             try {
@@ -648,12 +1146,132 @@
                     const data = await res.json();
                     decisionPayload.temp_file_ids.push(data.id);
                     renderDocuments(data);
+                } else {
+                    const errData = await res.json();
+                    showErrorOverlay(errData.detail || "Upload failed");
                 }
             } catch (error) {
                 console.error("Upload failed", error);
+                showErrorOverlay("Network error while uploading file.");
             }
         }
-        event.target.value = ''; // Reset input
+        event.target.value = '';
+    }
+
+    function getApprovalFlowForDecisionType() {
+        const catSelect = document.getElementById('cdCategory');
+        const catText = catSelect && catSelect.selectedIndex >= 0 ? catSelect.options[catSelect.selectedIndex].text : 'Finance';
+        const prioVal = document.getElementById('cdPriority') ? document.getElementById('cdPriority').value : 'Medium';
+        
+        let maxCost = 0;
+        if (decisionPayload.alternatives && decisionPayload.alternatives.length > 0) {
+            maxCost = Math.max(...decisionPayload.alternatives.map(a => parseFloat(a.cost) || 0));
+        }
+
+        if (catText.includes('Finance') || maxCost >= 500) {
+            return {
+                category: "Finance Approval Flow",
+                title: "Assigned Workflow: Financial Governance Flow",
+                description: `Based on Decision Category: <strong>${catText}</strong> and Estimated Cost: <strong>$${maxCost}</strong>, this decision requires Reviewer sign-off first, followed by Manager approval.`,
+                flowType: "Finance",
+                approval_type: "Sequential",
+                requiredRoles: ["Reviewer", "Manager"]
+            };
+        } else if (catText.includes('Tech') || catText.includes('Architecture')) {
+            return {
+                category: "Technology Approval Flow",
+                title: "Assigned Workflow: Technical & Architecture Review Flow",
+                description: `Based on Decision Category: <strong>${catText}</strong>, this decision requires Technical Reviewer sign-off first, followed by Engineering Manager approval.`,
+                flowType: "Technology",
+                approval_type: "Sequential",
+                requiredRoles: ["Reviewer", "Manager"]
+            };
+        } else if (catText.includes('Operations') || catText.includes('HR')) {
+            return {
+                category: "Operations Approval Flow",
+                title: "Assigned Workflow: Operational Governance Flow",
+                description: `Based on Decision Category: <strong>${catText}</strong>, this decision requires Operations Reviewer sign-off first, followed by Manager approval.`,
+                flowType: "Operations",
+                approval_type: "Sequential",
+                requiredRoles: ["Reviewer", "Manager"]
+            };
+        } else {
+            return {
+                category: "Standard Approval Flow",
+                title: "Assigned Workflow: Standard Management Sign-off",
+                description: `Based on Decision Category: <strong>${catText}</strong> and Priority: <strong>${prioVal}</strong>, Reviewer sign-off is required first, followed by Manager approval.`,
+                flowType: "Standard",
+                approval_type: "Sequential",
+                requiredRoles: ["Reviewer", "Manager"]
+            };
+        }
+    }
+
+    function updateApprovalFlowCard() {
+        const flow = getApprovalFlowForDecisionType();
+        const catBadge = document.getElementById('flowCategoryBadge');
+        const titleEl = document.getElementById('flowTitle');
+        const descEl = document.getElementById('flowDescription');
+
+        if (catBadge) catBadge.innerText = flow.category;
+        if (titleEl) titleEl.innerText = flow.title;
+        if (descEl) descEl.innerHTML = flow.description;
+    }
+
+    function applyDecisionApprovalFlow() {
+        if (!allUsers || allUsers.length === 0) {
+            alert("Users are still loading. Please try again in a moment.");
+            return;
+        }
+
+        const flow = getApprovalFlowForDecisionType();
+        const eligibleUsers = allUsers.filter(u => {
+            if (u.id === currentUserId) return false;
+            const rName = (u.role_name || "").toLowerCase();
+            const empId = (u.employee_id || "").toLowerCase();
+            if (rName.includes("admin") || rName.includes("administrator") || empId.startsWith("ad")) {
+                return false;
+            }
+            return true;
+        });
+
+        const selected = [];
+        flow.requiredRoles.forEach(roleReq => {
+            const matching = eligibleUsers.filter(u => {
+                const rName = (u.role_name || "").toLowerCase();
+                const empId = (u.employee_id || "").toLowerCase();
+                if (roleReq === "Manager") return rName.includes("manager") || empId.startsWith("mn");
+                if (roleReq === "Reviewer") return rName.includes("reviewer") || empId.startsWith("rw") || rName.includes("user") || rName.includes("employee");
+                return true;
+            }).filter(u => !selected.some(s => s.id === u.id));
+
+            if (matching.length > 0) {
+                selected.push(matching[0]);
+            } else {
+                const fallback = eligibleUsers.find(u => !selected.some(s => s.id === u.id));
+                if (fallback) selected.push(fallback);
+            }
+        });
+
+        decisionPayload.reviewers = [];
+        const deadline = document.getElementById("cdReviewDeadline") ? document.getElementById("cdReviewDeadline").value : null;
+
+        selected.forEach(u => {
+            decisionPayload.reviewers.push({
+                reviewer_id: u.id,
+                approval_type: flow.approval_type,
+                deadline: deadline ? deadline + "T23:59:59Z" : null,
+                _name: u.full_name
+            });
+        });
+
+        renderReviewers();
+    }
+
+    function removeTempDoc(docId) {
+        decisionPayload.temp_file_ids = decisionPayload.temp_file_ids.filter(id => id !== docId);
+        const el = document.getElementById(`doc-${docId}`);
+        if (el) el.remove();
     }
 
     function renderDocuments(doc) {
@@ -671,8 +1289,8 @@
                     <h6 class="fw-bold mb-1">${doc.filename}</h6>
                     <small class="text-muted">${sizeMB} MB • Uploaded just now</small>
                 </div>
-                <button type="button" class="btn btn-light text-muted me-2 border-0"><i data-lucide="eye" style="width:16px;"></i></button>
-                <button type="button" class="btn btn-light text-danger border-0"><i data-lucide="trash-2" style="width:16px;"></i></button>
+                <button type="button" class="btn btn-light text-muted me-2 border-0" onclick="window.open('http://127.0.0.1:8000/upload/' + ${doc.id}, '_blank')" title="View Document"><i data-lucide="eye" style="width:16px;"></i></button>
+                <button type="button" class="btn btn-light text-danger border-0" onclick="removeTempDoc(${doc.id})" title="Remove Document"><i data-lucide="trash-2" style="width:16px;"></i></button>
             </div>
         `;
         if (window.lucide) window.lucide.createIcons();
@@ -687,7 +1305,13 @@
             if (!res.ok) throw new Error("Failed to load decision details");
             const decision = await res.json();
 
-            // Pre-populate input fields
+            const loggedInUserId = parseInt("{{ session.get('user_id', 1) }}", 10);
+            if (decision.created_by !== loggedInUserId || decision.status !== 'Draft') {
+                alert("Access Denied: Only the decision owner can edit a decision while it is in Draft status.");
+                window.location.href = `/decision/${id}`;
+                return;
+            }
+
             document.getElementById('cdTitle').value = decision.title || '';
             document.getElementById('cdCategory').value = decision.category_id || 1;
             document.getElementById('cdPriority').value = decision.priority_level || 'Medium';
@@ -697,7 +1321,6 @@
             }
             document.getElementById('cdDescription').value = decision.description || '';
 
-            // Update local payload
             decisionPayload.title = decision.title;
             decisionPayload.description = decision.description;
             decisionPayload.category_id = decision.category_id;
@@ -706,7 +1329,6 @@
             decisionPayload.decision_date = decision.decision_date ? decision.decision_date.split('T')[0] : '';
             decisionPayload.tags = decision.tags || '';
 
-            // Set tags inputs
             const tagsContainer = document.getElementById('tagsContainer');
             if (tagsContainer && decision.tags) {
                 const tags = decision.tags.split(',').map(t => t.trim()).filter(Boolean);
@@ -717,11 +1339,9 @@
                 if (window.lucide) window.lucide.createIcons();
             }
 
-            // Load alternatives
             decisionPayload.alternatives = decision.alternatives || [];
             renderAlts();
 
-            // Load reviewers
             decisionPayload.reviewers = decision.reviews ? decision.reviews.map(r => ({
                 reviewer_id: r.reviewer_id,
                 reviewer_name: r.reviewer_name || `User #${r.reviewer_id}`,
@@ -730,7 +1350,6 @@
             })) : [];
             renderReviewers();
 
-            // Load documents
             if (decision.attachments) {
                 decisionPayload.temp_file_ids = decision.attachments.map(att => att.id);
                 const docList = document.getElementById('documentList');
@@ -747,9 +1366,13 @@
         }
     }
 
-    async function submitDecision() {
+    async function submitDecision(targetStatus = "Pending") {
         const btn = document.getElementById('btnSubmit');
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...';
+        if (targetStatus === 'Draft') {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving Draft...';
+        } else {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...';
+        }
         btn.disabled = true;
         
         const payload = {
@@ -761,6 +1384,7 @@
             department: decisionPayload.department,
             decision_date: decisionPayload.decision_date ? decisionPayload.decision_date + "T00:00:00Z" : null,
             tags: decisionPayload.tags,
+            status: targetStatus || "Pending",
             alternatives: decisionPayload.alternatives.map(a => ({
                 title: a.title,
                 description: "",
@@ -773,7 +1397,7 @@
             reviewers: decisionPayload.reviewers.map(r => ({
                 reviewer_id: r.reviewer_id,
                 approval_type: r.approval_type,
-                deadline: r.deadline ? r.deadline + "T00:00:00Z" : null
+                deadline: r.deadline ? r.deadline + "T23:59:59Z" : null
             })),
             temp_file_ids: decisionPayload.temp_file_ids
         };
@@ -795,8 +1419,11 @@
             });
             
             if (res.ok) {
-                // Success
-                window.location.href = "{{ url_for('decisions') }}";
+                if (targetStatus === 'Draft') {
+                    window.location.href = "/decisions?tab=Draft";
+                } else {
+                    window.location.href = "{{ url_for('decisions') }}";
+                }
             } else {
                 const data = await res.json();
                 showErrorOverlay(data.detail || "Failed to submit decision");
@@ -826,6 +1453,12 @@
     window.addEventListener('DOMContentLoaded', () => {
         loadUsers();
         renderAlts();
+        updateApprovalFlowCard();
+
+        const catSelect = document.getElementById('cdCategory');
+        if (catSelect) catSelect.addEventListener('change', updateApprovalFlowCard);
+        const prioSelect = document.getElementById('cdPriority');
+        if (prioSelect) prioSelect.addEventListener('change', updateApprovalFlowCard);
 
         // Check if we are in Edit Mode
         const urlParams = new URLSearchParams(window.location.search);

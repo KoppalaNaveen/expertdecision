@@ -1,208 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Dashboard - EDRP</title>
-    <!-- Bootstrap CSS for grid and utilities -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+{% extends "base.html" %}
+
+{% block css %}
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #F8FAFC;
-            color: #0F172A;
-            margin: 0;
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            width: 260px;
-            background-color: #0F172A;
-            color: #FFFFFF;
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            z-index: 100;
-        }
-        .sidebar-logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 24px;
-            text-decoration: none;
-        }
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background-color: #2563EB;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .logo-text-top {
-            font-size: 14px;
-            font-weight: 800;
-            color: #FFFFFF;
-            line-height: 1;
-        }
-        .logo-text-bottom {
-            font-size: 10px;
-            color: #94A3B8;
-            font-weight: 500;
-            margin-top: 2px;
-        }
-        .nav-links {
-            list-style: none;
-            padding: 0 12px;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            flex: 1;
-        }
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 16px;
-            border-radius: 8px;
-            color: #94A3B8;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-        .nav-item:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-            color: #FFFFFF;
-        }
-        .nav-item.active {
-            background-color: #2563EB;
-            color: #FFFFFF;
-        }
-        .nav-badge {
-            margin-left: auto;
-            background-color: #EF4444;
-            color: white;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 12px;
-        }
-        .nav-divider {
-            height: 1px;
-            background-color: #1E293B;
-            margin: 16px 24px;
-        }
-        .user-profile-bottom {
-            margin-top: auto;
-            padding: 16px 24px;
-            border-top: 1px solid #1E293B;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-        }
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background-color: #2563EB;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 700;
-            color: white;
-        }
-        .user-info {
-            flex: 1;
-        }
-        .user-name {
-            font-size: 13px;
-            font-weight: 700;
-            color: #FFFFFF;
-        }
-        .user-role {
-            font-size: 11px;
-            color: #94A3B8;
-        }
-
-        /* Main Content Styles */
-        .main-wrapper {
-            margin-left: 260px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-        }
-        
-        /* Topbar */
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 40px;
-            background-color: transparent;
-        }
-        .breadcrumb {
-            margin: 0;
-            font-size: 11px;
-            font-weight: 600;
-            color: #94A3B8;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .search-bar {
-            display: flex;
-            align-items: center;
-            background: #FFFFFF;
-            border: 1px solid #E2E8F0;
-            border-radius: 12px;
-            padding: 8px 16px;
-            width: 300px;
-        }
-        .search-bar input {
-            border: none;
-            outline: none;
-            background: transparent;
-            font-size: 13px;
-            margin-left: 8px;
-            width: 100%;
-        }
-        .search-bar input::placeholder {
-            color: #94A3B8;
-        }
-        .topbar-actions {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        
-        .main-content {
-            padding: 0 40px 40px;
-            max-width: 1200px;
-        }
-        
-        .page-header {
-            margin-bottom: 24px;
-        }
         .page-title {
             font-size: 24px;
-            font-weight: 900;
+            font-weight: 800;
             color: #0F172A;
             letter-spacing: -0.02em;
         }
@@ -213,38 +15,39 @@
             align-items: center;
             gap: 12px;
             background: white;
-            border: 1px solid #F1F5F9;
-            border-radius: 12px;
-            padding: 12px 20px;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            padding: 14px 20px;
             margin-bottom: 24px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
         }
         .role-banner-accent {
             width: 4px;
             height: 36px;
-            background: linear-gradient(180deg, #2563EB, #60A5FA);
+            background: #2563EB;
             border-radius: 2px;
             flex-shrink: 0;
         }
 
-        /* Stat Cards */
+        /* Stat Cards Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 20px;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
         }
         .stat-card {
             background: white;
             border-radius: 16px;
             padding: 24px;
-            border: 1px solid #F1F5F9;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            position: relative;
         }
         .stat-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -252,9 +55,10 @@
         }
         .stat-value {
             font-size: 28px;
-            font-weight: 900;
+            font-weight: 800;
             color: #0F172A;
             margin-bottom: 4px;
+            line-height: 1;
         }
         .stat-label {
             font-size: 13px;
@@ -266,15 +70,21 @@
             font-size: 11px;
             color: #94A3B8;
         }
+        .stat-arrow {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            color: #CBD5E1;
+        }
 
-        /* Sections */
+        /* Section Cards */
         .section-card {
             background: white;
             border-radius: 16px;
             padding: 24px;
-            border: 1px solid #F1F5F9;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
-            margin-bottom: 24px;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            margin-bottom: 28px;
         }
         .section-header {
             display: flex;
@@ -302,26 +112,27 @@
             gap: 4px;
         }
 
-        /* List Items */
+        /* Task & Notification List Items */
         .list-group {
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
-        .list-item {
+        .list-item-card {
             display: flex;
             align-items: flex-start;
-            gap: 16px;
-            padding: 16px;
-            border-radius: 12px;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-radius: 14px;
             background: #F8FAFC;
             border: 1px solid #F1F5F9;
             transition: all 0.2s;
         }
-        .list-item:hover {
-            border-color: #E2E8F0;
+        .list-item-card:hover {
+            border-color: #CBD5E1;
+            background: #FFFFFF;
         }
-        .item-icon {
+        .item-icon-box {
             width: 36px;
             height: 36px;
             border-radius: 10px;
@@ -329,9 +140,6 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-        }
-        .item-content {
-            flex: 1;
         }
         .item-tag {
             font-size: 10px;
@@ -342,8 +150,8 @@
         }
         .item-title {
             font-size: 14px;
-            font-weight: 600;
-            color: #1E293B;
+            font-weight: 700;
+            color: #0F172A;
             margin-bottom: 4px;
         }
         .item-meta {
@@ -364,34 +172,21 @@
             display: flex;
             align-items: center;
             gap: 16px;
-            padding: 12px 16px;
-            border-radius: 12px;
+            padding: 14px 20px;
+            border-radius: 14px;
             background: #F8FAFC;
             border: 1px solid #F1F5F9;
         }
         .timeline-icon {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
             background: white;
-        }
-        .timeline-text {
-            font-size: 13px;
-            color: #334155;
-            font-weight: 500;
-        }
-        .timeline-text b {
-            color: #0F172A;
-            font-weight: 600;
-        }
-        .timeline-time {
-            font-size: 11px;
-            color: #94A3B8;
-            margin-top: 2px;
+            border: 1px solid #E2E8F0;
         }
 
         /* Table */
@@ -409,7 +204,7 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             text-align: left;
-            padding: 12px 16px;
+            padding: 14px 16px;
             border-bottom: 1px solid #E2E8F0;
         }
         .decision-table td {
@@ -417,13 +212,10 @@
             border-bottom: 1px solid #F1F5F9;
             vertical-align: middle;
         }
-        .decision-table tr:last-child td {
-            border-bottom: none;
-        }
         .td-title {
             font-size: 13px;
-            font-weight: 600;
-            color: #1E293B;
+            font-weight: 700;
+            color: #0F172A;
             margin-bottom: 2px;
         }
         .td-id {
@@ -431,410 +223,293 @@
             color: #94A3B8;
             font-family: monospace;
         }
-        .badge-category {
-            font-size: 11px;
-            font-weight: 600;
-            color: #2563EB;
-            background: #EFF6FF;
-            padding: 4px 10px;
-            border-radius: 12px;
-            display: inline-block;
-        }
-        .reviewer-pill {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .reviewer-avatar {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: #2563EB;
-            color: white;
-            font-size: 9px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .status-badge {
+        .badge-pill {
             font-size: 11px;
             font-weight: 600;
             padding: 4px 10px;
             border-radius: 12px;
             display: inline-block;
-        }
-        .priority-badge {
-            font-size: 11px;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 6px;
-            display: inline-block;
-        }
-        .action-btn {
-            background: white;
-            border: 1px solid #E2E8F0;
-            border-radius: 6px;
-            padding: 4px 8px;
-            color: #64748B;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
         }
 
-        /* Quick Actions */
-        .quick-actions {
+        /* Quick Actions Grid */
+        .quick-actions-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
+            gap: 16px;
         }
         .qa-card {
             background: white;
             border-radius: 16px;
             padding: 24px;
             text-align: center;
-            border: 1px solid #F1F5F9;
+            border: 1px solid #E2E8F0;
             cursor: pointer;
             transition: all 0.2s;
         }
         .qa-card:hover {
-            border-color: #CBD5E1;
+            border-color: #2563EB;
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
         }
-        .qa-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
+        .qa-icon-circle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 16px;
+            margin: 0 auto 12px;
         }
         .qa-title {
             font-size: 13px;
             font-weight: 700;
-            color: #1E293B;
+            color: #0F172A;
         }
 
-        /* Utility colors */
+        /* Colors */
         .bg-blue-light { background: #EFF6FF; color: #2563EB; }
-        .bg-orange-light { background: #FFFBEB; color: #F59E0B; }
-        .bg-purple-light { background: #F5F3FF; color: #8B5CF6; }
-        .bg-green-light { background: #ECFDF5; color: #10B981; }
+        .bg-orange-light { background: #FFFBEB; color: #D97706; }
+        .bg-purple-light { background: #F5F3FF; color: #7C3AED; }
+        .bg-green-light { background: #ECFDF5; color: #059669; }
+        .bg-red-light { background: #FEF2F2; color: #DC2626; }
         .bg-gray-light { background: #F1F5F9; color: #64748B; }
-        .bg-red-light { background: #FEF2F2; color: #EF4444; }
 
         .text-blue { color: #2563EB; }
-        .text-orange { color: #F59E0B; }
-        .text-purple { color: #8B5CF6; }
-        .text-green { color: #10B981; }
-        .text-red { color: #EF4444; }
-    </style>
-</head>
-<body>
+        .text-orange { color: #D97706; }
+        .text-purple { color: #7C3AED; }
+        .text-green { color: #059669; }
+</style>
+{% endblock %}
 
-    <!-- Sidebar -->
-    <aside class="sidebar">
-        <a href="#" class="sidebar-logo">
-            <div class="logo-icon">
-                <i data-lucide="zap" style="color: white; width: 18px; height: 18px;"></i>
-            </div>
-            <div>
-                <div class="logo-text-top">EDRP</div>
-                <div class="logo-text-bottom">Decision Platform</div>
-            </div>
-        </a>
-
-        <ul class="nav-links">
-            <li><a href="{{ url_for('dashboard') }}" class="nav-item active"><i data-lucide="layout-dashboard" style="width: 18px; height: 18px;"></i> Dashboard</a></li>
-            <li><a href="{{ url_for('decisions') }}" class="nav-item"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i> My Decisions</a></li>
-            <li><a href="{{ url_for('decisions') }}" class="nav-item"><i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i> Create Decision</a></li>
-            <li><a href="{{ url_for('reviews') }}" class="nav-item"><i data-lucide="check-square" style="width: 18px; height: 18px;"></i> Pending Reviews {% if pending_reviews > 0 %}<span class="nav-badge">{{ pending_reviews }}</span>{% endif %}</a></li>
-            <div class="nav-divider"></div>
-            <li><a href="#" class="nav-item"><i data-lucide="message-square" style="width: 18px; height: 18px;"></i> Discussions</a></li>
-            <li><a href="{{ url_for('repository') }}" class="nav-item"><i data-lucide="database" style="width: 18px; height: 18px;"></i> Knowledge Repository</a></li>
-            <li><a href="#" class="nav-item"><i data-lucide="bell" style="width: 18px; height: 18px;"></i> Notifications</a></li>
-            <div class="nav-divider"></div>
-            <li><a href="#" class="nav-item"><i data-lucide="monitor" style="width: 18px; height: 18px;"></i> Local Device</a></li>
-            <li><a href="#" class="nav-item"><i data-lucide="help-circle" style="width: 18px; height: 18px;"></i> Support Center</a></li>
-        </ul>
-
-        <a href="{{ url_for('profile') }}" class="user-profile-bottom">
-            <div class="user-avatar">{{ session.get('initials', 'JD') }}</div>
-            <div class="user-info">
-                <div class="user-name">{{ session.get('full_name', 'John Doe') }}</div>
-                <div class="user-role">{{ session.get('role_name', 'Employee') }}</div>
-            </div>
-            <i data-lucide="log-out" style="width: 16px; height: 16px; color: #64748B; margin-left: auto;" onclick="window.location.href=this.dataset.url; return false;" data-url="{{ url_for('logout') }}"></i>
-        </a>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-wrapper">
-        <div class="topbar">
-            <div class="breadcrumb">
-                Home <i data-lucide="chevron-right" style="width: 12px; height: 12px;"></i> Employee Dashboard
-            </div>
-            <div class="topbar-actions">
-                <div class="search-bar">
-                    <i data-lucide="search" style="width: 16px; height: 16px; color: #94A3B8;"></i>
-                    <input type="text" placeholder="Search decisions...">
-                    <div style="background: #F1F5F9; border-radius: 4px; padding: 2px 6px; font-size: 10px; color: #64748B; font-weight: 700;">⌘K</div>
-                </div>
-                <div style="position: relative;" id="notification-dropdown-container">
-                    <div id="notification-bell" style="cursor: pointer; position: relative; width: 32px; height: 32px; border-radius: 50%; background: #EFF6FF; border: 1px solid #BFDBFE; display: flex; align-items: center; justify-content: center; color: #2563EB;">
-                        <i data-lucide="bell" style="width: 16px; height: 16px;"></i>
-                        {% if unread_notifications_count > 0 %}
-                        <div id="unread-badge" style="position: absolute; top: -2px; right: -2px; width: 14px; height: 14px; background: #EF4444; border-radius: 50%; border: 2px solid white; font-size: 8px; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">{{ unread_notifications_count }}</div>
-                        {% endif %}
-                    </div>
-                    <!-- Notification Dropdown -->
-                    <div id="notification-menu" style="display: none; position: absolute; top: 40px; right: 0; width: 320px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #E2E8F0; z-index: 1000; overflow: hidden;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #F1F5F9; background: #F8FAFC;">
-                            <span style="font-size: 13px; font-weight: 700; color: #0F172A;">Notifications</span>
-                            <div style="display: flex; gap: 8px;">
-                                <button id="mark-read-btn" style="background: none; border: none; font-size: 11px; color: #2563EB; font-weight: 600; cursor: pointer;">Mark all read</button>
-                                <button id="clear-all-btn" style="background: none; border: none; font-size: 11px; color: #EF4444; font-weight: 600; cursor: pointer;">Clear All</button>
-                            </div>
-                        </div>
-                        <div id="notification-list" style="max-height: 300px; overflow-y: auto; padding: 0;">
-                            <!-- Dynamic Notifications Go Here -->
-                        </div>
-                    </div>
-                </div>
-                <div style="position: relative; margin-left: 12px;">
-                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #EFF6FF; border: 1px solid #BFDBFE; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #2563EB;">{{ session.get('initials', 'JD') }}</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="main-content">
+{% block content %}
             <div class="page-header">
                 <h1 class="page-title">Employee / Reviewer Dashboard</h1>
             </div>
 
+            <!-- Role Banner -->
             <div class="role-banner">
                 <div class="role-banner-accent"></div>
                 <div>
-                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">Employee / Reviewer Dashboard</div>
-                    <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">Your personal workspace — decisions, tasks and reviews assigned to you.</div>
+                    <div style="font-size: 14px; font-weight: 800; color: #0F172A;">Employee / Reviewer Dashboard</div>
+                    <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Your personal workspace — decisions, tasks and reviews assigned to you.</div>
                 </div>
-                <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; background: #EFF6FF; padding: 6px 12px; border-radius: 8px; border: 1px solid #BFDBFE;">
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; background: #EFF6FF; padding: 6px 14px; border-radius: 20px; border: 1px solid #BFDBFE;">
                     <div style="width: 6px; height: 6px; border-radius: 50%; background: #2563EB;"></div>
-                    <span style="font-size: 11px; font-weight: 700; color: #2563EB;">Employee / Reviewer</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #2563EB;">Employee - Reviewer</span>
                 </div>
             </div>
 
-            <!-- Stats -->
+            <!-- Stat Cards Grid (4 Cards matching UI mockup) -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="stat-icon bg-blue-light"><i data-lucide="file-text" style="width: 20px; height: 20px;"></i></div>
-                        <i data-lucide="arrow-right" style="width: 16px; height: 16px; color: #CBD5E1;"></i>
-                    </div>
-                    <div class="stat-value">{{ total_decisions }}</div>
+                    <div class="stat-icon bg-blue-light"><i data-lucide="file-text" style="width: 20px; height: 20px;"></i></div>
+                    <i data-lucide="arrow-up-right" class="stat-arrow" style="width: 16px; height: 16px;"></i>
+                    <div class="stat-value">{{ total_decisions or 0 }}</div>
                     <div class="stat-label">My Decisions</div>
                     <div class="stat-desc">Total active</div>
                 </div>
+
                 <div class="stat-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="stat-icon bg-orange-light"><i data-lucide="edit-3" style="width: 20px; height: 20px;"></i></div>
-                        <i data-lucide="arrow-right" style="width: 16px; height: 16px; color: #CBD5E1;"></i>
-                    </div>
-                    <div class="stat-value">{{ draft_decisions }}</div>
+                    <div class="stat-icon bg-orange-light"><i data-lucide="edit-3" style="width: 20px; height: 20px;"></i></div>
+                    <i data-lucide="arrow-up-right" class="stat-arrow" style="width: 16px; height: 16px;"></i>
+                    <div class="stat-value">{{ draft_decisions or 0 }}</div>
                     <div class="stat-label">Draft Decisions</div>
                     <div class="stat-desc">In progress</div>
                 </div>
+
                 <div class="stat-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="stat-icon bg-purple-light"><i data-lucide="clock" style="width: 20px; height: 20px;"></i></div>
-                        <i data-lucide="arrow-right" style="width: 16px; height: 16px; color: #CBD5E1;"></i>
-                    </div>
-                    <div class="stat-value">{{ pending_reviews }}</div>
+                    <div class="stat-icon bg-purple-light"><i data-lucide="clock" style="width: 20px; height: 20px;"></i></div>
+                    <i data-lucide="arrow-up-right" class="stat-arrow" style="width: 16px; height: 16px;"></i>
+                    <div class="stat-value">{{ pending_reviews or 0 }}</div>
                     <div class="stat-label">Pending Reviews</div>
-                    <div class="stat-desc">Awaiting action</div>
+                    <div class="stat-desc">Awaiting review</div>
                 </div>
+
                 <div class="stat-card">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="stat-icon bg-green-light"><i data-lucide="check-square" style="width: 20px; height: 20px;"></i></div>
-                        <i data-lucide="arrow-right" style="width: 16px; height: 16px; color: #CBD5E1;"></i>
-                    </div>
-                    <div class="stat-value">{{ approved_decisions }}</div>
+                    <div class="stat-icon bg-green-light"><i data-lucide="check-square" style="width: 20px; height: 20px;"></i></div>
+                    <i data-lucide="arrow-up-right" class="stat-arrow" style="width: 16px; height: 16px;"></i>
+                    <div class="stat-value">{{ approved_decisions or 0 }}</div>
                     <div class="stat-label">Approved Decisions</div>
                     <div class="stat-desc">This month</div>
                 </div>
             </div>
 
-            <!-- My Pending Tasks -->
+            <!-- Section 1: My Pending Tasks -->
             <div class="section-card">
                 <div class="section-header">
                     <div>
                         <div class="section-title">My Pending Tasks</div>
-                        <div class="section-subtitle">Items and actions requiring your attention</div>
+                        <div class="section-subtitle">Tasks and actions requiring your attention</div>
                     </div>
-                    <a href="#" class="view-all">View All <i data-lucide="chevron-right" style="width: 14px; height: 14px;"></i></a>
+                    <a href="{{ url_for('reviews') }}" class="view-all">View All →</a>
                 </div>
-                <div class="list-group">
-                    {% if recent_reviews %}
+                
+                <div class="list-group" id="employee-pending-tasks-list">
+                    {% set current_user_id = session.get('user_id', 1) %}
+                    {% if recent_reviews and recent_reviews|length > 0 %}
                         {% for task in recent_reviews %}
-                        <div class="list-item">
-                            <div class="item-icon bg-orange-light"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i></div>
-                            <div class="item-content">
-                                <div class="item-tag text-orange">Review Request</div>
-                                <div class="item-title">{{ task.decision_title }}</div>
-                                <div class="item-meta"><i data-lucide="clock" style="width: 12px; height: 12px;"></i> {{ task.time_ago }}</div>
+                        <div class="list-item-card">
+                            <div class="d-flex align-items-center gap-3">
+                                {% if task.task_type == 'DOCUMENT UPDATE' %}
+                                <div class="item-icon-box bg-blue-light"><i data-lucide="upload-cloud" style="width: 18px; height: 18px;"></i></div>
+                                {% elif task.task_type == 'APPROVAL PENDING' %}
+                                <div class="item-icon-box bg-purple-light"><i data-lucide="check-square" style="width: 18px; height: 18px;"></i></div>
+                                {% elif task.task_type == 'COMMENT REPLY' %}
+                                <div class="item-icon-box bg-blue-light"><i data-lucide="message-square" style="width: 18px; height: 18px;"></i></div>
+                                {% else %}
+                                <div class="item-icon-box bg-orange-light"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i></div>
+                                {% endif %}
+
+                                <div>
+                                    <div class="item-tag {% if task.task_type == 'DOCUMENT UPDATE' or task.task_type == 'COMMENT REPLY' %}text-blue{% elif task.task_type == 'APPROVAL PENDING' %}text-purple{% else %}text-orange{% endif %}">
+                                        {{ task.task_type or 'REVIEW REQUEST' }}
+                                    </div>
+                                    <div class="item-title">{{ task.decision_title }}</div>
+                                    <div class="item-meta">
+                                        <i data-lucide="clock" style="width: 12px; height: 12px;"></i> {{ task.time_ago }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 align-self-center">
+                                {% if task.task_type == 'DOCUMENT UPDATE' %}
+                                <a href="{{ url_for('repository') }}" class="btn btn-sm btn-outline-primary px-3 py-1 fw-bold" style="font-size: 11px;">Upload</a>
+                                {% elif task.task_type == 'COMMENT REPLY' %}
+                                <a href="{{ url_for('discussion') }}" class="btn btn-sm btn-outline-secondary px-3 py-1 fw-bold" style="font-size: 11px;">Reply</a>
+                                {% else %}
+                                <a href="/decision/{{ task.decision_id }}" class="btn btn-sm btn-outline-primary px-3 py-1 fw-bold" style="font-size: 11px;">View Status</a>
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div style="font-size: 13px; color: #94A3B8; padding: 12px;">No pending tasks</div>
+                        <div class="text-center py-4 text-muted" style="font-size: 13px;">No pending tasks requiring attention</div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Recent Notifications -->
+            <!-- Section 2: Recent Notifications -->
             <div class="section-card">
                 <div class="section-header">
                     <div>
                         <div class="section-title">Recent Notifications</div>
                         <div class="section-subtitle">Latest updates and alerts</div>
                     </div>
-                    <div style="position: relative;">
-                        <i data-lucide="bell" style="color: #94A3B8; width: 20px; height: 20px;"></i>
-                        <div style="position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; background: #EF4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white;"></div>
-                    </div>
+                    <a href="{{ url_for('notifications_page') }}" style="cursor: pointer; text-decoration: none;">
+                        <i data-lucide="bell" style="color: #475569; width: 18px; height: 18px;"></i>
+                    </a>
                 </div>
+
                 <div class="list-group" id="widget-notification-list">
-                    {% if recent_notifications %}
+                    {% if recent_notifications and recent_notifications|length > 0 %}
                         {% for notif in recent_notifications %}
-                        <div class="list-item" style="{{ 'background-color: #F8FAFC;' if not notif.is_read else '' }}">
-                            <div class="item-icon" style="background: white; border: 1px solid #E2E8F0;">
-                                {% if notif.type == 'success' %}
-                                <i data-lucide="check-circle" style="color: #10B981; width: 18px; height: 18px;"></i>
-                                {% elif notif.type == 'warning' %}
-                                <i data-lucide="alert-triangle" style="color: #F59E0B; width: 18px; height: 18px;"></i>
-                                {% elif notif.type == 'error' %}
-                                <i data-lucide="x-circle" style="color: #EF4444; width: 18px; height: 18px;"></i>
-                                {% else %}
-                                <i data-lucide="info" style="color: #3B82F6; width: 18px; height: 18px;"></i>
-                                {% endif %}
-                            </div>
-                            <div class="item-content">
-                                <div class="item-title">{{ notif.title }}</div>
-                                <div class="item-meta">{{ notif.message }}</div>
-                                <div class="item-meta" style="margin-top: 4px;"><i data-lucide="clock" style="width: 12px; height: 12px;"></i> {{ notif.time_ago }}</div>
+                        <div class="list-item-card">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="item-icon-box {% if notif.type == 'error' %}bg-red-light{% elif notif.type == 'success' %}bg-green-light{% else %}bg-blue-light{% endif %}">
+                                    <i data-lucide="{% if notif.type == 'error' %}alert-circle{% elif notif.type == 'success' %}check-circle{% else %}bell{% endif %}" style="width: 18px; height: 18px;"></i>
+                                </div>
+                                <div>
+                                    <div class="item-tag {% if notif.type == 'error' %}text-red{% elif notif.type == 'success' %}text-green{% else %}text-blue{% endif %}">{{ notif.title or 'NOTIFICATION' }}</div>
+                                    <div class="item-title" style="font-size:13px;">{{ notif.message }}</div>
+                                    <div class="item-meta">{{ notif.time_ago or 'Recently' }}</div>
+                                </div>
                             </div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div style="font-size: 13px; color: #94A3B8; padding: 12px;">No recent notifications</div>
+                        <div class="text-center py-4 text-muted" style="font-size: 13px;">No recent notifications</div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Recent Activities -->
+            <!-- Section 3: Recent Activities -->
             <div class="section-card">
                 <div class="section-header">
                     <div>
                         <div class="section-title">Recent Activities</div>
                         <div class="section-subtitle">Your activity timeline</div>
                     </div>
-                    <a href="#" class="view-all">View All <i data-lucide="chevron-right" style="width: 14px; height: 14px;"></i></a>
+                    <a href="{{ url_for('dashboard') }}" class="view-all">View All →</a>
                 </div>
-                <div class="timeline">
-                    {% if recent_audit_logs %}
+
+                <div class="timeline" id="recent-activities-timeline">
+                    {% if recent_audit_logs and recent_audit_logs|length > 0 %}
                         {% for log in recent_audit_logs %}
                         <div class="timeline-item">
-                            <div class="timeline-icon" style="border: 1px solid #BFDBFE;"><i data-lucide="activity" style="width: 14px; height: 14px; color: #2563EB;"></i></div>
+                            <div class="timeline-icon bg-blue-light"><i data-lucide="activity" style="width: 16px; height: 16px; color: #2563EB;"></i></div>
                             <div>
-                                <div class="timeline-text"><b class="text-blue">{{ log.user_name }}</b> {{ log.action }}</div>
-                                <div class="timeline-time">{{ log.time_ago }}</div>
+                                <div style="font-size: 13px; color: #334155;"><b class="text-blue">{{ log.user_name }}</b> {{ log.action }}</div>
+                                <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">{{ log.time_ago }}</div>
                             </div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div style="font-size: 13px; color: #94A3B8; padding: 12px;">No recent activities</div>
+                        <div class="text-center py-4 text-muted" style="font-size: 13px;">No recent activity recorded</div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Recent Decisions -->
+            <!-- Section 4: Recent Decisions Table -->
             <div class="section-card">
                 <div class="section-header">
                     <div>
                         <div class="section-title">Recent Decisions</div>
                         <div class="section-subtitle">Your recent decision submissions</div>
                     </div>
-                    <a href="#" class="view-all">View All <i data-lucide="chevron-right" style="width: 14px; height: 14px;"></i></a>
+                    <a href="{{ url_for('decisions') }}" class="view-all">View All →</a>
                 </div>
+
                 <div class="table-responsive">
                     <table class="decision-table">
                         <thead>
                             <tr>
-                                <th>Decision</th>
-                                <th>Category</th>
-                                <th>Reviewer</th>
-                                <th>Status</th>
-                                <th>Priority</th>
-                                <th>Last Updated</th>
-                                <th>Actions</th>
+                                <th>DECISION</th>
+                                <th>CATEGORY</th>
+                                <th>REVIEWER</th>
+                                <th>STATUS</th>
+                                <th>PRIORITY</th>
+                                <th>LAST UPDATED</th>
+                                <th>ACTIONS</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% if recent_decisions %}
-                                {% for decision in recent_decisions %}
+                        <tbody id="employee-recent-decisions-tbody">
+                            {% if recent_decisions and recent_decisions|length > 0 %}
+                                {% for d in recent_decisions %}
                                 <tr>
                                     <td>
-                                        <div class="td-title">{{ decision.title }}</div>
-                                        <div class="td-id">DEC-{{ decision.id }}</div>
+                                        <div class="td-title">{{ d.title }}</div>
+                                        <div class="td-id">DEC-{{ d.id }}</div>
                                     </td>
-                                    <td><span class="badge-category">{{ decision.category_name }}</span></td>
+                                    <td><span class="badge-pill bg-blue-light">{{ d.department or 'Technology' }}</span></td>
                                     <td>
-                                        {% if decision.reviewer_name %}
-                                        <div class="reviewer-pill">
-                                            <div class="reviewer-avatar" style="background: #0EA5E9;">{{ decision.reviewer_name[:2].upper() }}</div>
-                                            <span style="font-size: 12px; color: #334155;">{{ decision.reviewer_name }}</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div style="width:24px;height:24px;border-radius:50%;background:#2563EB;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;">
+                                                {{ d.approver_name[:2].upper() if d.approver_name and d.approver_name != '—' else 'U' }}
+                                            </div>
+                                            <span style="font-size:12px;color:#334155;">{{ d.approver_name or '—' }}</span>
                                         </div>
-                                        {% else %}
-                                        <span style="font-size: 12px; color: #94A3B8;">Unassigned</span>
-                                        {% endif %}
                                     </td>
                                     <td>
-                                        {% if decision.status == 'Draft' %}
-                                        <span class="status-badge bg-gray-light">Draft</span>
-                                        {% elif decision.status == 'Pending' %}
-                                        <span class="status-badge bg-orange-light">Pending</span>
-                                        {% elif decision.status == 'Approved' %}
-                                        <span class="status-badge bg-green-light">Approved</span>
-                                        {% elif decision.status == 'Rejected' %}
-                                        <span class="status-badge bg-red-light">Rejected</span>
-                                        {% else %}
-                                        <span class="status-badge bg-blue-light">{{ decision.status }}</span>
-                                        {% endif %}
+                                        <span class="badge-pill {% if d.status == 'Approved' %}bg-green-light{% elif d.status == 'Rejected' %}bg-red-light{% elif d.status == 'Draft' %}bg-gray-light{% elif d.status == 'In Review' or d.status == 'Review' %}bg-purple-light{% else %}bg-orange-light{% endif %}">
+                                            {{ d.status }}
+                                        </span>
                                     </td>
                                     <td>
-                                        {% if decision.priority == 'Critical' %}
-                                        <span class="priority-badge bg-red-light">Critical</span>
-                                        {% elif decision.priority == 'High' %}
-                                        <span class="priority-badge bg-orange-light">High</span>
-                                        {% elif decision.priority == 'Medium' %}
-                                        <span class="priority-badge bg-blue-light">Medium</span>
-                                        {% else %}
-                                        <span class="priority-badge bg-gray-light">{{ decision.priority }}</span>
-                                        {% endif %}
+                                        <span class="badge-pill {% if d.priority == 'Critical' %}bg-red-light{% elif d.priority == 'High' %}bg-orange-light{% elif d.priority == 'Low' %}bg-gray-light{% else %}bg-blue-light{% endif %}">
+                                            {{ d.priority or 'Medium' }}
+                                        </span>
                                     </td>
-                                    <td><span style="font-size: 12px; color: #64748B;">{{ decision.updated_at.strftime('%b %d, %Y') if decision.updated_at else 'N/A' }}</span></td>
+                                    <td><span style="font-size:12px;color:#64748B;">{{ d.created_at_str or 'Recently' }}</span></td>
                                     <td>
-                                        <div style="display: flex; gap: 4px;">
-                                            <button class="action-btn" onclick="window.location.href='{{ url_for('decision_detail', decision_id=decision.id) }}'"><i data-lucide="eye" style="width: 14px; height: 14px;"></i></button>
+                                        <div class="d-flex gap-1">
+                                            <a href="/decision/{{ d.id }}" class="btn btn-sm btn-light border p-1"><i data-lucide="eye" style="width:14px;height:14px;"></i></a>
                                         </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             {% else %}
                                 <tr>
-                                    <td colspan="7" style="text-align: center; color: #94A3B8; font-size: 13px; padding: 24px;">No recent decisions found.</td>
+                                    <td colspan="7" class="text-center py-4 text-muted" style="font-size: 13px;">No decisions found</td>
                                 </tr>
                             {% endif %}
                         </tbody>
@@ -842,138 +517,259 @@
                 </div>
             </div>
 
-            <!-- Quick Actions -->
+            <!-- Section 5: Quick Actions (4 Cards) -->
             <div class="section-header" style="margin-bottom: 16px;">
                 <div class="section-title">Quick Actions</div>
             </div>
-            <div class="quick-actions">
-                <div class="qa-card" onclick="window.location.href=this.dataset.url;" data-url="{{ url_for('decisions') }}">
-                    <div class="qa-icon bg-blue-light"><i data-lucide="plus" style="width: 24px; height: 24px;"></i></div>
+            
+            <div class="quick-actions-grid">
+                <a href="{{ url_for('create_decision') }}" class="qa-card text-decoration-none">
+                    <div class="qa-icon-circle bg-blue-light"><i data-lucide="plus" style="width: 22px; height: 22px;"></i></div>
                     <div class="qa-title">Create Decision</div>
-                </div>
-                <div class="qa-card">
-                    <div class="qa-icon bg-purple-light"><i data-lucide="search" style="width: 24px; height: 24px;"></i></div>
+                </a>
+
+                <div class="qa-card" onclick="openSearchModal()">
+                    <div class="qa-icon-circle bg-purple-light"><i data-lucide="search" style="width: 22px; height: 22px;"></i></div>
                     <div class="qa-title">Search Decisions</div>
                 </div>
-                <div class="qa-card">
-                    <div class="qa-icon bg-green-light"><i data-lucide="upload-cloud" style="width: 24px; height: 24px;"></i></div>
-                    <div class="qa-title">Upload Document</div>
-                </div>
-                <div class="qa-card" onclick="window.location.href=this.dataset.url;" data-url="{{ url_for('repository') }}">
-                    <div class="qa-icon bg-blue-light"><i data-lucide="database" style="width: 24px; height: 24px;"></i></div>
-                    <div class="qa-title">Knowledge Repository</div>
-                </div>
-            </div>
 
+                <a href="{{ url_for('repository') }}" class="qa-card text-decoration-none">
+                    <div class="qa-icon-circle bg-green-light"><i data-lucide="upload" style="width: 22px; height: 22px;"></i></div>
+                    <div class="qa-title">Upload Document</div>
+                </a>
+
+                <a href="{{ url_for('repository') }}" class="qa-card text-decoration-none">
+                    <div class="qa-icon-circle bg-purple-light"><i data-lucide="book-open" style="width: 22px; height: 22px;"></i></div>
+                    <div class="qa-title">Knowledge Repository</div>
+                </a>
+            </div>
         </div>
     </main>
+
+    <!-- Search Modal -->
+    <div id="search-decision-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); z-index: 1050; align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 16px; width: 90%; max-width: 550px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="font-size: 17px; font-weight: 800; color: #0F172A; margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="search" style="width: 20px; height: 20px; color: #2563EB;"></i> Search Decisions
+                </h3>
+                <button onclick="closeSearchModal()" style="background: none; border: none; font-size: 22px; color: #94A3B8; cursor: pointer; padding: 4px; line-height: 1;">&times;</button>
+            </div>
+            
+            <div style="position: relative; margin-bottom: 16px;">
+                <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #94A3B8;"></i>
+                <input type="text" id="search-modal-input" placeholder="Type decision title or ID (e.g. DEC-3142)..." oninput="handleDecisionSearch()" style="width: 100%; padding: 10px 12px 10px 38px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; outline: none;" />
+            </div>
+
+            <div id="search-modal-results" style="max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                <div style="text-align: center; color: #94A3B8; padding: 24px; font-size: 13px;">Type above to search decisions...</div>
+            </div>
+        </div>
+    </div>
 
     <script>
         lucide.createIcons();
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const userId = parseInt("{{ session.get('user_id', 0) }}", 10);
-            const bell = document.getElementById('notification-bell');
-            const menu = document.getElementById('notification-menu');
-            const list = document.getElementById('notification-list');
-            const markReadBtn = document.getElementById('mark-read-btn');
-            const clearAllBtn = document.getElementById('clear-all-btn');
-            const unreadBadge = document.getElementById('unread-badge');
+        function openSearchModal() {
+            const modal = document.getElementById('search-decision-modal');
+            if (modal) {
+                modal.style.display = 'flex';
+                const input = document.getElementById('search-modal-input');
+                if (input) { input.value = ''; input.focus(); }
+            }
+        }
 
-            // Toggle menu
-            bell.addEventListener('click', () => {
-                if(menu.style.display === 'none') {
-                    menu.style.display = 'block';
-                    fetchNotifications();
+        function closeSearchModal() {
+            const modal = document.getElementById('search-decision-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function quickReviewAction(decisionId, reviewerId, status) {
+            const comments = prompt(`Enter comments for marking this decision as ${status} (optional):`) || "";
+            try {
+                const res = await fetch("http://127.0.0.1:8000/reviews/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        decision_id: decisionId,
+                        reviewer_id: reviewerId,
+                        status: status,
+                        comments: comments
+                    })
+                });
+                if (res.ok) {
+                    alert(`Review decision marked as ${status}!`);
+                    window.location.reload();
                 } else {
-                    menu.style.display = 'none';
+                    alert("Failed to submit review action.");
                 }
-            });
+            } catch (e) {
+                alert("Network error occurred.");
+            }
+        }
 
-            // Close on outside click
-            document.addEventListener('click', (e) => {
-                if(!bell.contains(e.target) && !menu.contains(e.target)) {
-                    menu.style.display = 'none';
-                }
-            });
+        document.addEventListener("DOMContentLoaded", () => {
+            const userId = parseInt("{{ session.get('user_id', 1) }}", 10);
 
-            function fetchNotifications() {
-                if (!userId) return;
-                fetch(`/notifications/${userId}`)
+            function fetchDashboardLiveData() {
+                fetch('/api/dashboard')
                     .then(r => r.json())
                     .then(data => {
-                        list.innerHTML = '';
-                        const widgetList = document.getElementById('widget-notification-list');
-                        if (widgetList) widgetList.innerHTML = '';
+                        if (!data) return;
 
-                        if (data.length === 0) {
-                            list.innerHTML = '<div style="padding: 16px; text-align: center; color: #94A3B8; font-size: 13px;">No notifications</div>';
-                            if (widgetList) widgetList.innerHTML = '<div style="font-size: 13px; color: #94A3B8; padding: 12px;">No recent notifications</div>';
-                            return;
+                        // Live update Stats Cards
+                        const statValues = document.querySelectorAll('.stat-value');
+                        if (statValues && statValues.length >= 4 && data.total_decisions !== undefined) {
+                            statValues[0].textContent = data.total_decisions || 0;
+                            statValues[1].textContent = data.draft_decisions || 0;
+                            statValues[2].textContent = data.pending_reviews || 0;
+                            statValues[3].textContent = data.approved_decisions || 0;
                         }
-                        
-                        let unreadCount = 0;
-                        data.forEach(n => {
-                            if(!n.is_read) unreadCount++;
-                            const div = document.createElement('div');
-                            div.style.padding = '12px 16px';
-                            div.style.borderBottom = '1px solid #F1F5F9';
-                            div.style.background = n.is_read ? 'transparent' : '#EFF6FF';
-                            div.innerHTML = `
-                                <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #2563EB; margin-bottom: 4px;">${n.notification_type}</div>
-                                <div style="font-size: 13px; color: #1E293B; font-weight: ${n.is_read ? '500' : '700'};">${n.message}</div>
-                            `;
-                            list.appendChild(div);
 
-                            if (widgetList) {
-                                const widgetDiv = document.createElement('div');
-                                widgetDiv.className = 'list-item';
-                                widgetDiv.style.border = 'none';
-                                widgetDiv.style.borderBottom = '1px solid #F1F5F9';
-                                widgetDiv.style.borderRadius = '0';
-                                widgetDiv.style.background = 'transparent';
-                                widgetDiv.style.padding = '12px 0';
-                                widgetDiv.innerHTML = `
-                                    <div class="item-icon bg-blue-light" style="width: 32px; height: 32px; border-radius: 50%;"><i data-lucide="bell" style="width: 14px; height: 14px;"></i></div>
-                                    <div class="item-content">
-                                        <div class="item-tag text-blue">${n.notification_type}</div>
-                                        <div class="item-title" style="font-size: 13px; font-weight: 500;">${n.message}</div>
-                                    </div>
-                                `;
-                                widgetList.appendChild(widgetDiv);
-                            }
-                        });
-                        
-                        if (unreadBadge) {
-                            if (unreadCount > 0) {
-                                unreadBadge.textContent = unreadCount;
-                                unreadBadge.style.display = 'flex';
+                        // Live update Recent Pending Tasks
+                        const taskContainer = document.getElementById('employee-pending-tasks-list');
+                        if (taskContainer) {
+                            if (data.recent_reviews && data.recent_reviews.length > 0) {
+                                let html = '';
+                                data.recent_reviews.forEach(task => {
+                                    const ttype = task.task_type || "APPROVAL PENDING";
+                                    let iconBox = `<div class="item-icon-box bg-purple-light"><i data-lucide="check-square" style="width: 18px; height: 18px;"></i></div>`;
+                                    let tagClass = "text-purple";
+                                    let actionBtn = `<a href="/decision/${task.decision_id}" class="btn btn-sm btn-outline-primary px-3 py-1 fw-bold" style="font-size: 11px;">View Status</a>`;
+
+                                    if (ttype === "DOCUMENT UPDATE") {
+                                        iconBox = `<div class="item-icon-box bg-blue-light"><i data-lucide="upload-cloud" style="width: 18px; height: 18px;"></i></div>`;
+                                        tagClass = "text-blue";
+                                        actionBtn = `<a href="/repository" class="btn btn-sm btn-outline-primary px-3 py-1 fw-bold" style="font-size: 11px;">Upload</a>`;
+                                    } else if (ttype === "COMMENT REPLY") {
+                                        iconBox = `<div class="item-icon-box bg-blue-light"><i data-lucide="message-square" style="width: 18px; height: 18px;"></i></div>`;
+                                        tagClass = "text-blue";
+                                        actionBtn = `<a href="/discussion" class="btn btn-sm btn-outline-secondary px-3 py-1 fw-bold" style="font-size: 11px;">Reply</a>`;
+                                    }
+
+                                    html += `
+                                        <div class="list-item-card">
+                                            <div class="d-flex align-items-center gap-3">
+                                                ${iconBox}
+                                                <div>
+                                                    <div class="item-tag ${tagClass}">${ttype}</div>
+                                                    <div class="item-title">${task.decision_title}</div>
+                                                    <div class="item-meta">
+                                                        <i data-lucide="clock" style="width: 12px; height: 12px;"></i> ${task.time_ago || 'Recently'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex gap-2 align-self-center">
+                                                ${actionBtn}
+                                            </div>
+                                        </div>
+                                    `;
+                                });
+                                taskContainer.innerHTML = html;
                             } else {
-                                unreadBadge.style.display = 'none';
+                                taskContainer.innerHTML = `<div class="text-center py-4 text-muted" style="font-size: 13px;">No pending tasks requiring attention</div>`;
                             }
                         }
-                        lucide.createIcons();
-                    });
+
+                        // Live update Notifications Widget
+                        const notifContainer = document.getElementById('widget-notification-list');
+                        if (notifContainer && data.recent_notifications) {
+                            if (data.recent_notifications.length > 0) {
+                                let html = '';
+                                data.recent_notifications.forEach(notif => {
+                                    const isErr = notif.type === 'error';
+                                    const isSucc = notif.type === 'success';
+                                    const bgClass = isErr ? 'bg-red-light' : (isSucc ? 'bg-green-light' : 'bg-blue-light');
+                                    const iconName = isErr ? 'alert-circle' : (isSucc ? 'check-circle' : 'bell');
+                                    const tagClass = isErr ? 'text-red' : (isSucc ? 'text-green' : 'text-blue');
+                                    
+                                    html += `
+                                        <div class="list-item-card">
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="item-icon-box ${bgClass}"><i data-lucide="${iconName}" style="width: 18px; height: 18px;"></i></div>
+                                                <div>
+                                                    <div class="item-tag ${tagClass}">${notif.title || 'NOTIFICATION'}</div>
+                                                    <div class="item-title" style="font-size:13px;">${notif.message}</div>
+                                                    <div class="item-meta">${notif.time_ago || 'Recently'}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                });
+                                notifContainer.innerHTML = html;
+                            } else {
+                                notifContainer.innerHTML = `<div class="text-center py-4 text-muted" style="font-size: 13px;">No recent notifications</div>`;
+                            }
+                        }
+
+                        // Live update Recent Activities
+                        const activitiesTimeline = document.getElementById('recent-activities-timeline');
+                        if (activitiesTimeline) {
+                            if (data.recent_audit_logs && data.recent_audit_logs.length > 0) {
+                                activitiesTimeline.innerHTML = data.recent_audit_logs.map(log => `
+                                    <div class="timeline-item">
+                                        <div class="timeline-icon bg-blue-light"><i data-lucide="activity" style="width: 16px; height: 16px; color: #2563EB;"></i></div>
+                                        <div>
+                                            <div style="font-size: 13px; color: #334155;"><b class="text-blue">${log.user_name}</b> ${log.action}</div>
+                                            <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">${log.time_ago}</div>
+                                        </div>
+                                    </div>
+                                `).join('');
+                            } else {
+                                activitiesTimeline.innerHTML = `<div class="text-center py-4 text-muted" style="font-size: 13px;">No recent activity recorded</div>`;
+                            }
+                        }
+
+                        // Live update Recent Decisions Table
+                        const decisionsTbody = document.getElementById('employee-recent-decisions-tbody');
+                        if (decisionsTbody) {
+                            if (data.recent_decisions && data.recent_decisions.length > 0) {
+                                let html = '';
+                                data.recent_decisions.forEach(d => {
+                                    const dept = d.department || 'Technology';
+                                    const approver = d.approver_name || '—';
+                                    const initials = (approver !== '—' && approver.length >= 2) ? approver.substring(0, 2).toUpperCase() : 'U';
+                                    const statusClass = d.status === 'Approved' ? 'bg-green-light' : (d.status === 'Rejected' ? 'bg-red-light' : (d.status === 'Draft' ? 'bg-gray-light' : (d.status === 'In Review' || d.status === 'Review' ? 'bg-purple-light' : 'bg-orange-light')));
+                                    const priority = d.priority || 'Medium';
+                                    const priorityClass = priority === 'Critical' ? 'bg-red-light' : (priority === 'High' ? 'bg-orange-light' : (priority === 'Low' ? 'bg-gray-light' : 'bg-blue-light'));
+                                    const timeAgo = d.created_at_str || 'Recently';
+
+                                    html += `
+                                        <tr>
+                                            <td>
+                                                <div class="td-title">${d.title}</div>
+                                                <div class="td-id">DEC-${d.id}</div>
+                                            </td>
+                                            <td><span class="badge-pill bg-blue-light">${dept}</span></td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div style="width:24px;height:24px;border-radius:50%;background:#2563EB;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;">${initials}</div>
+                                                    <span style="font-size:12px;color:#334155;">${approver}</span>
+                                                </div>
+                                            </td>
+                                            <td><span class="badge-pill ${statusClass}">${d.status}</span></td>
+                                            <td><span class="badge-pill ${priorityClass}">${priority}</span></td>
+                                            <td><span style="font-size:12px;color:#64748B;">${timeAgo}</span></td>
+                                            <td>
+                                                <div class="d-flex gap-1">
+                                                    <a href="/decision/${d.id}" class="btn btn-sm btn-light border p-1"><i data-lucide="eye" style="width:14px;height:14px;"></i></a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                });
+                                decisionsTbody.innerHTML = html;
+                            } else {
+                                decisionsTbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted" style="font-size: 13px;">No decisions found</td></tr>`;
+                            }
+                        }
+
+                        if (window.lucide) lucide.createIcons();
+                    }).catch(console.error);
             }
 
-            markReadBtn.addEventListener('click', () => {
-                if (!userId) return;
-                fetch(`/notifications/${userId}/mark-all-read`, { method: 'PUT' })
-                    .then(() => {
-                        if (unreadBadge) unreadBadge.style.display = 'none';
-                        fetchNotifications();
-                    });
-            });
-
-            clearAllBtn.addEventListener('click', () => {
-                if (!userId) return;
-                fetch(`/notifications/${userId}/clear-all`, { method: 'DELETE' })
-                    .then(() => {
-                        if (unreadBadge) unreadBadge.style.display = 'none';
-                        list.innerHTML = '<div style="padding: 16px; text-align: center; color: #94A3B8; font-size: 13px;">No notifications</div>';
-                    });
-            });
+            fetchDashboardLiveData();
+            setInterval(fetchDashboardLiveData, 5000);
         });
     </script>
-</body>
-</html>
+{% endblock %}

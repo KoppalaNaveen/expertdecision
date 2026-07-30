@@ -52,6 +52,25 @@ def create_comment(thread_id: int, comment: CommentCreate, db: Session = Depends
     db.add(db_comment)
     db.commit()
     db.refresh(db_comment)
+
+    try:
+        from app.models.activity_log import ActivityLog
+        act_log = ActivityLog(
+            user_id=comment.user_id,
+            action=f"Added discussion comment on DEC-{db_thread.decision_id}",
+            details=f"Comment in '{db_thread.topic}': {comment.content[:80]}"
+        )
+        db.add(act_log)
+        db.commit()
+    except Exception as e:
+        print("Error logging discussion comment activity:", e)
+
+    try:
+        from app.services.notification_service import NotificationService
+        NotificationService.notify_discussion(db, db_thread.decision_id, comment.user_id, comment.content)
+    except Exception as e:
+        print("Error sending discussion notification:", e)
+
     return db_comment
 
 @router.post("/{decision_id}/meeting_notes", response_model=MeetingNoteResponse)
@@ -66,6 +85,19 @@ def create_meeting_note(decision_id: int, note: MeetingNoteCreate, db: Session =
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
+
+    try:
+        from app.models.activity_log import ActivityLog
+        act_log = ActivityLog(
+            user_id=note.created_by,
+            action=f"Created meeting note for DEC-{decision_id}",
+            details=f"Meeting Note: '{note.title}'"
+        )
+        db.add(act_log)
+        db.commit()
+    except Exception as e:
+        print("Error logging meeting note activity:", e)
+
     return db_note
 
 @router.get("/{decision_id}/meeting_notes", response_model=List[MeetingNoteResponse])

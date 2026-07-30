@@ -1,125 +1,133 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-        <h2 class="fw-bold text-dark mb-1">User Management</h2>
-        <p class="text-muted mb-0">Manage all registered users, roles, and access levels.</p>
+        <h3 class="fw-bold text-dark mb-0" style="font-size: 20px;">User Management</h3>
+        <p class="text-muted mb-0" style="font-size: 12px;">Manage all registered users, roles, and access levels.</p>
     </div>
     <div class="d-flex gap-2">
-        <div class="input-group" style="width: 260px;">
-            <span class="input-group-text bg-white border-end-0">
-                <i data-lucide="search" style="width:16px;height:16px;color:#94a3b8;"></i>
+        <div class="input-group" style="width: 220px;">
+            <span class="input-group-text bg-white border-end-0 py-1">
+                <i data-lucide="search" style="width:14px;height:14px;color:#94a3b8;"></i>
             </span>
-            <input type="text" id="userSearch" class="form-control border-start-0 ps-0" placeholder="Search users..." oninput="handleSearch()">
+            <input type="text" id="userSearch" class="form-control border-start-0 ps-0 py-1" style="font-size: 12.5px;" placeholder="Search users..." oninput="handleSearch()">
         </div>
-        <select id="roleFilter" class="form-select" style="width:160px;" onchange="handleSearch()">
+        <select id="roleFilter" class="form-select py-1" style="width:140px; font-size: 12.5px;" onchange="handleSearch()">
             <option value="">All Roles</option>
             <option value="Employee">Employee</option>
             <option value="Reviewer">Reviewer</option>
             <option value="Manager">Manager</option>
             <option value="Administrator">Administrator</option>
         </select>
+        {% if session.get('role_name') in ['Admin', 'Administrator', 'System Administrator'] %}
+        <a href="{{ url_for('pending_approvals') }}" class="btn btn-warning text-dark d-flex align-items-center gap-1 px-2.5 py-1" style="font-size:12px; font-weight:700; border-radius:6px;">
+            <i data-lucide="clock" style="width:14px;height:14px;"></i> Pending Approvals
+        </a>
+        <button class="btn btn-primary d-flex align-items-center gap-1 px-2.5 py-1" style="font-size:12px; font-weight:600; border-radius:6px;" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            <i data-lucide="user-plus" style="width:14px;height:14px;"></i> Add User
+        </button>
+        {% endif %}
     </div>
 </div>
 
-<!-- Stats Cards -->
-<div class="row g-3 mb-4">
+<!-- Compact Stats Cards with Vertically & Horizontally Centered Content -->
+<div class="row g-2 mb-3">
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm rounded-3 p-3">
-            <div class="d-flex align-items-center gap-3">
-                <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#EEF2FF,#C7D2FE);display:flex;align-items:center;justify-content:center;">
-                    <i data-lucide="users" style="width:20px;height:20px;color:#4F46E5;"></i>
+        <div class="card border-0 shadow-sm rounded-3 py-3 px-3">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#EEF2FF,#C7D2FE);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="users" style="width:18px;height:18px;color:#4F46E5;"></i>
                 </div>
-                <div>
-                    <div id="statTotal" class="fw-bold fs-4 text-dark lh-1">—</div>
-                    <div class="text-muted" style="font-size:12px;">Total Users</div>
+                <div class="d-flex flex-column align-items-center justify-content-center text-center">
+                    <div id="statTotal" class="fw-bold text-dark lh-1" style="font-size: 20px; margin-bottom: 2px;">—</div>
+                    <div class="text-muted" style="font-size:11px; font-weight:600;">Total Users</div>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm rounded-3 p-3">
-            <div class="d-flex align-items-center gap-3">
-                <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#ECFDF5,#A7F3D0);display:flex;align-items:center;justify-content:center;">
-                    <i data-lucide="user-check" style="width:20px;height:20px;color:#059669;"></i>
+        <div class="card border-0 shadow-sm rounded-3 py-3 px-3">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#ECFDF5,#A7F3D0);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="user-check" style="width:18px;height:18px;color:#059669;"></i>
                 </div>
-                <div>
-                    <div id="statActive" class="fw-bold fs-4 text-dark lh-1">—</div>
-                    <div class="text-muted" style="font-size:12px;">Active Users</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm rounded-3 p-3">
-            <div class="d-flex align-items-center gap-3">
-                <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#FFF7ED,#FED7AA);display:flex;align-items:center;justify-content:center;">
-                    <i data-lucide="shield" style="width:20px;height:20px;color:#D97706;"></i>
-                </div>
-                <div>
-                    <div id="statAdmins" class="fw-bold fs-4 text-dark lh-1">—</div>
-                    <div class="text-muted" style="font-size:12px;">Admins</div>
+                <div class="d-flex flex-column align-items-center justify-content-center text-center">
+                    <div id="statActive" class="fw-bold text-dark lh-1" style="font-size: 20px; margin-bottom: 2px;">—</div>
+                    <div class="text-muted" style="font-size:11px; font-weight:600;">Active Users</div>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm rounded-3 p-3">
-            <div class="d-flex align-items-center gap-3">
-                <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#EFF6FF,#BFDBFE);display:flex;align-items:center;justify-content:center;">
-                    <i data-lucide="user-plus" style="width:20px;height:20px;color:#2563EB;"></i>
+        <div class="card border-0 shadow-sm rounded-3 py-3 px-3">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#FFF7ED,#FED7AA);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="shield" style="width:18px;height:18px;color:#D97706;"></i>
                 </div>
-                <div>
-                    <div id="statInactive" class="fw-bold fs-4 text-dark lh-1">—</div>
-                    <div class="text-muted" style="font-size:12px;">Inactive</div>
+                <div class="d-flex flex-column align-items-center justify-content-center text-center">
+                    <div id="statAdmins" class="fw-bold text-dark lh-1" style="font-size: 20px; margin-bottom: 2px;">—</div>
+                    <div class="text-muted" style="font-size:11px; font-weight:600;">Admins</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 py-3 px-3">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#EFF6FF,#BFDBFE);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i data-lucide="user-plus" style="width:18px;height:18px;color:#2563EB;"></i>
+                </div>
+                <div class="d-flex flex-column align-items-center justify-content-center text-center">
+                    <div id="statInactive" class="fw-bold text-dark lh-1" style="font-size: 20px; margin-bottom: 2px;">—</div>
+                    <div class="text-muted" style="font-size:11px; font-weight:600;">Inactive</div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Users Table -->
-<div class="card border-0 shadow-sm" style="border-radius:12px;overflow:hidden;">
+<!-- Compact Users Table -->
+<div class="card border-0 shadow-sm" style="border-radius:10px;overflow:hidden;">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" style="font-size:0.9rem;">
-            <thead class="table-light text-secondary" style="font-size:0.75rem;text-transform:uppercase;">
+        <table class="table table-hover align-middle mb-0" style="font-size:0.82rem;">
+            <thead class="table-light text-secondary" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
                 <tr>
-                    <th class="px-4 py-3 border-bottom-0">User</th>
-                    <th class="px-4 py-3 border-bottom-0">Employee ID</th>
-                    <th class="px-4 py-3 border-bottom-0">Role</th>
-                    <th class="px-4 py-3 border-bottom-0">Designation</th>
-                    <th class="px-4 py-3 border-bottom-0">Phone</th>
-                    <th class="px-4 py-3 border-bottom-0">Status</th>
-                    <th class="px-4 py-3 border-bottom-0 text-end">Actions</th>
+                    <th class="px-3 py-2 border-bottom-0">User</th>
+                    <th class="px-3 py-2 border-bottom-0">Employee ID</th>
+                    <th class="px-3 py-2 border-bottom-0">Role</th>
+                    <th class="px-3 py-2 border-bottom-0">Designation</th>
+                    <th class="px-3 py-2 border-bottom-0">Phone</th>
+                    <th class="px-3 py-2 border-bottom-0">Status</th>
+                    <th class="px-3 py-2 border-bottom-0 text-end">Actions</th>
                 </tr>
             </thead>
             <tbody id="usersTableBody" class="border-top-0">
-                <tr><td colspan="7" class="text-center py-5 text-muted">
+                <tr><td colspan="7" class="text-center py-4 text-muted">
                     <div class="spinner-border spinner-border-sm me-2"></div>Loading users...
                 </td></tr>
             </tbody>
         </table>
     </div>
-    <div class="card-footer bg-white border-top py-3 px-4">
+    <div class="card-footer bg-white border-top py-2 px-3">
         <div class="d-flex justify-content-between align-items-center">
-            <span id="paginationInfo" class="text-muted small">Loading...</span>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-outline-secondary px-3" id="btnPrev" onclick="prevPage()" disabled>Previous</button>
-                <span id="pageIndicator" class="text-muted small px-2">—</span>
-                <button class="btn btn-sm btn-outline-secondary px-3" id="btnNext" onclick="nextPage()" disabled>Next</button>
+            <span id="paginationInfo" class="text-muted small" style="font-size: 11.5px;">Loading...</span>
+            <div class="d-flex align-items-center gap-1.5">
+                <button class="btn btn-xs btn-outline-secondary px-2.5 py-1" style="font-size:11.5px;" id="btnPrev" onclick="prevPage()" disabled>Previous</button>
+                <span id="pageIndicator" class="text-muted small px-2" style="font-size:11.5px;">—</span>
+                <button class="btn btn-xs btn-outline-secondary px-2.5 py-1" style="font-size:11.5px;" id="btnNext" onclick="nextPage()" disabled>Next</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Role Badge Colors -->
+<!-- Compact Role Badge Colors -->
 <style>
 .role-badge {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 20px;
+    padding: 2px 8px;
+    border-radius: 12px;
     display: inline-block;
 }
 .role-employee { background: #EEF2FF; color: #4F46E5; }
@@ -127,16 +135,129 @@
 .role-manager   { background: #ECFDF5; color: #059669; }
 .role-administrator { background: #FEF2F2; color: #DC2626; }
 .user-avatar-sm {
-    width: 34px; height: 34px; border-radius: 50%;
+    width: 28px; height: 28px; border-radius: 50%;
     background: linear-gradient(135deg, #667EEA, #764BA2);
     display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; color: #fff;
+    font-size: 11px; font-weight: 700; color: #fff;
     flex-shrink: 0;
 }
 </style>
 
+<!-- View User Details Modal -->
+<div class="modal fade" id="viewUserModal" tabindex="-1" aria-labelledby="viewUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark" id="viewUserModalLabel" style="font-size:17px;">User Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <div class="d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
+                    <div id="viewUserAvatar" class="user-avatar-sm" style="width:44px; height:44px; font-size:16px;">U</div>
+                    <div>
+                        <h6 id="viewFullName" class="fw-bold text-dark mb-1" style="font-size:16px;">User Name</h6>
+                        <span id="viewRoleBadge" class="role-badge">Role</span>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="text-muted small fw-bold text-uppercase" style="font-size:10.5px;">Employee ID</label>
+                        <div id="viewEmployeeId" class="fw-bold text-dark" style="font-size:13px;">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="text-muted small fw-bold text-uppercase" style="font-size:10.5px;">Status</label>
+                        <div id="viewStatus" class="fw-bold text-dark" style="font-size:13px;">—</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="text-muted small fw-bold text-uppercase" style="font-size:10.5px;">Email Address</label>
+                        <div id="viewEmail" class="fw-semibold text-dark" style="font-size:13px; word-break:break-all; background:#F8FAFC; padding:8px 12px; border-radius:8px; border:1px solid #E2E8F0;">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="text-muted small fw-bold text-uppercase" style="font-size:10.5px;">Designation</label>
+                        <div id="viewDesignation" class="fw-semibold text-dark" style="font-size:13px;">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="text-muted small fw-bold text-uppercase" style="font-size:10.5px;">Phone</label>
+                        <div id="viewPhone" class="fw-semibold text-dark" style="font-size:13px;">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="text-muted small fw-bold text-uppercase" style="font-size:10.5px;">Email Verified</label>
+                        <div id="viewEmailVerified" class="fw-semibold text-dark" style="font-size:13px;">—</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="text-muted small fw-bold text-uppercase" style="font-size:10.5px;">Approved Status</label>
+                        <div id="viewApproved" class="fw-semibold text-dark" style="font-size:13px;">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-secondary btn-sm px-4 fw-bold" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal (Admin only) -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:14px;">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark" id="addUserModalLabel" style="font-size:16px;">Create New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addUserForm">
+                <div class="modal-body py-2">
+                    <div class="mb-2.5">
+                        <label class="form-label small fw-bold text-dark mb-1" style="font-size:11.5px;">Full Name *</label>
+                        <input type="text" id="addFullName" class="form-control form-control-sm" required placeholder="e.g. John Doe">
+                    </div>
+                    <div class="mb-2.5">
+                        <label class="form-label small fw-bold text-dark mb-1" style="font-size:11.5px;">Email Address *</label>
+                        <input type="email" id="addEmail" class="form-control form-control-sm" required placeholder="john@example.com">
+                    </div>
+                    <div class="row g-2 mb-2.5">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark mb-1" style="font-size:11.5px;">Role *</label>
+                            <select id="addRoleId" class="form-select form-select-sm" required>
+                                <option value="3">Employee</option>
+                                <option value="4">Reviewer</option>
+                                <option value="2">Manager</option>
+                                <option value="1">Administrator</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark mb-1" style="font-size:11.5px;">Employee ID (Optional)</label>
+                            <input type="text" id="addEmployeeId" class="form-control form-control-sm" placeholder="Auto-generated if empty">
+                        </div>
+                    </div>
+                    <div class="mb-2.5">
+                        <label class="form-label small fw-bold text-dark mb-1" style="font-size:11.5px;">Password *</label>
+                        <input type="password" id="addPassword" class="form-control form-control-sm" required minlength="6" placeholder="Min. 6 characters">
+                    </div>
+                    <div class="row g-2 mb-2.5">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark mb-1" style="font-size:11.5px;">Designation</label>
+                            <input type="text" id="addDesignation" class="form-control form-control-sm" placeholder="e.g. Senior Developer">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark mb-1" style="font-size:11.5px;">Phone</label>
+                            <input type="text" id="addPhone" class="form-control form-control-sm" placeholder="+1 234 567 890">
+                        </div>
+                    </div>
+                    <div id="addUserAlert" class="alert alert-danger py-1.5 px-2 small d-none" role="alert"></div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="btnAddUserSubmit" class="btn btn-primary btn-sm px-4 fw-bold">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
     const API_URL = "http://127.0.0.1:8000";
+    const CURRENT_USER_ROLE = "{{ session.get('role_name', 'Employee') }}";
 </script>
-<script src="{{ url_for('static', filename='js/users.js') }}"></script>
+<script src="{{ url_for('static', filename='js/users.js') }}?v={{ range(1, 100000) | random }}"></script>
 {% endblock %}

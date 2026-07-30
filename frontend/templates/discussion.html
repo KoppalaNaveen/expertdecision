@@ -436,8 +436,14 @@
             return;
         }
 
+        const file = files[0];
+        if (file.size > 200 * 1024 * 1024) {
+            alert(`File "${file.name}" exceeds the maximum allowed upload limit of 200 MB.`);
+            return;
+        }
+
         const formData = new FormData();
-        formData.append('file', files[0]);
+        formData.append('file', file);
         formData.append('user_id', USER_ID);
         formData.append('decision_id', decisionId);
 
@@ -447,7 +453,10 @@
                 body: formData
             });
 
-            if (!res.ok) throw new Error("Failed to upload document");
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.detail || "Failed to upload document");
+            }
 
             bootstrap.Modal.getInstance(document.getElementById('uploadFileModal')).hide();
             alert("Supporting document uploaded successfully");
@@ -559,7 +568,8 @@
                 </div>
                 <div class="mb-0">
                     <label class="form-label fw-semibold text-secondary">Choose File</label>
-                    <input type="file" id="uploadFileInput" class="form-control">
+                    <input type="file" id="uploadFileInput" class="form-control" accept=".pdf,.docx,.xlsx,.pptx,.csv">
+                    <div class="form-text text-xs">Supports PDF, DOCX, XLSX, PPTX, and CSV files up to 200 MB</div>
                 </div>
             </div>
             <div class="modal-footer border-top-0 pt-0">

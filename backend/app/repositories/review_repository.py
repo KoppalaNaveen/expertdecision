@@ -11,19 +11,102 @@ class ReviewRepository:
         db: Session,
         review: ReviewCreate
     ):
+        from app.models.decision import Decision
+        from fastapi import HTTPException
 
-        new_review = Review(
-            decision_id=review.decision_id,
-            reviewer_id=review.reviewer_id,
-            status=review.status,
-            comments=review.comments
+        dec = db.query(Decision).filter(Decision.id == review.decision_id).first()
+        if dec and dec.created_by == review.reviewer_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Decision owner cannot approve or reject their own decision. Only assigned reviewers and managers can take approval actions."
+            )
+
+        existing_review = db.query(Review).filter(
+            Review.decision_id == review.decision_id,
+            Review.reviewer_id == review.reviewer_id
+        ).first()
+
+        if existing_review:
+            existing_review.status = review.status
+            existing_review.comments = review.comments
+            db.commit()
+            db.refresh(existing_review)
+            target_review = existing_review
+        else:
+            new_review = Review(
+                decision_id=review.decision_id,
+                reviewer_id=review.reviewer_id,
+                status=review.status,
+                comments=review.comments
+            )
+            db.add(new_review)
+            db.commit()
+            db.refresh(new_review)
+        from app.models.activity_log import ActivityLog
+        act_log = ActivityLog(
+            user_id=review.reviewer_id,
+            action=f"Reviewed DEC-{review.decision_id}: marked as {review.status}",
+            details=f"Comments: {review.comments or 'None'}"
         )
+        db.add(act_log)
 
-        db.add(new_review)
-        db.commit()
-        db.refresh(new_review)
+        # Also update decision overall status and handle sequential notifications
+        from app.models.decision import Decision
+        from app.services.notification_service import NotificationService
+        
+        dec = db.query(Decision).filter(Decision.id == review.decision_id).first()
+        if dec and review.status in ["Approved", "Rejected"]:
+            if review.status == "Rejected":
+                dec.status = "Rejected"
+                db.commit()
+                # Notify creator about rejection
+                try:
+                    NotificationService.create_notification(
+                        db,
+                        user_id=dec.created_by,
+                        message=f"Your decision 'DEC-{dec.id}: {dec.title}' was rejected by reviewer.",
+                        notification_type="Decision Status"
+                    )
+                except Exception as e:
+                    print("Notification error:", e)
+            elif review.status == "Approved":
+                all_revs = db.query(Review).filter(Review.decision_id == review.decision_id).order_by(Review.id.asc()).all()
+                all_approved = all(r.status == "Approved" for r in all_revs)
+                
+                if all_approved:
+                    dec.status = "Approved"
+                    db.commit()
+                    # Notify creator about overall approval
+                    try:
+                        NotificationService.create_notification(
+                            db,
+                            user_id=dec.created_by,
+                            message=f"Your decision 'DEC-{dec.id}: {dec.title}' was fully approved by all assigned reviewers and managers!",
+                            notification_type="Decision Status"
+                        )
+                    except Exception as e:
+                        print("Notification error:", e)
+                else:
+                    # Find next pending reviewer in sequence (e.g. Manager)
+                    next_rev = next((r for r in all_revs if r.status == "Pending"), None)
+                    if next_rev:
+                        try:
+                            NotificationService.create_notification(
+                                db,
+                                user_id=next_rev.reviewer_id,
+                                message=f"Pending review for decision 'DEC-{dec.id}: {dec.title}' approved by previous reviewer and awaiting your decision.",
+                                notification_type="Review Request"
+                            )
+                        except Exception as e:
+                            print("Notification error:", e)
 
-        return new_review
+        # Trigger live notifications for action
+        try:
+            NotificationService.notify_review_action(db, review.decision_id, review.reviewer_id, review.status, review.comments)
+        except Exception as e:
+            print("Error triggering review notification:", e)
+
+        return target_review
 
     @staticmethod
     def get_all_reviews(db: Session):

@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-dark mb-1">Email Support &amp; Help Desk</h2>
+        <p class="text-muted mb-0">Submit support requests, track ticket status, and receive support email responses.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary d-flex align-items-center gap-2 px-4 py-2 fw-bold shadow-sm" style="border-radius:10px;" onclick="openNewTicketModal()">
+            <i data-lucide="life-buoy" style="width:16px;height:16px;"></i> Submit Support Ticket
+        </button>
+    </div>
+</div>
+
+<!-- Alert Banner -->
+<div id="supportAlertContainer"></div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 p-3 h-100 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:40px;height:40px;border-radius:10px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;color:#4F46E5;">
+                    <i data-lucide="ticket" style="width:18px;height:18px;"></i>
+                </div>
+                <div><div id="statTotalTickets" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Total Tickets</div></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 p-3 h-100 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:40px;height:40px;border-radius:10px;background:#FFF7ED;display:flex;align-items:center;justify-content:center;color:#D97706;">
+                    <i data-lucide="clock" style="width:18px;height:18px;"></i>
+                </div>
+                <div><div id="statOpenTickets" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Open</div></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 p-3 h-100 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:40px;height:40px;border-radius:10px;background:#FEF3C7;display:flex;align-items:center;justify-content:center;color:#B45309;">
+                    <i data-lucide="loader" style="width:18px;height:18px;"></i>
+                </div>
+                <div><div id="statInProgressTickets" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">In Progress</div></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm rounded-3 p-3 h-100 bg-white">
+            <div class="d-flex align-items-center gap-3">
+                <div style="width:40px;height:40px;border-radius:10px;background:#ECFDF5;display:flex;align-items:center;justify-content:center;color:#059669;">
+                    <i data-lucide="check-circle-2" style="width:18px;height:18px;"></i>
+                </div>
+                <div><div id="statResolvedTickets" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Resolved</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Support Tickets Table Card -->
+<div class="card border-0 shadow-sm" style="border-radius:12px;overflow:hidden;">
+    <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold text-dark mb-0">Support Ticket History</h6>
+        <div class="input-group" style="width:240px;">
+            <span class="input-group-text bg-white border-end-0">
+                <i data-lucide="search" style="width:14px;height:14px;color:#94a3b8;"></i>
+            </span>
+            <input type="text" id="supportSearch" class="form-control border-start-0 ps-0" placeholder="Search tickets..." oninput="filterSupportTickets()">
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:0.875rem;">
+            <thead class="table-light text-secondary" style="font-size:0.75rem;text-transform:uppercase;">
+                <tr>
+                    <th class="px-4 py-3 border-bottom-0">Ticket #</th>
+                    <th class="px-4 py-3 border-bottom-0">Subject &amp; Query</th>
+                    <th class="px-4 py-3 border-bottom-0">Category</th>
+                    <th class="px-4 py-3 border-bottom-0">Priority</th>
+                    <th class="px-4 py-3 border-bottom-0">Status</th>
+                    <th class="px-4 py-3 border-bottom-0">Created At</th>
+                    <th class="px-4 py-3 border-bottom-0 text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody id="supportTableBody">
+                <tr><td colspan="7" class="text-center py-5 text-muted">
+                    <div class="spinner-border spinner-border-sm me-2"></div>Loading support tickets...
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Submit New Support Ticket Modal -->
+<div class="modal fade" id="newTicketModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header bg-primary text-white py-3 px-4 border-0">
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;">
+                        <i data-lucide="headphone-off" style="width:20px;height:20px;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">Submit Support Ticket</h5>
+                        <div class="small opacity-90">Our support team will email you a response shortly</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="background:#F8FAFC;">
+                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white mb-3">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold text-dark small">Ticket Subject <span class="text-danger">*</span></label>
+                            <input type="text" id="ticketSubject" class="form-control" placeholder="Brief summary of your issue or request...">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark small">Category</label>
+                            <select id="ticketCategory" class="form-select">
+                                <option value="Account & Access">Account &amp; Access</option>
+                                <option value="Decision Workflow" selected>Decision Workflow</option>
+                                <option value="Email & Notifications">Email &amp; Notifications</option>
+                                <option value="Bug Report">Bug Report</option>
+                                <option value="General Query">General Query</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark small">Priority</label>
+                            <select id="ticketPriority" class="form-select">
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                                <option value="Urgent">Urgent</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold text-dark small">Detailed Description <span class="text-danger">*</span></label>
+                            <textarea id="ticketMessage" class="form-control" rows="4" placeholder="Explain the problem or query in detail so our support team can assist you effectively..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-white border-top py-3 px-4 d-flex justify-content-between">
+                <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal" style="border-radius:10px;">Cancel</button>
+                <button type="button" id="btnSubmitTicket" class="btn btn-primary px-4 py-2 fw-bold d-flex align-items-center gap-2" style="border-radius:10px;" onclick="submitSupportTicket()">
+                    <i data-lucide="send" style="width:16px;height:16px;"></i> Submit Request
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View / Reply Ticket Modal -->
+<div class="modal fade" id="viewTicketModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+            <div class="modal-header bg-dark text-white py-3 px-4 border-0">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="badge bg-primary px-3 py-1 fw-bold fs-6" id="viewTicketNum">SUP-0000</span>
+                    <h5 class="modal-title fw-bold mb-0" id="viewTicketSubject">Ticket Subject</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="background:#F8FAFC;">
+                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fw-bold text-dark" id="viewTicketUser">User Name</span>
+                            <span class="text-muted small" id="viewTicketEmail">(user@email.com)</span>
+                        </div>
+                        <span class="badge" id="viewTicketStatusBadge" style="background:#EEF2FF;color:#4F46E5;">Open</span>
+                    </div>
+                    <div class="p-3 bg-light rounded-3 text-dark small mb-2" id="viewTicketMessage" style="white-space:pre-line;">
+                        User query message...
+                    </div>
+                    <div class="text-muted" style="font-size:11px;" id="viewTicketCreated">Submitted at...</div>
+                </div>
+
+                <!-- Admin Response Box -->
+                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+                    <h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2">
+                        <i data-lucide="corner-down-right" style="width:16px;height:16px;color:#2563EB;"></i> Support Team Response
+                    </h6>
+                    
+                    {% if session.get('role_name') in ['Admin', 'Administrator'] %}
+                        <textarea id="replyText" class="form-control mb-3" rows="3" placeholder="Write support team response to send via email..."></textarea>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button class="btn btn-success fw-bold px-3 py-1 text-sm" onclick="sendAdminTicketReply()">
+                                <i data-lucide="check-circle" style="width:14px;height:14px;" class="me-1"></i> Resolve &amp; Email Reply
+                            </button>
+                        </div>
+                    {% else %}
+                        <div id="userReplyView" class="p-3 bg-success-subtle text-success-emphasis rounded-3 small">
+                            No response from support team yet. You will receive an email as soon as an administrator replies.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+    let allSupportTickets = [];
+    let currentSelectedTicketId = null;
+    const currentUserId = {{ session.get('user_id', 1) }};
+    const isAdminUser = {% if session.get('role_name') in ['Admin', 'Administrator'] %}true{% else %}false{% endif %};
+
+    document.addEventListener("DOMContentLoaded", () => {
+        loadSupportTickets();
+    });
+
+    async function loadSupportTickets() {
+        try {
+            const endpoint = isAdminUser ? `${API_URL}/support/all` : `${API_URL}/support/my-tickets/${currentUserId}`;
+            const res = await fetch(endpoint);
+            if (res.ok) {
+                allSupportTickets = await res.json();
+                updateSupportStats();
+                renderSupportTable();
+            }
+        } catch (e) {
+            console.error("Failed to load tickets:", e);
+        }
+    }
+
+    function updateSupportStats() {
+        const total = allSupportTickets.length;
+        const open = allSupportTickets.filter(t => t.status === "Open").length;
+        const progress = allSupportTickets.filter(t => t.status === "In Progress").length;
+        const resolved = allSupportTickets.filter(t => t.status === "Resolved" || t.status === "Closed").length;
+
+        document.getElementById("statTotalTickets").innerText = total;
+        document.getElementById("statOpenTickets").innerText = open;
+        document.getElementById("statInProgressTickets").innerText = progress;
+        document.getElementById("statResolvedTickets").innerText = resolved;
+    }
+
+    function filterSupportTickets() {
+        renderSupportTable();
+    }
+
+    function renderSupportTable() {
+        const query = (document.getElementById("supportSearch")?.value || "").toLowerCase();
+        const filtered = allSupportTickets.filter(t => {
+            return !query || 
+                t.ticket_number.toLowerCase().includes(query) ||
+                t.subject.toLowerCase().includes(query) ||
+                t.category.toLowerCase().includes(query) ||
+                (t.user_name || "").toLowerCase().includes(query);
+        });
+
+        const tbody = document.getElementById("supportTableBody");
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted">No support tickets found.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(t => {
+            const dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+            let statusStyle = "background:#FFF7ED;color:#D97706;";
+            if (t.status === "Resolved" || t.status === "Closed") statusStyle = "background:#ECFDF5;color:#059669;";
+            else if (t.status === "In Progress") statusStyle = "background:#FEF3C7;color:#B45309;";
+
+            let prioStyle = "background:#EEF2FF;color:#4F46E5;";
+            if (t.priority === "High" || t.priority === "Urgent") prioStyle = "background:#FEF2F2;color:#DC2626;";
+
+            return `
+            <tr>
+                <td class="px-4 py-3"><span class="fw-bold text-primary">${t.ticket_number}</span></td>
+                <td class="px-4">
+                    <div class="fw-semibold text-dark" style="font-size:13px;">${t.subject}</div>
+                    <div class="text-muted" style="font-size:11px;">By ${t.user_name || 'User'}</div>
+                </td>
+                <td class="px-4"><span style="background:#F1F5F9;color:#475569;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;">${t.category}</span></td>
+                <td class="px-4"><span class="badge" style="${prioStyle}font-size:10px;">${t.priority}</span></td>
+                <td class="px-4"><span class="badge" style="${statusStyle}font-size:11px;font-weight:700;">${t.status}</span></td>
+                <td class="px-4 text-muted small">${dateStr}</td>
+                <td class="px-4 text-end">
+                    <button class="btn btn-sm btn-outline-primary px-3 fw-semibold" style="font-size:11px;" onclick="viewSupportTicketDetails(${t.id})">
+                        View &amp; Details
+                    </button>
+                </td>
+            </tr>`;
+        }).join("");
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function openNewTicketModal() {
+        document.getElementById("ticketSubject").value = "";
+        document.getElementById("ticketMessage").value = "";
+        const modal = new bootstrap.Modal(document.getElementById("newTicketModal"));
+        modal.show();
+    }
+
+    async function submitSupportTicket() {
+        const subject = document.getElementById("ticketSubject").value.trim();
+        const category = document.getElementById("ticketCategory").value;
+        const priority = document.getElementById("ticketPriority").value;
+        const message = document.getElementById("ticketMessage").value.trim();
+
+        if (!subject || !message) {
+            alert("Please fill in both subject and description.");
+            return;
+        }
+
+        const btn = document.getElementById("btnSubmitTicket");
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`${API_URL}/support/create`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: currentUserId,
+                    subject: subject,
+                    category: category,
+                    priority: priority,
+                    message: message
+                })
+            });
+
+            if (res.ok) {
+                const modalEl = document.getElementById("newTicketModal");
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                alert("Support ticket submitted successfully! A confirmation email has been dispatched to your address.");
+                loadSupportTickets();
+            } else {
+                alert("Failed to submit support ticket.");
+            }
+        } catch (e) {
+            alert("Network error occurred.");
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function viewSupportTicketDetails(ticketId) {
+        const ticket = allSupportTickets.find(t => t.id === ticketId);
+        if (!ticket) return;
+        currentSelectedTicketId = ticketId;
+
+        document.getElementById("viewTicketNum").innerText = ticket.ticket_number;
+        document.getElementById("viewTicketSubject").innerText = ticket.subject;
+        document.getElementById("viewTicketUser").innerText = ticket.user_name || "User";
+        document.getElementById("viewTicketEmail").innerText = `(${ticket.user_email || 'user@email.com'})`;
+        document.getElementById("viewTicketMessage").innerText = ticket.message;
+        document.getElementById("viewTicketCreated").innerText = `Submitted on ${ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'N/A'}`;
+        document.getElementById("viewTicketStatusBadge").innerText = ticket.status;
+
+        const replyView = document.getElementById("userReplyView");
+        if (replyView) {
+            if (ticket.admin_reply) {
+                replyView.className = "p-3 bg-success-subtle text-success-emphasis rounded-3 small border border-success-subtle";
+                replyView.innerHTML = `<strong>Support Reply (${ticket.resolved_at ? new Date(ticket.resolved_at).toLocaleDateString() : 'Resolved'}):</strong><br>${ticket.admin_reply}`;
+            } else {
+                replyView.className = "p-3 bg-light text-muted rounded-3 small";
+                replyView.innerText = "No response from support team yet. You will receive an email as soon as an administrator replies.";
+            }
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById("viewTicketModal"));
+        modal.show();
+    }
+
+    async function sendAdminTicketReply() {
+        const replyText = document.getElementById("replyText")?.value.trim();
+        if (!replyText) {
+            alert("Please enter a response to send to the user.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/support/reply`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ticket_id: currentSelectedTicketId,
+                    admin_reply: replyText,
+                    status: "Resolved"
+                })
+            });
+
+            if (res.ok) {
+                const modalEl = document.getElementById("viewTicketModal");
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                alert("Response sent successfully! An email notification has been sent to the user.");
+                loadSupportTickets();
+            } else {
+                alert("Failed to send reply.");
+            }
+        } catch (e) {
+            alert("Network error occurred.");
+        }
+    }
+</script>
+{% endblock %}

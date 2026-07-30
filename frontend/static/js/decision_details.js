@@ -1,21 +1,43 @@
 let currentDecision = null;
 let currentAlternatives = [];
+let livePollInterval = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     fetchDecisionDetails();
     fetchAlternatives();
+
+    if (!livePollInterval) {
+        livePollInterval = setInterval(fetchDecisionDetailsSilent, 3000);
+    }
 });
 
 async function fetchDecisionDetails() {
     try {
-        const response = await fetch(`${API_URL}/decisions/${DECISION_ID}`);
+        const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
+        const response = await fetch(`${API_URL}/decisions/${DECISION_ID}?user_id=${userIdParam}`);
         if (!response.ok) throw new Error("Failed to load decision");
         
         currentDecision = await response.json();
         renderDecisionDetails();
+        loadHistory();
     } catch (error) {
         showToast("Danger", error.message);
     }
+}
+
+async function fetchDecisionDetailsSilent() {
+    try {
+        const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
+        const response = await fetch(`${API_URL}/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        if (!response.ok) return;
+        const newData = await response.json();
+        
+        const hasChanged = JSON.stringify(newData.reviews) !== JSON.stringify(currentDecision?.reviews) || newData.status !== currentDecision?.status;
+        currentDecision = newData;
+        if (hasChanged) {
+            renderDecisionDetails();
+        }
+    } catch (_) {}
 }
 
 function renderDecisionDetails() {
@@ -26,7 +48,7 @@ function renderDecisionDetails() {
     const creatorName = currentDecision.creator_name || `User #${currentDecision.created_by}`;
     const creatorInitials = currentDecision.creator_initials || 'U';
     
-    // Select the avatar and name elements (need to update the HTML to give them IDs if not already)
+    // Select the avatar and name elements
     const creatorContainer = document.getElementById("detailCreator").parentElement;
     if (creatorContainer) {
         const avatar = creatorContainer.querySelector('.avatar-sm');
@@ -37,15 +59,68 @@ function renderDecisionDetails() {
     document.getElementById("detailDate").innerText = new Date(currentDecision.created_at).toLocaleDateString();
     
     const badge = document.getElementById("decisionStatusBadge");
-    badge.innerText = currentDecision.status;
-    badge.className = "badge " + getStatusBadgeClass(currentDecision.status);
+    if (badge) {
+        badge.innerText = currentDecision.status;
+        badge.className = "badge " + getStatusBadgeClass(currentDecision.status);
+    }
 
-    document.getElementById("statusSelect").value = currentDecision.status;
+    const isOwner = (currentDecision.created_by === USER_ID);
+    const isAdmin = typeof CURRENT_USER_ROLE !== 'undefined' && CURRENT_USER_ROLE && String(CURRENT_USER_ROLE).toLowerCase().includes('admin');
+    const canDelete = isAdmin || (isOwner && currentDecision.status !== "Approved" && currentDecision.status !== "Rejected");
+    const btnDelete = document.getElementById("btnDeleteDecision");
+    if (btnDelete) {
+        if (canDelete) {
+            btnDelete.classList.remove("d-none");
+        } else {
+            btnDelete.classList.add("d-none");
+        }
+    }
+
+    // Edit button: ONLY decision owner can edit
+    const btnEdit = document.getElementById("btnEditDecision");
+    if (btnEdit) {
+        if (isOwner && currentDecision.status === "Draft") {
+            btnEdit.classList.remove("d-none");
+        } else if (isOwner) {
+            btnEdit.classList.remove("d-none");
+        } else {
+            btnEdit.classList.add("d-none");
+        }
+    }
+
+    // Submit Draft button: ONLY decision owner can submit
+    const btnSubmitDraft = document.getElementById("btnSubmitDraft");
+    if (btnSubmitDraft) {
+        if (isOwner && currentDecision.status === "Draft") {
+            btnSubmitDraft.classList.remove("d-none");
+        } else {
+            btnSubmitDraft.classList.add("d-none");
+        }
+    }
+
+    const statusSel = document.getElementById("statusSelect");
+    if (statusSel) statusSel.value = currentDecision.status;
+
+    // Check if current user is the FIRST pending reviewer in sequential sequence
+    const pendingReviews = currentDecision.reviews ? currentDecision.reviews.filter(r => r.status === "Pending") : [];
+    const firstPending = pendingReviews.length > 0 ? pendingReviews[0] : null;
+    const isUserTurn = firstPending && firstPending.reviewer_id === USER_ID;
+
+    const actionCard = document.getElementById("pendingReviewActionCard");
+    if (isUserTurn && actionCard) {
+        actionCard.classList.remove("d-none");
+    } else if (actionCard) {
+        actionCard.classList.add("d-none");
+    }
     
-    // Update Category badge in the right column if we can find it
-    // Wait, the HTML has it hardcoded as "General", let's update it in the HTML later if needed,
-    // or just find it by some selector. For now, let's render the Approval Chain.
     renderApprovalChain();
+}
+
+function submitDetailReviewAction(status) {
+    const title = currentDecision ? currentDecision.title : `Decision #${DECISION_ID}`;
+    const creator = currentDecision ? (currentDecision.creator_name || 'Author') : 'Author';
+    const category = currentDecision ? (currentDecision.category || 'General') : 'General';
+    openApprovalWorkflowModal(DECISION_ID, title, USER_ID, status, creator, category);
 }
 
 function renderApprovalChain() {
@@ -70,38 +145,60 @@ function renderApprovalChain() {
         </div>
     `;
     
+    // Find index of first pending review in sequential flow
+    const firstPendingIdx = currentDecision.reviews ? currentDecision.reviews.findIndex(r => r.status === "Pending") : -1;
+
     // Add reviews
     if (currentDecision.reviews && currentDecision.reviews.length > 0) {
         currentDecision.reviews.forEach((review, idx) => {
             let itemClass = "timeline-item";
             let titleClass = "fw-semibold text-secondary";
-            let statusText = `Pending: ${review.reviewer_name || 'User ' + review.reviewer_id}`;
-            let icon = "";
             let timeLabel = "";
+
+            const revName = review.reviewer_name || `User #${review.reviewer_id}`;
+            const empIdStr = review.employee_id ? ` (${review.employee_id})` : '';
+            const roleStr = idx === 0 ? 'Reviewer' : 'Manager';
+            const reviewerDisplay = `${escapeHtml(revName)}${empIdStr}`;
+            
+            let statusText = `Pending: ${reviewerDisplay}`;
             
             if (review.status === "Approved") {
                 itemClass = "timeline-item completed";
-                titleClass = "fw-bold";
-                statusText = `${review.reviewer_name || 'User ' + review.reviewer_id} <i class="bi bi-check-circle-fill text-success ms-1"></i>`;
-                timeLabel = new Date(review.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                titleClass = "fw-bold text-success";
+                statusText = `<span class="fw-bold text-dark">${reviewerDisplay}</span> <span class="badge bg-success-subtle text-success border border-success-subtle ms-1"><i class="bi bi-check-circle-fill me-1"></i>Approved / Accepted</span>`;
+                if (review.comments) {
+                    statusText += `<div class="text-muted small mt-1">"${escapeHtml(review.comments)}"</div>`;
+                }
+                timeLabel = review.reviewed_at ? new Date(review.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Approved';
             } else if (review.status === "Rejected") {
                 itemClass = "timeline-item completed";
                 titleClass = "fw-bold text-danger";
-                statusText = `${review.reviewer_name || 'User ' + review.reviewer_id} <i class="bi bi-x-circle-fill text-danger ms-1"></i>`;
-                timeLabel = new Date(review.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                statusText = `<span class="fw-bold text-dark">${reviewerDisplay}</span> <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1"><i class="bi bi-x-circle-fill me-1"></i>Rejected</span>`;
+                if (review.comments) {
+                    statusText += `<div class="text-danger small mt-1">Reason: "${escapeHtml(review.comments)}"</div>`;
+                }
+                timeLabel = review.reviewed_at ? new Date(review.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Rejected';
             } else if (review.status === "Pending") {
-                itemClass = "timeline-item active";
-                titleClass = "fw-bold text-primary";
-                timeLabel = `<span class="text-primary fw-bold" style="font-size: 11px;">Current</span>`;
+                if (idx === firstPendingIdx) {
+                    itemClass = "timeline-item active";
+                    titleClass = "fw-bold text-primary";
+                    statusText = `Pending: <span class="fw-bold text-dark">${reviewerDisplay}</span>`;
+                    timeLabel = `<span class="badge bg-primary bg-opacity-10 text-primary fw-bold" style="font-size: 11px;">Current</span>`;
+                } else {
+                    itemClass = "timeline-item";
+                    titleClass = "fw-medium text-secondary";
+                    statusText = `Queued (Awaiting Step 1): <span class="fw-medium text-dark">${reviewerDisplay}</span>`;
+                    timeLabel = `<span class="badge bg-light text-muted border" style="font-size: 10px;">Queued</span>`;
+                }
             }
             
-            let approvalTypeLabel = review.approval_type ? review.approval_type + " Approval" : "Review Step";
+            let approvalTypeLabel = `Review Step ${idx + 1} (${roleStr})`;
             
             html += `
                 <div class="${itemClass}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h6 class="${titleClass} mb-0 text-sm">${approvalTypeLabel}</h6>
+                            <h6 class="${titleClass} mb-1 text-sm">${approvalTypeLabel}</h6>
                             <p class="text-muted mb-0" style="font-size: 12px;">${statusText}</p>
                         </div>
                         <small class="text-muted" style="font-size: 11px;">${timeLabel}</small>
@@ -125,12 +222,47 @@ function renderApprovalChain() {
 }
 
 function getStatusBadgeClass(status) {
-    if (status === "Approved") return "bg-success";
-    if (status === "Rejected") return "bg-danger";
-    if (status === "Under Review") return "bg-warning text-dark";
-    if (status === "Archived") return "bg-dark";
-    return "bg-secondary";
+    if (status === "Approved") return "bg-success text-white";
+    if (status === "Rejected") return "bg-danger text-white";
+    if (status === "Under Review" || status === "Pending") return "bg-warning text-dark";
+    if (status === "Draft") return "bg-secondary text-white";
+    if (status === "Archived") return "bg-dark text-white";
+    return "bg-secondary text-white";
 }
+
+async function archiveCurrentDecision() {
+    if (!confirm("Are you sure you want to move this decision to Archive?")) return;
+    try {
+        const res = await fetch(`${API_URL}/decisions/${DECISION_ID}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "Archived" })
+        });
+        if (!res.ok) throw new Error("Failed to archive decision");
+        showToast("Success", "Decision status updated to Archived.");
+        fetchDecisionDetails();
+    } catch (e) {
+        showToast("Danger", e.message || "Error archiving decision");
+    }
+}
+window.archiveCurrentDecision = archiveCurrentDecision;
+
+async function submitDraftForReview() {
+    if (!confirm("Submit this draft decision for review?")) return;
+    try {
+        const res = await fetch(`${API_URL}/decisions/${DECISION_ID}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "Pending" })
+        });
+        if (!res.ok) throw new Error("Failed to submit draft decision for review");
+        showToast("Success", "Draft decision submitted for review!");
+        fetchDecisionDetails();
+    } catch (e) {
+        showToast("Danger", e.message || "Error submitting draft decision");
+    }
+}
+window.submitDraftForReview = submitDraftForReview;
 
 async function updateStatus() {
     const newStatus = document.getElementById("statusSelect").value;
@@ -468,12 +600,14 @@ function renderThreadsList() {
 
 function openNewThreadModal() {
     document.getElementById('newThreadTopicInput').value = '';
-    const modal = new bootstrap.Modal(document.getElementById('newThreadModal'));
+    const modalEl = document.getElementById('newThreadModal');
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
     modal.show();
 }
 
 async function submitNewThread() {
-    const topic = document.getElementById('newThreadTopicInput').value.trim();
+    const topicInput = document.getElementById('newThreadTopicInput');
+    const topic = topicInput ? topicInput.value.trim() : '';
     if (!topic) {
         showToast("Warning", "Topic is required");
         return;
@@ -489,10 +623,18 @@ async function submitNewThread() {
             })
         });
 
-        if (!res.ok) throw new Error("Failed to start thread");
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to start thread");
+        }
         
         const data = await res.json();
-        bootstrap.Modal.getInstance(document.getElementById('newThreadModal')).hide();
+        const modalEl = document.getElementById('newThreadModal');
+        if (modalEl) {
+            const instance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            instance.hide();
+        }
+        if (topicInput) topicInput.value = '';
         showToast("Success", "Discussion thread started");
         
         activeThreadId = data.id;
@@ -668,17 +810,28 @@ function openNewMeetingNoteModal() {
     document.getElementById('newMeetingTitle').value = '';
     document.getElementById('newMeetingNotes').value = '';
     document.getElementById('newMeetingDate').value = '';
-    new bootstrap.Modal(document.getElementById('newMeetingNoteModal')).show();
+    const modalEl = document.getElementById('newMeetingNoteModal');
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.show();
 }
 
 async function submitNewMeetingNote() {
     const title = document.getElementById('newMeetingTitle').value.trim();
     const notes = document.getElementById('newMeetingNotes').value.trim();
-    const date = document.getElementById('newMeetingDate').value;
+    const dateInput = document.getElementById('newMeetingDate').value;
 
     if (!title || !notes) {
         showToast("Warning", "Title and Notes are required");
         return;
+    }
+
+    let dateIso = null;
+    if (dateInput) {
+        try {
+            dateIso = new Date(dateInput).toISOString();
+        } catch (_) {
+            dateIso = null;
+        }
     }
 
     try {
@@ -688,14 +841,21 @@ async function submitNewMeetingNote() {
             body: JSON.stringify({
                 title: title,
                 notes: notes,
-                meeting_date: date ? new Date(date).toISOString() : null,
+                meeting_date: dateIso,
                 created_by: USER_ID
             })
         });
 
-        if (!res.ok) throw new Error("Failed to record meeting notes");
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to record meeting notes");
+        }
         
-        bootstrap.Modal.getInstance(document.getElementById('newMeetingNoteModal')).hide();
+        const modalEl = document.getElementById('newMeetingNoteModal');
+        if (modalEl) {
+            const instance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            instance.hide();
+        }
         showToast("Success", "Meeting notes recorded");
         loadMeetingNotes();
     } catch (err) {
@@ -765,8 +925,8 @@ async function loadDocuments() {
                     <td>${u.full_name}</td>
                     <td>${date}</td>
                     <td class="text-end pe-4">
-                        <!-- Direct download path pointing to backend uploads -->
-                        <a href="${API_URL}/${att.file_path}" class="btn btn-sm btn-outline-primary me-2" download>Download</a>
+                        <a href="${API_URL}/upload/${att.id}" target="_blank" class="btn btn-sm btn-outline-secondary me-2" title="View Document"><i class="bi bi-eye"></i> View</a>
+                        <a href="${API_URL}/upload/${att.id}" class="btn btn-sm btn-outline-primary" download><i class="bi bi-download"></i> Download</a>
                     </td>
                 </tr>
             `;
@@ -833,6 +993,77 @@ async function handleFileUpload(files) {
     }
 }
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+async function logUserAction(action, details) {
+    if (typeof DECISION_ID === 'undefined' || !USER_ID) return;
+    try {
+        await fetch(`${API_URL}/audit/log`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                user_id: USER_ID,
+                action: action,
+                details: details
+            })
+        });
+    } catch (_) {}
+}
+window.logUserAction = logUserAction;
+
+function switchTab(tabName) {
+    if (window.event) {
+        window.event.preventDefault();
+    }
+    const panes = document.querySelectorAll('.tab-pane-content');
+    panes.forEach(p => p.classList.add('d-none'));
+
+    const links = document.querySelectorAll('#decisionTabs .nav-link');
+    links.forEach(l => {
+        l.classList.remove('active', 'fw-bold', 'text-primary', 'text-white', 'bg-primary');
+        l.classList.add('fw-semibold', 'text-secondary');
+    });
+
+    const targetPane = document.getElementById(`tab-pane-${tabName}`);
+    if (targetPane) {
+        targetPane.classList.remove('d-none');
+    }
+
+    const targetLink = document.getElementById(`tab-link-${tabName}`);
+    if (targetLink) {
+        targetLink.classList.add('active', 'fw-bold', 'text-white', 'bg-primary');
+        targetLink.classList.remove('fw-semibold', 'text-secondary', 'text-primary');
+    }
+
+    if (tabName !== 'overview') {
+        logUserAction(
+            `Viewed ${tabName.replace('_', ' ')} section for DEC-${DECISION_ID}`,
+            `User opened ${tabName.replace('_', ' ')} tab`
+        );
+    }
+
+    if (tabName === 'history') {
+        loadHistory();
+    } else if (tabName === 'discussions') {
+        if (typeof loadDiscussions === 'function') loadDiscussions();
+    } else if (tabName === 'meeting_notes') {
+        if (typeof loadMeetingNotes === 'function') loadMeetingNotes();
+    } else if (tabName === 'documents') {
+        if (typeof loadDocuments === 'function') loadDocuments();
+    } else if (tabName === 'rationale') {
+        if (typeof fetchAlternatives === 'function') fetchAlternatives();
+    }
+}
+window.switchTab = switchTab;
+
 // ==========================================
 // HISTORY LOGIC
 // ==========================================
@@ -841,38 +1072,158 @@ async function loadHistory() {
     const container = document.getElementById('versionHistoryContainer');
     if (!container) return;
 
-    if (!currentDecision.versions || currentDecision.versions.length === 0) {
+    const decisionId = typeof DECISION_ID !== 'undefined' ? DECISION_ID : (typeof CURRENT_DECISION_ID !== 'undefined' ? CURRENT_DECISION_ID : 1);
+    const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
+
+    let versions = [];
+    try {
+        const vRes = await fetch(`${API_URL}/decisions/${decisionId}/versions?user_id=${userIdParam}`);
+        if (vRes.ok) {
+            versions = await vRes.json();
+        }
+    } catch (_) {}
+
+    if (!versions || versions.length === 0) {
         container.innerHTML = '<div class="text-center py-4 text-muted small">No version history available.</div>';
         return;
     }
 
     container.innerHTML = '';
-    
-    // Fetch users for mapping if needed
-    const uRes = await fetch(`${API_URL}/users/`);
-    const users = uRes.ok ? await uRes.json() : [];
-    const userMap = {};
-    users.forEach(u => { userMap[u.id] = u; });
 
-    currentDecision.versions.forEach((v, index) => {
-        const isLatest = index === 0; // Assuming backend orders by version_number DESC
-        const itemClass = isLatest ? "timeline-item active" : "timeline-item completed";
-        
-        const dateStr = new Date(v.created_at).toLocaleString();
-        const changer = userMap[v.changed_by] ? userMap[v.changed_by].full_name : `User #${v.changed_by || 'System'}`;
-        const reason = v.change_reason || "System Update";
+    versions.forEach((v, index) => {
+        const dateStr = v.created_at ? new Date(v.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' }) : 'Recent';
+        const changer = v.changed_by_name || 'System';
 
-        container.innerHTML += `
-            <div class="${itemClass}">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h6 class="fw-bold mb-1 text-sm text-dark">Version ${v.version_number} <span class="badge bg-light text-secondary border fw-normal ms-2">${v.status}</span></h6>
-                        <p class="text-muted mb-1 text-xs"><span class="fw-semibold text-dark">Reason:</span> ${reason}</p>
-                        <p class="text-muted mb-0" style="font-size: 12px;"><i class="bi bi-person me-1"></i> ${changer}</p>
+        if (v.event_type === 'VERSION_UPDATE') {
+            const isLatest = index === 0;
+            const itemClass = isLatest ? "timeline-item active border-start border-4 border-success bg-white shadow-sm p-3 mb-3 rounded" : "timeline-item completed bg-light border p-3 mb-3 rounded";
+            const activeBadgeHtml = `
+                <span class="badge px-3 py-1 text-white ms-1 fw-bold shadow-sm" style="background-color: #10B981 !important; color: #FFFFFF !important; font-size: 11px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="bi bi-check-circle-fill"></i> Current Active Version
+                </span>
+            `;
+
+            container.innerHTML += `
+                <div class="${itemClass}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1 me-3">
+                            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                <span class="badge bg-primary px-2.5 py-1 fw-bold" style="font-size: 11px;">Version ${v.version_number}</span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold px-2.5 py-1" style="font-size: 11px;">${escapeHtml(v.status || 'Pending')}</span>
+                                ${isLatest ? activeBadgeHtml : ''}
+                            </div>
+                            <div class="fw-bold text-dark text-md mb-1" style="font-size: 16px;">${escapeHtml(v.title || "Decision Record")}</div>
+                            ${v.description ? `<p class="text-secondary small mb-2 text-truncate" style="max-width: 550px;">${escapeHtml(v.description)}</p>` : ''}
+                            <div class="p-2.5 rounded bg-light border mb-2">
+                                <small class="text-dark d-block"><strong>Change Summary:</strong> ${escapeHtml(v.change_reason || "Version Snapshot Saved")}</small>
+                            </div>
+                            <p class="text-muted mb-0 small" style="font-size: 12px;"><i class="bi bi-person-circle me-1 text-primary"></i> Changed by: <strong>${escapeHtml(changer)}</strong></p>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted d-block mb-3" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>${dateStr}</small>
+                            ${(!isLatest && v.version_number > 0) ? `
+                                <button class="btn btn-outline-primary btn-sm py-1 px-3 fw-semibold shadow-sm" onclick="restoreVersion(${v.version_number})">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Restore Version ${v.version_number}
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
-                    <small class="text-muted" style="font-size: 11px;">${dateStr}</small>
                 </div>
-            </div>
-        `;
+            `;
+        } else if (v.event_type === 'REVIEW_EVENT') {
+            const isApproved = (v.status || '').toLowerCase().includes('approved');
+            const badgeClass = isApproved ? 'success' : 'danger';
+            const iconClass = isApproved ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+
+            container.innerHTML += `
+                <div class="timeline-item bg-white border border-${badgeClass}-subtle p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid ${isApproved ? '#10B981' : '#EF4444'} !important;">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1 me-3">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-${badgeClass}-subtle text-${badgeClass} border border-${badgeClass}-subtle px-2.5 py-1" style="font-size: 11px;"><i class="bi ${iconClass} me-1"></i>Review ${v.status}</span>
+                            </div>
+                            <div class="fw-bold text-dark text-sm mb-1"><i class="bi bi-person-badge-fill me-1 text-primary"></i><strong>${escapeHtml(changer)}</strong> (${escapeHtml(v.title || 'Review Action')})</div>
+                            <div class="text-muted small">${escapeHtml(v.change_reason || "Review status updated")}</div>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted d-block" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>${dateStr}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            // DOC_ACCESS, DISCUSSION_EVENT, NOTE_EVENT, TAB_VIEW, ACCESS_EVENT
+            let bClass = v.badge_color || 'info';
+            let bIcon = v.badge_icon || 'bi-eye-fill';
+            let bLabel = v.badge_label || 'Activity Log';
+            let actionTitle = v.title || `${changer} performed action`;
+
+            container.innerHTML += `
+                <div class="timeline-item bg-white border border-${bClass}-subtle p-3 mb-3 rounded shadow-sm" style="border-left: 4px solid var(--bs-${bClass}, #0EA5E9) !important;">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1 me-3">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-${bClass}-subtle text-${bClass} border border-${bClass}-subtle px-2.5 py-1" style="font-size: 11px;"><i class="bi ${bIcon} me-1"></i>${escapeHtml(bLabel)}</span>
+                            </div>
+                            <div class="fw-bold text-dark text-sm mb-1"><i class="bi bi-person-check-fill text-primary me-1"></i><strong>${escapeHtml(changer)}</strong>: ${escapeHtml(actionTitle)}</div>
+                            <div class="text-muted small">${escapeHtml(v.description || v.change_reason || "Activity recorded")}</div>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted d-block" style="font-size: 11px;"><i class="bi bi-clock me-1"></i>${dateStr}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
     });
 }
+
+async function restoreVersion(versionNumber) {
+    if (!confirm(`Are you sure you want to restore decision to Version ${versionNumber}?`)) {
+        return;
+    }
+    const decisionId = typeof DECISION_ID !== 'undefined' ? DECISION_ID : (typeof CURRENT_DECISION_ID !== 'undefined' ? CURRENT_DECISION_ID : 1);
+    try {
+        const res = await fetch(`${API_URL}/decisions/${decisionId}/versions/${versionNumber}/restore`, {
+            method: "POST"
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to restore version");
+        }
+        showCenterNotification(`Decision restored to Version ${versionNumber} successfully!`, 'success', 'Version Restored');
+        if (typeof fetchDecisionDetails === 'function') {
+            fetchDecisionDetails();
+        } else {
+            window.location.reload();
+        }
+    } catch (e) {
+        showCenterNotification(e.message || "Failed to restore version", 'error', 'Restore Error');
+    }
+}
+window.restoreVersion = restoreVersion;
+
+async function deleteCurrentDecision() {
+    const decisionId = typeof DECISION_ID !== 'undefined' ? DECISION_ID : (typeof CURRENT_DECISION_ID !== 'undefined' ? CURRENT_DECISION_ID : 1);
+    if (!confirm(`Are you sure you want to delete this decision (DEC-${decisionId})?\nThis action cannot be undone.`)) {
+        return;
+    }
+    try {
+        const roleParam = typeof CURRENT_USER_ROLE !== 'undefined' ? encodeURIComponent(CURRENT_USER_ROLE) : '';
+        const userParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
+        const res = await fetch(`${API_URL}/decisions/${decisionId}?user_id=${userParam}&role_name=${roleParam}`, {
+            method: "DELETE"
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to delete decision");
+        }
+        showCenterNotification("Decision deleted successfully.", 'success', 'Decision Deleted');
+        setTimeout(() => {
+            window.location.href = "/decisions";
+        }, 1200);
+    } catch (e) {
+        showCenterNotification(e.message || "Failed to delete decision", 'error', 'Error Deleting Decision');
+    }
+}
+window.deleteCurrentDecision = deleteCurrentDecision;

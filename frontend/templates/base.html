@@ -15,15 +15,22 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; margin: 0; padding: 0; }
+        html, body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8FAFC;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
         
         /* Sidebar Layout styling */
-        .app-wrapper { display: flex; height: 100vh; overflow: hidden; }
+        .app-wrapper { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
         
         /* ── Sidebar ─────────────────────────────────────────── */
         .sidebar {
             width: 260px;
-            background-color: #0F172A;
+            background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
             color: #FFFFFF;
             display: flex;
             flex-direction: column;
@@ -31,29 +38,32 @@
             height: 100vh;
             top: 0; bottom: 0; left: 0;
             z-index: 100;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.15);
         }
         .sidebar-logo {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 24px;
+            padding: 22px 24px;
             text-decoration: none;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .logo-icon {
-            width: 32px;
-            height: 32px;
-            background-color: #2563EB;
-            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #6366F1, #818CF8);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 12px rgba(99,102,241,0.4);
         }
         .logo-text-top { font-size: 16px; font-weight: 800; color: #FFFFFF; line-height: 1; }
         .logo-text-bottom { font-size: 10px; color: #94A3B8; font-weight: 500; margin-top: 2px; }
 
         .nav-links {
             list-style: none;
-            padding: 0 12px;
+            padding: 12px;
             margin: 0;
             display: flex;
             flex-direction: column;
@@ -68,20 +78,25 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 10px 16px;
-            border-radius: 8px;
+            padding: 11px 16px;
+            border-radius: 10px;
             color: #94A3B8;
             text-decoration: none;
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 600;
             transition: all 0.2s;
         }
-        .nav-item:hover { background-color: rgba(255, 255, 255, 0.05); color: #FFFFFF; }
-        .nav-item.active { background-color: #2563EB; color: #FFFFFF; }
+        .nav-item:hover { background-color: rgba(255, 255, 255, 0.07); color: #FFFFFF; }
+        .nav-item.active {
+            background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+            color: #FFFFFF;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+        }
         .nav-section-label {
-            font-size: 9px; font-weight: 700; color: #475569;
-            text-transform: uppercase; letter-spacing: 0.1em;
-            padding: 12px 14px 4px;
+            font-size: 9.5px; font-weight: 700; color: #64748B;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            padding: 14px 16px 4px;
         }
         
         .nav-badge {
@@ -95,31 +110,47 @@
         }
         .nav-divider {
             height: 1px;
-            background-color: #1E293B;
-            margin: 16px 24px;
+            background-color: rgba(255,255,255,0.06);
+            margin: 12px 16px;
         }
 
         .user-profile-bottom {
             margin-top: auto;
-            padding: 16px 24px;
-            border-top: 1px solid #1E293B;
+            padding: 16px 20px;
+            background: rgba(15, 23, 42, 0.6);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
             display: flex; align-items: center; gap: 12px;
             text-decoration: none;
             transition: background 0.15s;
         }
-        .user-profile-bottom:hover { background: rgba(255,255,255,0.04); }
+        .user-profile-bottom:hover { background: rgba(255,255,255,0.06); }
         .user-avatar {
-            width: 32px; height: 32px; border-radius: 50%;
-            background-color: #2563EB;
+            width: 36px; height: 36px; border-radius: 50%;
+            background: linear-gradient(135deg, #6366F1, #818CF8);
             display: flex; align-items: center; justify-content: center;
-            font-size: 12px; font-weight: 700; color: white;
+            font-size: 13px; font-weight: 800; color: white;
             flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(99,102,241,0.3);
         }
-        .user-info { flex: 1; }
-        .user-name { font-size: 13px; font-weight: 700; color: #FFFFFF; }
-        .user-role { font-size: 11px; color: #94A3B8; }
+        .user-info { flex: 1; min-width: 0; }
+        .user-name { font-size: 13px; font-weight: 700; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-role { font-size: 11px; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         
+        /* Role-Based Themes */
+        body[data-role-theme="manager"] .logo-icon { background: linear-gradient(135deg, #14B8A6, #2DD4BF) !important; box-shadow: 0 4px 12px rgba(20,184,166,0.4) !important; }
+        body[data-role-theme="manager"] .nav-item.active { background: linear-gradient(135deg, #14B8A6 0%, #0D9488 100%) !important; color: #FFFFFF !important; box-shadow: 0 4px 14px rgba(20, 184, 166, 0.4) !important; }
+        body[data-role-theme="manager"] .user-avatar { background: linear-gradient(135deg, #14B8A6, #2DD4BF) !important; }
+
+        body[data-role-theme="admin"] .logo-icon { background: linear-gradient(135deg, #3B82F6, #60A5FA) !important; box-shadow: 0 4px 12px rgba(59,130,246,0.4) !important; }
+        body[data-role-theme="admin"] .nav-item.active { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important; color: #FFFFFF !important; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4) !important; }
+        body[data-role-theme="admin"] .user-avatar { background: linear-gradient(135deg, #3B82F6, #60A5FA) !important; }
+
+        body[data-role-theme="employee"] .logo-icon { background: linear-gradient(135deg, #2563EB, #3B82F6) !important; box-shadow: 0 4px 12px rgba(37,99,235,0.4) !important; }
+        body[data-role-theme="employee"] .nav-item.active { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important; color: #FFFFFF !important; box-shadow: 0 4px 14px rgba(37,99,235,0.4) !important; }
+        body[data-role-theme="employee"] .user-avatar { background: linear-gradient(135deg, #2563EB, #3B82F6) !important; }
+
+
         .main-content { 
             margin-left: 260px; 
             flex: 1; 
@@ -151,15 +182,16 @@
     </style>
     {% block css %}{% endblock %}
 </head>
-<body>
+{% set current_role_css = (session.get('role_name') or 'Employee') | string | lower %}
+<body data-role-theme="{% if 'manager' in current_role_css or 'lead' in current_role_css %}manager{% elif 'admin' in current_role_css %}admin{% else %}employee{% endif %}">
 
     <div class="app-wrapper">
         
         <!-- Sidebar -->
     <aside class="sidebar">
-        <a href="#" class="sidebar-logo">
+        <a href="{{ url_for('dashboard') }}" class="sidebar-logo">
             <div class="logo-icon">
-                <i data-lucide="zap" style="color: white; width: 18px; height: 18px;"></i>
+                <i data-lucide="zap" style="color: white; width: 20px; height: 20px;"></i>
             </div>
             <div>
                 <div class="logo-text-top">EDRP</div>
@@ -168,57 +200,64 @@
         </a>
 
         <ul class="nav-links">
-            {% if session.get('role_name') == 'Employee' or session.get('role_name') == 'Reviewer' %}
-                <li><a href="{{ url_for('dashboard') }}" class="nav-item"><i data-lucide="layout-dashboard" style="width: 18px; height: 18px;"></i> Dashboard</a></li>
-                <li><a href="{{ url_for('decisions') }}" class="nav-item"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i> My Decisions</a></li>
-                <li><a href="{{ url_for('create_decision') }}" class="nav-item"><i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i> Create Decision</a></li>
-                <li><a href="{{ url_for('reviews') }}" class="nav-item"><i data-lucide="check-square" style="width: 18px; height: 18px;"></i> Pending Reviews {% if pending_reviews and pending_reviews > 0 %}<span class="nav-badge">{{ pending_reviews }}</span>{% endif %}</a></li>
-                <div class="nav-divider"></div>
-                <li><a href="{{ url_for('discussion') }}" class="nav-item"><i data-lucide="message-square" style="width: 18px; height: 18px;"></i> Discussions</a></li>
-                <li><a href="{{ url_for('repository') }}" class="nav-item"><i data-lucide="database" style="width: 18px; height: 18px;"></i> Knowledge Repository</a></li>
-                <li><a href="#" class="nav-item"><i data-lucide="bell" style="width: 18px; height: 18px;"></i> Notifications</a></li>
-                <div class="nav-divider"></div>
-                <li><a href="#" class="nav-item"><i data-lucide="monitor" style="width: 18px; height: 18px;"></i> Local Device</a></li>
-                <li><a href="#" class="nav-item"><i data-lucide="help-circle" style="width: 18px; height: 18px;"></i> Support Center</a></li>
-            {% elif session.get('role_name') == 'Manager' %}
-                <li><a href="{{ url_for('dashboard') }}" class="nav-item"><i data-lucide="layout-dashboard" style="width: 18px; height: 18px;"></i> Dashboard</a></li>
-                <li><a href="{{ url_for('decisions') }}" class="nav-item"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i> Team Decisions</a></li>
-                <li><a href="{{ url_for('reviews') }}" class="nav-item"><i data-lucide="check-square" style="width: 18px; height: 18px;"></i> Pending Approvals {% if pending_reviews and pending_reviews > 0 %}<span class="nav-badge">{{ pending_reviews }}</span>{% endif %}</a></li>
-                <div class="nav-divider"></div>
-                <li><a href="{{ url_for('discussion') }}" class="nav-item"><i data-lucide="message-square" style="width: 18px; height: 18px;"></i> Discussions Module</a></li>
-                <li><a href="{{ url_for('repository') }}" class="nav-item"><i data-lucide="database" style="width: 18px; height: 18px;"></i> Knowledge Repository</a></li>
-                <li><a href="{{ url_for('reports') }}" class="nav-item"><i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i> Reports</a></li>
-                <li><a href="#" class="nav-item"><i data-lucide="bell" style="width: 18px; height: 18px;"></i> Notifications</a></li>
-                <div class="nav-divider"></div>
-                <li><a href="{{ url_for('profile') }}" class="nav-item"><i data-lucide="user" style="width: 18px; height: 18px;"></i> Profile</a></li>
-                <li><a href="#" class="nav-item"><i data-lucide="settings" style="width: 18px; height: 18px;"></i> Settings</a></li>
-            {% else %}
-                <!-- Administrator defaults -->
+            {% set current_role = (session.get('role_name') or 'Employee') | string | lower %}
+            {% if 'admin' in current_role %}
+                <!-- Administrator Sidebar -->
                 <li class="nav-section-label">Overview</li>
-                <li><a href="{{ url_for('dashboard') }}" class="nav-item"><i data-lucide="layout-dashboard" style="width: 17px; height: 17px;"></i> Dashboard</a></li>
+                <li><a href="{{ url_for('dashboard') }}" class="nav-item {{ 'active' if request.path == url_for('dashboard') or request.path == '/' }}"><i data-lucide="grid" style="width: 18px; height: 18px;"></i> Dashboard</a></li>
 
                 <li class="nav-section-label">Management</li>
-                <li><a href="{{ url_for('users') }}" class="nav-item"><i data-lucide="users" style="width: 17px; height: 17px;"></i> User Management</a></li>
-                <li><a href="{{ url_for('roles') }}" class="nav-item"><i data-lucide="shield" style="width: 17px; height: 17px;"></i> Role Management</a></li>
-                <li><a href="{{ url_for('teams') }}" class="nav-item"><i data-lucide="git-branch" style="width: 17px; height: 17px;"></i> Team Management</a></li>
-                <li><a href="{{ url_for('decisions') }}" class="nav-item"><i data-lucide="file-text" style="width: 17px; height: 17px;"></i> Decision Management</a></li>
+                <li><a href="{{ url_for('users') }}" class="nav-item {{ 'active' if request.path == url_for('users') }}"><i data-lucide="users" style="width: 18px; height: 18px;"></i> User Management</a></li>
+                <li><a href="{{ url_for('roles') }}" class="nav-item {{ 'active' if request.path == url_for('roles') }}"><i data-lucide="shield" style="width: 18px; height: 18px;"></i> Role Management</a></li>
+                <li><a href="{{ url_for('teams') }}" class="nav-item {{ 'active' if request.path == url_for('teams') }}"><i data-lucide="git-branch" style="width: 18px; height: 18px;"></i> Team Management</a></li>
+                <li><a href="{{ url_for('decisions') }}" class="nav-item {{ 'active' if request.path == url_for('decisions') or '/decision/' in request.path }}"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i> Decision Management</a></li>
 
-                <li class="nav-section-label">Analytics</li>
-                <li><a href="{{ url_for('repository') }}" class="nav-item"><i data-lucide="database" style="width: 17px; height: 17px;"></i> Knowledge Repository</a></li>
-                <li><a href="{{ url_for('reports') }}" class="nav-item"><i data-lucide="bar-chart-2" style="width: 17px; height: 17px;"></i> Reports &amp; Analytics</a></li>
-                <li><a href="{{ url_for('audit') }}" class="nav-item"><i data-lucide="clipboard-list" style="width: 17px; height: 17px;"></i> Audit Logs</a></li>
+                <li class="nav-section-label">Analytics &amp; Modules</li>
+                <li><a href="{{ url_for('discussion') }}" class="nav-item {{ 'active' if request.path == url_for('discussion') }}"><i data-lucide="message-square" style="width: 18px; height: 18px;"></i> Discussions</a></li>
+                <li><a href="{{ url_for('repository') }}" class="nav-item {{ 'active' if request.path == url_for('repository') }}"><i data-lucide="database" style="width: 18px; height: 18px;"></i> Knowledge Repository</a></li>
+                <li><a href="{{ url_for('reports') }}" class="nav-item {{ 'active' if request.path == url_for('reports') }}"><i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i> Reports &amp; Analytics</a></li>
+                <li><a href="{{ url_for('audit') }}" class="nav-item {{ 'active' if request.path == url_for('audit') }}"><i data-lucide="clipboard-list" style="width: 18px; height: 18px;"></i> Audit Logs</a></li>
 
-                <li class="nav-section-label">Settings</li>
-                <li><a href="#" class="nav-item"><i data-lucide="settings" style="width: 17px; height: 17px;"></i> System Config</a></li>
-                <li><a href="#" class="nav-item"><i data-lucide="bell" style="width: 17px; height: 17px;"></i> Notifications</a></li>
-                <li><a href="{{ url_for('profile') }}" class="nav-item"><i data-lucide="user" style="width: 17px; height: 17px;"></i> Profile</a></li>
+                <li class="nav-section-label">Services &amp; Settings</li>
+                <li><a href="{{ url_for('notifications_page') }}" class="nav-item {{ 'active' if request.path == url_for('notifications_page') }}"><i data-lucide="bell" style="width: 18px; height: 18px;"></i> Notifications <span class="nav-badge ms-auto sidebar-notif-count" style="display: none;">0</span></a></li>
+                <li><a href="{{ url_for('email_service') }}" class="nav-item {{ 'active' if request.path == url_for('email_service') }}"><i data-lucide="mail" style="width: 18px; height: 18px;"></i> Email Service</a></li>
+                <li><a href="{{ url_for('support') }}" class="nav-item {{ 'active' if request.path == url_for('support') and request.path != url_for('email_service') }}"><i data-lucide="help-circle" style="width: 18px; height: 18px;"></i> Support Center</a></li>
+                <li><a href="{{ url_for('profile') }}" class="nav-item {{ 'active' if request.path == url_for('profile') }}"><i data-lucide="user" style="width: 18px; height: 18px;"></i> Profile</a></li>
+                <li><a href="{{ url_for('settings') }}" class="nav-item {{ 'active' if request.path == url_for('settings') }}"><i data-lucide="settings" style="width: 18px; height: 18px;"></i> System Config</a></li>
+            {% elif 'manager' in current_role or 'lead' in current_role %}
+                <!-- Manager / Team Lead Sidebar -->
+                <li><a href="{{ url_for('dashboard') }}" class="nav-item {{ 'active' if request.path == url_for('dashboard') or request.path == '/' }}"><i data-lucide="grid" style="width: 18px; height: 18px;"></i> Dashboard</a></li>
+                <li><a href="{{ url_for('decisions') }}" class="nav-item {{ 'active' if request.path == url_for('decisions') or '/decision/' in request.path }}"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i> Team Decisions</a></li>
+                <li><a href="{{ url_for('reviews') }}" class="nav-item {{ 'active' if request.path == url_for('reviews') }}"><i data-lucide="check-square" style="width: 18px; height: 18px;"></i> Pending Approvals {% if pending_reviews and pending_reviews > 0 %}<span class="nav-badge ms-auto">{{ pending_reviews }}</span>{% endif %}</a></li>
+                <div class="nav-divider"></div>
+                <li><a href="{{ url_for('discussion') }}" class="nav-item {{ 'active' if request.path == url_for('discussion') }}"><i data-lucide="message-square" style="width: 18px; height: 18px;"></i> Discussions</a></li>
+                <li><a href="{{ url_for('repository') }}" class="nav-item {{ 'active' if request.path == url_for('repository') }}"><i data-lucide="database" style="width: 18px; height: 18px;"></i> Knowledge Repository</a></li>
+                <li><a href="{{ url_for('notifications_page') }}" class="nav-item {{ 'active' if request.path == url_for('notifications_page') }}"><i data-lucide="bell" style="width: 18px; height: 18px;"></i> Notifications <span class="nav-badge ms-auto sidebar-notif-count" style="display: none;">0</span></a></li>
+                <li><a href="{{ url_for('email_service') }}" class="nav-item {{ 'active' if request.path == url_for('email_service') }}"><i data-lucide="mail" style="width: 18px; height: 18px;"></i> Email Service</a></li>
+                <li><a href="{{ url_for('support') }}" class="nav-item {{ 'active' if request.path == url_for('support') and request.path != url_for('email_service') }}"><i data-lucide="help-circle" style="width: 18px; height: 18px;"></i> Support Center</a></li>
+                <li><a href="{{ url_for('profile') }}" class="nav-item {{ 'active' if request.path == url_for('profile') }}"><i data-lucide="user" style="width: 18px; height: 18px;"></i> Profile</a></li>
+                <li><a href="{{ url_for('settings') }}" class="nav-item {{ 'active' if request.path == url_for('settings') }}"><i data-lucide="settings" style="width: 18px; height: 18px;"></i> Settings</a></li>
+            {% else %}
+                <!-- Employee / Reviewer Sidebar -->
+                <li><a href="{{ url_for('dashboard') }}" class="nav-item {{ 'active' if request.path == url_for('dashboard') or request.path == '/' }}"><i data-lucide="grid" style="width: 18px; height: 18px;"></i> Dashboard</a></li>
+                <li><a href="{{ url_for('decisions') }}" class="nav-item {{ 'active' if request.path == url_for('decisions') or '/decision/' in request.path }}"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i> My Decisions</a></li>
+                <li><a href="{{ url_for('create_decision') }}" class="nav-item {{ 'active' if request.path == url_for('create_decision') }}"><i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i> Create Decision</a></li>
+                <li><a href="{{ url_for('reviews') }}" class="nav-item {{ 'active' if request.path == url_for('reviews') }}"><i data-lucide="check-square" style="width: 18px; height: 18px;"></i> Pending Reviews {% if pending_reviews and pending_reviews > 0 %}<span class="nav-badge ms-auto">{{ pending_reviews }}</span>{% endif %}</a></li>
+                <div class="nav-divider"></div>
+                <li><a href="{{ url_for('discussion') }}" class="nav-item {{ 'active' if request.path == url_for('discussion') }}"><i data-lucide="message-square" style="width: 18px; height: 18px;"></i> Discussions</a></li>
+                <li><a href="{{ url_for('repository') }}" class="nav-item {{ 'active' if request.path == url_for('repository') }}"><i data-lucide="database" style="width: 18px; height: 18px;"></i> Knowledge Repository</a></li>
+                <li><a href="{{ url_for('notifications_page') }}" class="nav-item {{ 'active' if request.path == url_for('notifications_page') }}"><i data-lucide="bell" style="width: 18px; height: 18px;"></i> Notifications <span class="nav-badge ms-auto sidebar-notif-count" style="display: none;">0</span></a></li>
+                <li><a href="{{ url_for('email_service') }}" class="nav-item {{ 'active' if request.path == url_for('email_service') }}"><i data-lucide="mail" style="width: 18px; height: 18px;"></i> Email Service</a></li>
+                <li><a href="{{ url_for('support') }}" class="nav-item {{ 'active' if request.path == url_for('support') and request.path != url_for('email_service') }}"><i data-lucide="help-circle" style="width: 18px; height: 18px;"></i> Support Center</a></li>
+                <li><a href="{{ url_for('profile') }}" class="nav-item {{ 'active' if request.path == url_for('profile') }}"><i data-lucide="user" style="width: 18px; height: 18px;"></i> Profile</a></li>
+                <li><a href="{{ url_for('settings') }}" class="nav-item {{ 'active' if request.path == url_for('settings') }}"><i data-lucide="settings" style="width: 18px; height: 18px;"></i> Settings</a></li>
             {% endif %}
         </ul>
 
         <a href="{{ url_for('profile') }}" class="user-profile-bottom">
-            <div class="user-avatar">{{ session.get('initials', 'U') }}</div>
+            <div class="user-avatar">{{ session.get('initials', 'KN') }}</div>
             <div class="user-info">
-                <div class="user-name">{{ session.get('full_name', 'User') }}</div>
+                <div class="user-name">{{ session.get('full_name', 'Koppala Naveen') }}</div>
                 <div class="user-role">{{ session.get('role_name', 'Employee') }}</div>
             </div>
             <i data-lucide="log-out" style="width: 15px; height: 15px; color: #64748B; margin-left: auto; cursor: pointer;"
@@ -236,49 +275,25 @@
                     <div class="dropdown">
                         <button class="btn btn-light rounded-circle p-2 d-flex align-items-center justify-content-center dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="position: relative; width: 44px; height: 44px; border: 1px solid #e2e8f0;" id="notificationsDropdown">
                             <i data-lucide="bell" style="width: 22px; height: 22px; color: #64748b;"></i>
-                            {% if unread_notifications_count and unread_notifications_count > 0 %}
-                            <div id="unread-badge" style="position: absolute; top: 0px; right: 0px; width: 18px; height: 18px; background: #EF4444; border-radius: 50%; border: 2px solid white; font-size: 10px; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">{{ unread_notifications_count }}</div>
-                            {% endif %}
+                            <div id="unread-badge" style="display: none; position: absolute; top: 0px; right: 0px; width: 18px; height: 18px; background: #EF4444; border-radius: 50%; border: 2px solid white; font-size: 10px; color: white; align-items: center; justify-content: center; font-weight: bold;">0</div>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="notificationsDropdown" style="width: 320px; border-radius: 8px; padding: 0;">
-                            <li class="dropdown-header fw-bold border-bottom py-2" style="font-size: 14px; color: #1E293B;">Notifications</li>
-                            <div style="max-height: 300px; overflow-y: auto;">
-                            {% if recent_notifications %}
-                                {% for notif in recent_notifications %}
-                                <li>
-                                    <a class="dropdown-item py-3 border-bottom d-flex align-items-start" href="#" style="white-space: normal; {{ 'background-color: #F8FAFC;' if not notif.is_read else '' }}">
-                                        <div class="me-3 mt-1">
-                                            {% if notif.type == 'success' %}
-                                            <i data-lucide="check-circle" style="color: #10B981; width: 16px; height: 16px;"></i>
-                                            {% elif notif.type == 'warning' %}
-                                            <i data-lucide="alert-triangle" style="color: #F59E0B; width: 16px; height: 16px;"></i>
-                                            {% elif notif.type == 'error' %}
-                                            <i data-lucide="x-circle" style="color: #EF4444; width: 16px; height: 16px;"></i>
-                                            {% else %}
-                                            <i data-lucide="info" style="color: #3B82F6; width: 16px; height: 16px;"></i>
-                                            {% endif %}
-                                        </div>
-                                        <div>
-                                            <div class="fw-bold mb-1" style="font-size: 13px; color: #1E293B;">{{ notif.title }}</div>
-                                            <div style="font-size: 12px; color: #64748B;">{{ notif.message }}</div>
-                                            <div style="font-size: 11px; color: #94A3B8; margin-top: 4px;">{{ notif.time_ago }}</div>
-                                        </div>
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            {% else %}
-                                <li class="p-3 text-center text-muted" style="font-size: 13px;">No new notifications</li>
-                            {% endif %}
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="notificationsDropdown" style="width: 340px; border-radius: 12px; padding: 0;">
+                            <div class="d-flex justify-content-between align-items-center border-bottom px-3 py-2 bg-light rounded-top-3">
+                                <span class="fw-bold text-dark" style="font-size: 13px;">Notifications</span>
+                                <button class="btn btn-link btn-sm text-decoration-none text-primary p-0" style="font-size: 11px; font-weight: 600;" onclick="markAllNotificationsReadGlobal(event)">Mark all as read</button>
                             </div>
-                            <li><a class="dropdown-item text-center text-primary fw-bold py-2" href="#" style="font-size: 13px; background: #F8FAFC; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">View All Notifications</a></li>
+                            <div id="header-notifications-list" style="max-height: 300px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted" style="font-size: 12px;">Loading alerts...</div>
+                            </div>
+                            <a class="dropdown-item text-center text-primary fw-bold py-2 border-top bg-light rounded-bottom-3" href="{{ url_for('notifications_page') }}" style="font-size: 12.5px;">View All Notifications</a>
                         </ul>
                     </div>
-                    <div class="d-flex align-items-center" style="gap: 0.5rem; cursor: pointer;">
+                    <a href="{{ url_for('profile') }}" class="d-flex align-items-center text-decoration-none" style="gap: 0.5rem; cursor: pointer;">
                         <div style="width: 36px; height: 36px; border-radius: 50%; background-color: #EFF6FF; border: 1px solid #BFDBFE; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #2563EB;">
                             {{ session.get('initials', 'U') }}
                         </div>
                         <div style="font-size: 0.875rem; font-weight: 600; color: #1e293b;">{{ session.get('full_name', 'User') }}</div>
-                    </div>
+                    </a>
                 </div>
                 {% endif %}
             </div>
@@ -309,11 +324,167 @@
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     
-    <!-- Initialize Lucide Icons -->
+    <!-- Global Notifications Polling & Lucide Initialization -->
     <script>
         lucide.createIcons();
         
+        const LOGGED_USER_ID = parseInt("{{ session.get('user_id', 0) }}", 10);
+        const BACKEND_API = "http://127.0.0.1:8000";
+
+        async function fetchGlobalHeaderNotifications() {
+            if (!LOGGED_USER_ID) return;
+            try {
+                const res = await fetch(`${BACKEND_API}/notifications/${LOGGED_USER_ID}`);
+                if (!res.ok) return;
+                const notifs = await res.json();
+                
+                const badge = document.getElementById('unread-badge');
+                const list = document.getElementById('header-notifications-list');
+                
+                const unreadCount = notifs.filter(n => !n.is_read).length;
+                const countToDisplay = unreadCount > 0 ? unreadCount : notifs.length;
+                
+                if (badge) {
+                    if (unreadCount > 0) {
+                        badge.innerText = unreadCount > 99 ? '99+' : unreadCount;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+
+                const sidebarBadges = document.querySelectorAll('.sidebar-notif-count');
+                sidebarBadges.forEach(el => {
+                    if (countToDisplay > 0) {
+                        el.innerText = countToDisplay > 99 ? '99+' : countToDisplay;
+                        el.style.display = 'inline-block';
+                    } else {
+                        el.style.display = 'none';
+                    }
+                });
+                
+                if (list) {
+                    if (notifs.length === 0) {
+                        list.innerHTML = `<div class="p-4 text-center text-muted" style="font-size: 12.5px;">No notifications yet</div>`;
+                    } else {
+                        let html = '';
+                        notifs.forEach(n => {
+                            const decMatch = n.message.match(/DEC-(\d+)/i);
+                            const isUserApproval = n.notification_type.includes('Approval') || n.message.includes('approval');
+                            const targetUrl = isUserApproval ? '{{ url_for("pending_approvals") }}' : (decMatch ? `/decision/${decMatch[1]}` : '{{ url_for("notifications_page") }}');
+                            
+                            html += `
+                                <a class="dropdown-item py-2.5 px-3 border-bottom d-flex align-items-start gap-2.5" href="${targetUrl}" style="white-space: normal; ${!n.is_read ? 'background-color: #F0F9FF;' : ''}">
+                                    <div style="font-size: 16px; margin-top: 2px;">
+                                        ${n.notification_type === 'Review Request' ? '📝' : n.notification_type === 'Decision Submission' ? '📄' : n.notification_type === 'Discussion' ? '💬' : '🔔'}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-dark" style="font-size: 11.5px;">${n.notification_type}</div>
+                                        <div style="font-size: 12px; color: #475569; line-height: 1.35;">${n.message}</div>
+                                    </div>
+                                </a>
+                            `;
+                        });
+                        list.innerHTML = html;
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching header notifications:", err);
+            }
+        }
+
+        async function markAllNotificationsReadGlobal(e) {
+            if (e) e.stopPropagation();
+            if (!LOGGED_USER_ID) return;
+            try {
+                await fetch(`${BACKEND_API}/notifications/${LOGGED_USER_ID}/mark-all-read`, { method: 'PUT' });
+                fetchGlobalHeaderNotifications();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function showCenterNotification(message, type = 'error', title = null) {
+            const modal = document.getElementById('centerNotificationModal');
+            const iconContainer = document.getElementById('centerNotifIcon');
+            const lucideIcon = document.getElementById('centerNotifLucide');
+            const titleEl = document.getElementById('centerNotifTitle');
+            const msgEl = document.getElementById('centerNotifMessage');
+
+            if (!modal) {
+                alert(message);
+                return;
+            }
+
+            if (type === 'error' || type === 'danger') {
+                iconContainer.style.background = '#FEF2F2';
+                lucideIcon.setAttribute('data-lucide', 'alert-triangle');
+                lucideIcon.style.color = '#EF4444';
+                titleEl.innerText = title || 'Error';
+                titleEl.style.color = '#991B1B';
+            } else if (type === 'success') {
+                iconContainer.style.background = '#ECFDF5';
+                lucideIcon.setAttribute('data-lucide', 'check-circle');
+                lucideIcon.style.color = '#10B981';
+                titleEl.innerText = title || 'Success';
+                titleEl.style.color = '#065F46';
+            } else if (type === 'warning') {
+                iconContainer.style.background = '#FFFBEB';
+                lucideIcon.setAttribute('data-lucide', 'alert-circle');
+                lucideIcon.style.color = '#F59E0B';
+                titleEl.innerText = title || 'Warning';
+                titleEl.style.color = '#92400E';
+            } else {
+                iconContainer.style.background = '#EFF6FF';
+                lucideIcon.setAttribute('data-lucide', 'info');
+                lucideIcon.style.color = '#2563EB';
+                titleEl.innerText = title || 'Information';
+                titleEl.style.color = '#1E40AF';
+            }
+
+            msgEl.innerText = message;
+            modal.style.display = 'flex';
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function hideCenterNotification() {
+            const modal = document.getElementById('centerNotificationModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function applyGlobalSystemSettings() {
+            try {
+                const res = await fetch(`${BACKEND_API}/settings/`);
+                if (!res.ok) return;
+                const cfg = await res.json();
+                
+                // 1. Theme application
+                if (cfg.theme === 'Dark') {
+                    document.body.classList.add('dark-mode');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                }
+
+                // 2. Keyboard shortcuts
+                if (cfg.enable_keyboard_shortcuts) {
+                    document.addEventListener('keydown', (e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                            e.preventDefault();
+                            const searchInput = document.querySelector('.search-bar input, input[type="search"]');
+                            if (searchInput) searchInput.focus();
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Global settings load error:", e);
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
+            applyGlobalSystemSettings();
+            fetchGlobalHeaderNotifications();
+            setInterval(fetchGlobalHeaderNotifications, 10000);
+
             const alerts = document.querySelectorAll(".alert");
             alerts.forEach(function(alert) {
                 setTimeout(function() {
@@ -323,6 +494,24 @@
             });
         });
     </script>
+
+    <!-- Center Screen Alert Notification Modal -->
+    <div id="centerNotificationModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.45);backdrop-filter:blur(5px);z-index:99999;display:none;align-items:center;justify-content:center;">
+        <div style="width:90%;max-width:440px;background:white;border-radius:18px;padding:26px 28px;box-shadow:0 25px 60px -15px rgba(0,0,0,0.3);border:1px solid #E2E8F0;text-align:center;animation:centerPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <div id="centerNotifIcon" style="width:52px;height:52px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+                <i id="centerNotifLucide" data-lucide="info" style="width:26px;height:26px;"></i>
+            </div>
+            <h5 id="centerNotifTitle" style="font-size:17px;font-weight:800;color:#0F172A;margin-bottom:8px;">Notification</h5>
+            <p id="centerNotifMessage" style="font-size:13.5px;color:#475569;margin-bottom:22px;line-height:1.55;word-break:break-word;"></p>
+            <button type="button" class="btn btn-primary px-4 py-2 fw-bold" style="border-radius:10px;font-size:13px;" onclick="hideCenterNotification()">OK</button>
+        </div>
+    </div>
+    <style>
+        @keyframes centerPop {
+            from { opacity: 0; transform: scale(0.85); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
 
     <!-- Toast Container for Notifications -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
@@ -335,6 +524,199 @@
             </div>
         </div>
     </div>
+
+    <!-- Global Decision Approval Workflow Modal -->
+    <div class="modal fade" id="approvalWorkflowModal" tabindex="-1" aria-labelledby="approvalWorkflowModalLabel" aria-hidden="true" style="z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+                <div id="approvalModalHeader" class="modal-header py-3 px-4 text-white border-0 bg-success">
+                    <div class="d-flex align-items-center gap-3">
+                        <div id="approvalHeaderIconWrap" style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.2);">
+                            <i id="approvalHeaderIcon" data-lucide="check-circle" style="width:24px;height:24px;color:white;"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0" id="approvalWorkflowModalLabel">Decision Approval Workflow</h5>
+                            <div id="approvalHeaderSub" class="small opacity-90">Accept or Reject Decision Request</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4" style="background:#F8FAFC;">
+                    <!-- Decision Summary Card -->
+                    <div class="card border-0 shadow-sm rounded-3 p-3 mb-3 bg-white">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 mb-1" id="approvalModalDecisionId">DEC-00</span>
+                                <h6 class="fw-bold text-dark mb-1" id="approvalModalDecisionTitle">Decision Title</h6>
+                            </div>
+                            <span id="approvalModalCurrentStatus" class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-1">In Review</span>
+                        </div>
+                        <div class="d-flex gap-3 text-muted small mt-2">
+                            <div><i data-lucide="user" style="width:13px;height:13px;" class="me-1"></i><span id="approvalModalCreator">Creator</span></div>
+                            <div><i data-lucide="tag" style="width:13px;height:13px;" class="me-1"></i><span id="approvalModalCategory">Category</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Remarks & Feedback -->
+                    <div class="card border-0 shadow-sm rounded-3 p-3 bg-white mb-3">
+                        <label class="form-label fw-semibold text-dark d-flex align-items-center gap-2 mb-2" id="approvalCommentsLabel">
+                            <i data-lucide="message-square" style="width:16px;height:16px;color:#2563EB;"></i>
+                            <span>Reviewer Remarks & Feedback</span>
+                        </label>
+                        <textarea id="approvalModalComments" class="form-control border-light-subtle" rows="3" placeholder="Provide clear remarks, justification, or recommendations for this decision outcome..." style="border-radius:10px;font-size:13.5px;"></textarea>
+                        
+                        <!-- Verification Checklist -->
+                        <div class="mt-3 pt-3 border-top">
+                            <label class="form-label fw-semibold text-dark text-xs mb-2">Review Verification Checklist</label>
+                            <div class="d-flex flex-column gap-2" id="approvalChecklistContainer">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-white border-top py-3 px-4 d-flex justify-content-between">
+                    <button type="button" class="btn btn-light border px-4 fw-medium" data-bs-dismiss="modal" style="border-radius:10px;">Cancel</button>
+                    <button type="button" id="approvalModalSubmitBtn" class="btn btn-success px-4 py-2 fw-bold d-flex align-items-center gap-2" style="border-radius:10px;" onclick="executeApprovalWorkflowSubmit()">
+                        <i data-lucide="check" style="width:16px;height:16px;"></i>
+                        <span id="approvalModalBtnText">Confirm & Approve Decision</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentApprovalState = {
+            decisionId: null,
+            reviewerId: null,
+            actionType: "Approved"
+        };
+
+        function openApprovalWorkflowModal(decisionId, decisionTitle, reviewerId, actionType, creatorName = "Author", categoryName = "General") {
+            currentApprovalState = { decisionId, reviewerId, actionType };
+            
+            const header = document.getElementById("approvalModalHeader");
+            const icon = document.getElementById("approvalHeaderIcon");
+            const title = document.getElementById("approvalWorkflowModalLabel");
+            const sub = document.getElementById("approvalHeaderSub");
+            const commentsLabel = document.getElementById("approvalCommentsLabel");
+            const commentsInput = document.getElementById("approvalModalComments");
+            const submitBtn = document.getElementById("approvalModalSubmitBtn");
+            const btnText = document.getElementById("approvalModalBtnText");
+            const checklist = document.getElementById("approvalChecklistContainer");
+
+            document.getElementById("approvalModalDecisionId").innerText = `DEC-${decisionId}`;
+            document.getElementById("approvalModalDecisionTitle").innerText = decisionTitle || `Decision #${decisionId}`;
+            document.getElementById("approvalModalCreator").innerText = creatorName;
+            document.getElementById("approvalModalCategory").innerText = categoryName;
+            commentsInput.value = "";
+
+            if (actionType === "Approved" || actionType === "Accept") {
+                header.className = "modal-header py-3 px-4 text-white border-0 bg-success";
+                icon.setAttribute("data-lucide", "check-circle");
+                title.innerText = "Accept & Approve Decision";
+                sub.innerText = "Confirm proposal approval and advance decision status to Approved.";
+                commentsLabel.innerHTML = `<i data-lucide="check-circle" style="width:16px;height:16px;color:#059669;"></i> Approval Rationale & Feedback (Optional)`;
+                submitBtn.className = "btn btn-success px-4 py-2 fw-bold d-flex align-items-center gap-2";
+                btnText.innerText = "Confirm & Approve Decision";
+                
+                checklist.innerHTML = `
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chk1" checked>
+                        <label class="form-check-label small text-secondary" for="chk1">Evaluated alternatives & financial impacts meet organizational guidelines</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chk2" checked>
+                        <label class="form-check-label small text-secondary" for="chk2">Risk levels are acceptable and mitigation strategies are adequate</label>
+                    </div>
+                `;
+            } else {
+                header.className = "modal-header py-3 px-4 text-white border-0 bg-danger";
+                icon.setAttribute("data-lucide", "alert-octagon");
+                title.innerText = "Reject Decision Proposal";
+                sub.innerText = "Decline this decision proposal and return feedback to the author.";
+                commentsLabel.innerHTML = `<i data-lucide="alert-triangle" style="width:16px;height:16px;color:#DC2626;"></i> Rejection Reason & Improvement Feedback (Required)`;
+                submitBtn.className = "btn btn-danger px-4 py-2 fw-bold d-flex align-items-center gap-2";
+                btnText.innerText = "Confirm & Reject Decision";
+                
+                checklist.innerHTML = `
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chk1" checked>
+                        <label class="form-check-label small text-secondary" for="chk1">Proposal rationale requires further revision or clarification</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chk2" checked>
+                        <label class="form-check-label small text-secondary" for="chk2">Alternative solutions need to be evaluated before approval</label>
+                    </div>
+                `;
+            }
+
+            if (window.lucide) lucide.createIcons();
+            const modalEl = document.getElementById("approvalWorkflowModal");
+            const bsModal = new bootstrap.Modal(modalEl);
+            bsModal.show();
+        }
+
+        async function executeApprovalWorkflowSubmit() {
+            const decisionId = currentApprovalState.decisionId;
+            const reviewerId = currentApprovalState.reviewerId || 1;
+            const actionType = (currentApprovalState.actionType === "Reject" || currentApprovalState.actionType === "Rejected") ? "Rejected" : "Approved";
+            const comments = document.getElementById("approvalModalComments").value.trim();
+
+            if (actionType === "Rejected" && !comments) {
+                alert("Please provide a brief reason or feedback when rejecting a decision proposal.");
+                return;
+            }
+
+            const submitBtn = document.getElementById("approvalModalSubmitBtn");
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span>Processing...`;
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8000/reviews/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        decision_id: parseInt(decisionId),
+                        reviewer_id: parseInt(reviewerId),
+                        status: actionType,
+                        comments: comments
+                    })
+                });
+
+                if (res.ok) {
+                    const modalEl = document.getElementById("approvalWorkflowModal");
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    if (typeof showCenterNotification === "function") {
+                        showCenterNotification(
+                            actionType === "Approved" ? "Decision Approved Successfully" : "Decision Proposal Rejected",
+                            actionType === "Approved" 
+                                ? `Decision DEC-${decisionId} has been officially approved and logged in audit history.` 
+                                : `Decision DEC-${decisionId} has been rejected with feedback sent to the author.`,
+                            actionType === "Approved" ? "success" : "danger"
+                        );
+                    } else {
+                        alert(`Decision DEC-${decisionId} marked as ${actionType}!`);
+                    }
+
+                    if (typeof fetchReviews === "function") fetchReviews();
+                    if (typeof loadDecisionDetails === "function") loadDecisionDetails();
+                } else {
+                    const err = await res.json();
+                    alert(`Failed: ${err.detail || 'Could not update approval status.'}`);
+                }
+            } catch (e) {
+                console.error("Error submitting approval:", e);
+                alert("Network error occurred while submitting review.");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+    </script>
 
     {% block js %}{% endblock %}
 </body>

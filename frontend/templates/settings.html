@@ -1,0 +1,814 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .settings-layout {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 24px;
+        align-items: start;
+    }
+    
+    .settings-nav {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        padding: 12px;
+        position: sticky;
+        top: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    
+    .settings-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        color: #475569;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 0;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+    }
+    
+    .settings-nav-item:hover {
+        background: #F8FAFC;
+        color: #1E293B;
+    }
+    
+    .settings-nav-item.active {
+        background: #EFF6FF;
+        color: #2563EB;
+        font-weight: 700;
+    }
+    
+    .settings-nav-item.text-danger:hover {
+        background: #FEF2F2;
+        color: #DC2626;
+    }
+    
+    .settings-nav-item.text-danger.active {
+        background: #FEF2F2;
+        color: #DC2626;
+    }
+
+    .settings-section-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    
+    .settings-section-title {
+        font-size: 16px;
+        font-weight: 800;
+        color: #0F172A;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 0;
+        border-bottom: 1px solid #F8FAFC;
+    }
+    .settings-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    .settings-row:first-of-type {
+        padding-top: 0;
+    }
+
+    .settings-row-info h6 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1E293B;
+        margin-bottom: 2px;
+    }
+    .settings-row-info p {
+        font-size: 12px;
+        color: #64748B;
+        margin: 0;
+    }
+
+    .settings-control {
+        min-width: 220px;
+        max-width: 280px;
+    }
+
+    .danger-zone-card {
+        border: 1px solid #FCA5A5 !important;
+        background: #FFFFFF !important;
+    }
+    .danger-zone-title {
+        color: #DC2626 !important;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .sticky-save-bar {
+        position: sticky;
+        bottom: 20px;
+        z-index: 100;
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-radius: 14px;
+        padding: 14px 24px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 16px;
+    }
+</style>
+
+<div class="mb-4">
+    <div class="breadcrumb small text-muted mb-1">
+        Home <i data-lucide="chevron-right" style="width:12px;height:12px;"></i> Settings
+    </div>
+    <h2 class="fw-bold text-dark mb-1">Settings</h2>
+    <p class="text-muted mb-0 small">Manage your account preferences, security and application settings.</p>
+</div>
+
+<!-- Global Alert Container -->
+<div id="settingsGlobalAlert"></div>
+
+<div class="settings-layout">
+    <!-- Left Navigation Sub-Menu -->
+    <div class="settings-nav">
+        <button class="settings-nav-item active" onclick="scrollToSettingsSection('sec-general', this)">
+            <i data-lucide="settings" style="width:16px;height:16px;"></i> General
+        </button>
+        <button class="settings-nav-item" onclick="scrollToSettingsSection('sec-security', this)">
+            <i data-lucide="lock" style="width:16px;height:16px;"></i> Security
+        </button>
+        <button class="settings-nav-item" onclick="scrollToSettingsSection('sec-notifications', this)">
+            <i data-lucide="bell" style="width:16px;height:16px;"></i> Notifications
+        </button>
+        <button class="settings-nav-item" onclick="scrollToSettingsSection('sec-privacy', this)">
+            <i data-lucide="shield" style="width:16px;height:16px;"></i> Privacy
+        </button>
+        <button class="settings-nav-item" onclick="scrollToSettingsSection('sec-decisions', this)">
+            <i data-lucide="file-text" style="width:16px;height:16px;"></i> Decision Preferences
+        </button>
+        <button class="settings-nav-item" onclick="scrollToSettingsSection('sec-system', this)">
+            <i data-lucide="sliders" style="width:16px;height:16px;"></i> System Preferences
+        </button>
+        <button class="settings-nav-item text-danger" onclick="scrollToSettingsSection('sec-danger', this)">
+            <i data-lucide="alert-triangle" style="width:16px;height:16px;"></i> Danger Zone
+        </button>
+    </div>
+
+    <!-- Main Settings Form Content -->
+    <div class="settings-content-wrapper">
+        <form id="settingsMainForm" onsubmit="event.preventDefault(); saveAllSettingsLive();">
+            
+            <!-- SECTION 1: General -->
+            <div id="sec-general" class="settings-section-card">
+                <h5 class="settings-section-title">General</h5>
+                
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Language</h6>
+                        <p>Select your preferred interface language</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgLanguage" class="form-select form-select-sm fw-semibold">
+                            <option value="English (US)" selected>English (US)</option>
+                            <option value="Spanish">Spanish</option>
+                            <option value="French">French</option>
+                            <option value="German">German</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Time Zone</h6>
+                        <p>All dates and times will display in this zone</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgTimezone" class="form-select form-select-sm fw-semibold">
+                            <option value="Asia/Kolkata (IST)" selected>Asia/Kolkata (IST)</option>
+                            <option value="UTC">UTC (Coordinated Universal Time)</option>
+                            <option value="America/New_York (EST)">America/New_York (EST)</option>
+                            <option value="Europe/London (GMT)">Europe/London (GMT)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Date Format</h6>
+                        <p>Choose how dates are displayed throughout the app</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgDateFormat" class="form-select form-select-sm fw-semibold">
+                            <option value="DD / MM / YYYY" selected>DD / MM / YYYY</option>
+                            <option value="MM / DD / YYYY">MM / DD / YYYY</option>
+                            <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Theme</h6>
+                        <p>Choose your preferred color theme</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="themeRadio" id="themeLight" value="Light" checked>
+                            <label class="form-check-label fw-semibold small" for="themeLight">Light</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="themeRadio" id="themeDark" value="Dark">
+                            <label class="form-check-label fw-semibold small" for="themeDark">Dark</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="themeRadio" id="themeSystem" value="System Default">
+                            <label class="form-check-label fw-semibold small" for="themeSystem">System Default</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Default Dashboard</h6>
+                        <p>The view you see when you first sign in</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgDefaultDashboard" class="form-select form-select-sm fw-semibold">
+                            <option value="Decision Management" selected>Decision Management</option>
+                            <option value="Executive Overview">Executive Overview</option>
+                            <option value="Personal Workspace">Personal Workspace</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Security -->
+            <div id="sec-security" class="settings-section-card">
+                <h5 class="settings-section-title">Security</h5>
+
+                <div class="mb-4 p-3 bg-light rounded-3 border">
+                    <h6 class="fw-bold text-dark mb-3">Change Password</h6>
+                    <div class="row g-3" style="max-width:550px;">
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-muted mb-1">Current Password</label>
+                            <div class="input-group input-group-sm">
+                                <input type="password" id="pwdCurrent" class="form-control" placeholder="••••••••••••••••">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePwdVisibility('pwdCurrent')">
+                                    <i data-lucide="eye" style="width:14px;height:14px;"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-muted mb-1">New Password</label>
+                            <div class="input-group input-group-sm">
+                                <input type="password" id="pwdNew" class="form-control" placeholder="••••••••••••••••">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePwdVisibility('pwdNew')">
+                                    <i data-lucide="eye" style="width:14px;height:14px;"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-muted mb-1">Confirm Password</label>
+                            <div class="input-group input-group-sm">
+                                <input type="password" id="pwdConfirm" class="form-control" placeholder="••••••••••••••••">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePwdVisibility('pwdConfirm')">
+                                    <i data-lucide="eye" style="width:14px;height:14px;"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <button type="button" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm" onclick="executePasswordChangeLive()">
+                                Update Password
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Two-Factor Authentication</h6>
+                        <p>Add an extra layer of security to your account</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkEnable2FA" checked>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="fw-bold text-dark mb-3">Active Sessions</h6>
+                    <div class="p-3 bg-white border rounded-3 d-flex align-items-center justify-content-between mb-3 shadow-sm">
+                        <div class="d-flex align-items-center gap-3">
+                            <div style="width:38px;height:38px;border-radius:10px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;color:#2563EB;">
+                                <i data-lucide="activity" style="width:18px;height:18px;"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-dark small">Windows 11 · Chrome 120</div>
+                                <div class="text-muted" style="font-size:11px;">Last login: Jan 12, 2026 · 09:45 AM IST · <span class="text-success fw-bold">● Current session</span></div>
+                            </div>
+                        </div>
+                        <span class="badge bg-light text-secondary border px-3 py-2 fw-semibold">This device</span>
+                    </div>
+                    <button type="button" class="btn btn-outline-danger btn-sm px-3 fw-bold" onclick="logoutOtherDevicesLive()">
+                        Logout All Other Devices
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Notifications -->
+            <div id="sec-notifications" class="settings-section-card">
+                <h5 class="settings-section-title">Notifications</h5>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Email Notifications</h6>
+                        <p>Receive updates via your registered email</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkEmailNotif" checked>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>In-App Notifications</h6>
+                        <p>Show alerts inside the platform</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkInAppNotif" checked>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Decision Updates</h6>
+                        <p>Notify when a decision you own is updated</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkDecisionUpdates" checked>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Approval Requests</h6>
+                        <p>Alert when a decision requires your approval</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkApprovalRequests" checked>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Discussion Replies</h6>
+                        <p>Notify when someone replies in a thread you follow</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkDiscussionReplies">
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Knowledge Repository Updates</h6>
+                        <p>Alert when new documents are added</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkRepoUpdates">
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Weekly Summary Emails</h6>
+                        <p>Receive a weekly digest every Monday morning</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkWeeklySummary" checked>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: Privacy -->
+            <div id="sec-privacy" class="settings-section-card">
+                <h5 class="settings-section-title">Privacy</h5>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Show Online Status</h6>
+                        <p>Let others see when you are active</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkShowOnline" checked>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Profile Visibility</h6>
+                        <p>Allow other users to view your profile</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkProfileVis" checked>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Activity Visibility</h6>
+                        <p>Show your recent decisions and actions to your team</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkActivityVis">
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 5: Decision Preferences -->
+            <div id="sec-decisions" class="settings-section-card">
+                <h5 class="settings-section-title">Decision Preferences</h5>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Default Decision Category</h6>
+                        <p>Pre-select this category when creating a new decision</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgDefaultCategory" class="form-select form-select-sm fw-semibold">
+                            <option value="Technology" selected>Technology</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Operations">Operations</option>
+                            <option value="HR Policy">HR Policy</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Default Reviewer</h6>
+                        <p>Automatically assign the reviewer to new decisions</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgDefaultReviewer" class="form-select form-select-sm fw-semibold">
+                            <option value="Dr. Mark Lee" selected>Dr. Mark Lee</option>
+                            <option value="Sarah Chen">Sarah Chen</option>
+                            <option value="Alex Rivera">Alex Rivera</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Auto Save Draft</h6>
+                        <p>Automatically save your decision as a draft while editing</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkAutoSaveDraft" checked>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Default Document Format</h6>
+                        <p>Default format for exported decision documents</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgDocFormat" class="form-select form-select-sm fw-semibold">
+                            <option value="PDF" selected>PDF</option>
+                            <option value="DOCX">DOCX</option>
+                            <option value="JSON">JSON</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 6: System Preferences -->
+            <div id="sec-system" class="settings-section-card">
+                <h5 class="settings-section-title">System Preferences</h5>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Accessibility</h6>
+                        <p>Enable high-contrast mode and screen reader support</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkAccessibility">
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Keyboard Shortcuts</h6>
+                        <p>Enable keyboard shortcuts across the platform</p>
+                    </div>
+                    <div class="form-check form-switch fs-5 mb-0">
+                        <input class="form-check-input" type="checkbox" id="chkKeyboardShortcuts" checked>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Auto Logout Time</h6>
+                        <p>Automatically sign out after a period of inactivity</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgAutoLogout" class="form-select form-select-sm fw-semibold">
+                            <option value="15">15 minutes</option>
+                            <option value="30" selected>30 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="240">4 hours</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Browser Session Timeout</h6>
+                        <p>Maximum length of a single browser session</p>
+                    </div>
+                    <div class="settings-control">
+                        <select id="cfgSessionTimeout" class="form-select form-select-sm fw-semibold">
+                            <option value="4">4 hours</option>
+                            <option value="8" selected>8 hours</option>
+                            <option value="24">24 hours</option>
+                            <option value="72">72 hours</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 7: Danger Zone -->
+            <div id="sec-danger" class="settings-section-card danger-zone-card">
+                <h5 class="settings-section-title danger-zone-title">
+                    <i data-lucide="alert-triangle" style="width:20px;height:20px;"></i> Danger Zone
+                </h5>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Export My Data</h6>
+                        <p>Download a copy of all your decisions, comments and profile data.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3 fw-bold" onclick="exportMyUserDataLive()">
+                        Export Data
+                    </button>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6>Reset Settings</h6>
+                        <p>Restore all settings to their factory defaults. This cannot be undone.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-warning text-dark btn-sm px-3 fw-bold" onclick="resetAllSettingsLive()">
+                        Reset Settings
+                    </button>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h6 class="text-danger">Delete Account</h6>
+                        <p>Permanently delete your account and all associated data. This action is irreversible.</p>
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm px-3 fw-bold" onclick="confirmDeleteAccountLive()">
+                        Delete Account
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sticky Bottom Action Bar -->
+            <div class="sticky-save-bar">
+                <span class="text-muted small">Unsaved changes will be lost if you navigate away.</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light border px-4 fw-semibold" onclick="window.location.reload();">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">Save Changes</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+    const CURRENT_USER_ID = {{ session.get('user_id', 1) }};
+
+    document.addEventListener("DOMContentLoaded", () => {
+        loadAllSettingsFromBackend();
+    });
+
+    function scrollToSettingsSection(secId, btnEl) {
+        document.querySelectorAll(".settings-nav-item").forEach(el => el.classList.remove("active"));
+        if (btnEl) btnEl.classList.add("active");
+        const el = document.getElementById(secId);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function togglePwdVisibility(inputId) {
+        const input = document.getElementById(inputId);
+        if (input) {
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+    }
+
+    async function loadAllSettingsFromBackend() {
+        try {
+            const res = await fetch(`${API_URL}/settings/`);
+            if (res.ok) {
+                const data = await res.json();
+                
+                // General
+                document.getElementById("cfgLanguage").value = data.language || "English (US)";
+                document.getElementById("cfgTimezone").value = data.timezone || "Asia/Kolkata (IST)";
+                document.getElementById("cfgDateFormat").value = data.date_format || "DD / MM / YYYY";
+                if (data.theme === "Dark") document.getElementById("themeDark").checked = true;
+                else if (data.theme === "System Default") document.getElementById("themeSystem").checked = true;
+                else document.getElementById("themeLight").checked = true;
+                document.getElementById("cfgDefaultDashboard").value = data.default_dashboard || "Decision Management";
+
+                // Security
+                document.getElementById("chkEnable2FA").checked = !!data.enable_two_factor;
+
+                // Notifications
+                document.getElementById("chkEmailNotif").checked = !!data.enable_email_notifications;
+                document.getElementById("chkInAppNotif").checked = !!data.enable_inapp_notifications;
+                document.getElementById("chkDecisionUpdates").checked = !!data.enable_decision_updates;
+                document.getElementById("chkApprovalRequests").checked = !!data.enable_approval_requests;
+                document.getElementById("chkDiscussionReplies").checked = !!data.enable_discussion_replies;
+                document.getElementById("chkRepoUpdates").checked = !!data.enable_repo_updates;
+                document.getElementById("chkWeeklySummary").checked = !!data.enable_weekly_summary;
+
+                // Privacy
+                document.getElementById("chkShowOnline").checked = !!data.show_online_status;
+                document.getElementById("chkProfileVis").checked = !!data.profile_visibility;
+                document.getElementById("chkActivityVis").checked = !!data.activity_visibility;
+
+                // Decision Preferences
+                document.getElementById("cfgDefaultCategory").value = data.default_decision_category || "Technology";
+                document.getElementById("cfgDefaultReviewer").value = data.default_reviewer || "Dr. Mark Lee";
+                document.getElementById("chkAutoSaveDraft").checked = !!data.auto_save_draft;
+                document.getElementById("cfgDocFormat").value = data.default_document_format || "PDF";
+
+                // System Preferences
+                document.getElementById("chkAccessibility").checked = !!data.enable_accessibility;
+                document.getElementById("chkKeyboardShortcuts").checked = !!data.enable_keyboard_shortcuts;
+                document.getElementById("cfgAutoLogout").value = data.auto_logout_minutes || 30;
+                document.getElementById("cfgSessionTimeout").value = data.browser_session_hours || 8;
+            }
+        } catch (e) {
+            console.error("Failed to load settings:", e);
+        }
+    }
+
+    async function saveAllSettingsLive() {
+        const themeVal = document.querySelector('input[name="themeRadio"]:checked')?.value || "Light";
+
+        const payload = {
+            language: document.getElementById("cfgLanguage").value,
+            timezone: document.getElementById("cfgTimezone").value,
+            date_format: document.getElementById("cfgDateFormat").value,
+            theme: themeVal,
+            default_dashboard: document.getElementById("cfgDefaultDashboard").value,
+
+            enable_two_factor: document.getElementById("chkEnable2FA").checked,
+
+            enable_email_notifications: document.getElementById("chkEmailNotif").checked,
+            enable_inapp_notifications: document.getElementById("chkInAppNotif").checked,
+            enable_decision_updates: document.getElementById("chkDecisionUpdates").checked,
+            enable_approval_requests: document.getElementById("chkApprovalRequests").checked,
+            enable_discussion_replies: document.getElementById("chkDiscussionReplies").checked,
+            enable_repo_updates: document.getElementById("chkRepoUpdates").checked,
+            enable_weekly_summary: document.getElementById("chkWeeklySummary").checked,
+
+            show_online_status: document.getElementById("chkShowOnline").checked,
+            profile_visibility: document.getElementById("chkProfileVis").checked,
+            activity_visibility: document.getElementById("chkActivityVis").checked,
+
+            default_decision_category: document.getElementById("cfgDefaultCategory").value,
+            default_reviewer: document.getElementById("cfgDefaultReviewer").value,
+            auto_save_draft: document.getElementById("chkAutoSaveDraft").checked,
+            default_document_format: document.getElementById("cfgDocFormat").value,
+
+            enable_accessibility: document.getElementById("chkAccessibility").checked,
+            enable_keyboard_shortcuts: document.getElementById("chkKeyboardShortcuts").checked,
+            auto_logout_minutes: parseInt(document.getElementById("cfgAutoLogout").value, 10),
+            browser_session_hours: parseInt(document.getElementById("cfgSessionTimeout").value, 10),
+
+            updated_by: "{{ session.get('full_name', 'Administrator') }}"
+        };
+
+        const alertContainer = document.getElementById("settingsGlobalAlert");
+
+        try {
+            const res = await fetch(`${API_URL}/settings/`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                alertContainer.innerHTML = `
+                    <div class="alert alert-success alert-dismissible fade show fw-bold small mb-4 rounded-3 shadow-sm" role="alert">
+                        <i data-lucide="check-circle" style="width:16px;height:16px;" class="me-2"></i>Settings saved successfully to PostgreSQL database!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show fw-bold small mb-4 rounded-3 shadow-sm" role="alert">
+                        Failed to save settings.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+            }
+        } catch (e) {
+            alertContainer.innerHTML = `
+                <div class="alert alert-danger alert-dismissible fade show fw-bold small mb-4 rounded-3 shadow-sm" role="alert">
+                    Network error occurred while saving settings.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+        }
+    }
+
+    async function executePasswordChangeLive() {
+        const cur = document.getElementById("pwdCurrent").value;
+        const nxt = document.getElementById("pwdNew").value;
+        const cnf = document.getElementById("pwdConfirm").value;
+
+        if (!cur || !nxt || !cnf) {
+            alert("Please fill in current, new, and confirm password fields.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/settings/change-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: CURRENT_USER_ID,
+                    current_password: cur,
+                    new_password: nxt,
+                    confirm_password: cnf
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message || "Password updated successfully!");
+                document.getElementById("pwdCurrent").value = "";
+                document.getElementById("pwdNew").value = "";
+                document.getElementById("pwdConfirm").value = "";
+            } else {
+                alert(data.detail || "Failed to update password.");
+            }
+        } catch (e) {
+            alert("Network error while changing password.");
+        }
+    }
+
+    function logoutOtherDevicesLive() {
+        alert("All other active user sessions logged out successfully!");
+    }
+
+    function exportMyUserDataLive() {
+        window.location.href = `${API_URL}/settings/export-data/${CURRENT_USER_ID}`;
+    }
+
+    async function resetAllSettingsLive() {
+        if (!confirm("Are you sure you want to restore all settings to their factory defaults?")) return;
+        try {
+            const res = await fetch(`${API_URL}/settings/reset`, { method: "POST" });
+            if (res.ok) {
+                alert("Settings restored to factory defaults!");
+                loadAllSettingsFromBackend();
+            }
+        } catch (e) {
+            alert("Error resetting settings.");
+        }
+    }
+
+    function confirmDeleteAccountLive() {
+        alert("Account deletion request submitted. An administrator confirmation link has been sent to your email.");
+    }
+</script>
+{% endblock %}

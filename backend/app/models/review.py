@@ -44,6 +44,16 @@ class Review(Base):
         return self.reviewer.full_name if self.reviewer else None
 
     @property
+    def reviewer_role(self):
+        if not self.reviewer:
+            return None
+        return self.reviewer.role.name if getattr(self.reviewer, 'role', None) else getattr(self.reviewer, 'role_name', None)
+
+    @property
+    def employee_id(self):
+        return self.reviewer.employee_id if self.reviewer else None
+
+    @property
     def reviewer_initials(self):
         if not self.reviewer or not self.reviewer.full_name:
             return "U"

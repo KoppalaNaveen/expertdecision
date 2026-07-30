@@ -34,22 +34,22 @@ const SEVERITY_STYLE = {
 
 document.addEventListener("DOMContentLoaded", () => {
     fetchAuditLogs();
+    // Auto-refresh lively every 5 seconds to show live logins and events
+    setInterval(fetchAuditLogs, 5000);
 });
 
 async function fetchAuditLogs() {
     try {
-        // Primary: use dashboard audit_logs (admin has them)
-        const res = await fetch(`${API_URL}/dashboard/1`);
-        let logs  = [];
+        let logs = [];
+        const res = await fetch(`${API_URL}/audit/`);
         if (res.ok) {
-            const data = await res.json();
-            logs = (data.recent_audit_logs || []).map(e => ({
-                user_name : e.user_name || "System",
-                action    : e.action    || "—",
-                module    : e.module    || "General",
-                time_ago  : e.time_ago  || "just now",
-                severity  : e.severity  || "Info",
-            }));
+            logs = await res.json();
+        } else {
+            const dRes = await fetch(`${API_URL}/dashboard/1`);
+            if (dRes.ok) {
+                const data = await dRes.json();
+                logs = data.recent_audit_logs || [];
+            }
         }
 
         // Supplement with decision events if logs are sparse
@@ -98,12 +98,17 @@ async function fetchAuditLogs() {
 }
 
 function buildModuleFilter() {
-    const modules = [...new Set(allLogs.map(l => l.module).filter(Boolean))].sort();
     const sel = document.getElementById("moduleFilter");
+    if (!sel) return;
+    const currentVal = sel.value;
+    const modules = [...new Set(allLogs.map(l => l.module).filter(Boolean))].sort();
+    
+    sel.innerHTML = '<option value="">All Modules</option>';
     modules.forEach(m => {
         const opt = document.createElement("option");
         opt.value = m;
         opt.textContent = m;
+        if (m === currentVal) opt.selected = true;
         sel.appendChild(opt);
     });
 }
@@ -154,7 +159,10 @@ function renderTable() {
             const initials = (l.user_name || "SY").split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase();
             return `
             <tr class="audit-row">
-                <td class="px-4 py-3 text-muted" style="font-size:12px;white-space:nowrap;">${l.time_ago || "—"}</td>
+                <td class="px-4 py-3" style="white-space:nowrap;">
+                    <div class="fw-semibold text-dark" style="font-size:12px;">${l.time_ago || "Just now"}</div>
+                    <div class="text-muted" style="font-size:10.5px;">${l.created_at_str || "—"}</div>
+                </td>
                 <td class="px-4">
                     <div class="d-flex align-items-center gap-2">
                         <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#667EEA,#764BA2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;">${initials}</div>
