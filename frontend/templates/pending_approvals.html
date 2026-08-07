@@ -150,12 +150,12 @@
                             <tr id="userRow-{{ user.id }}">
                                 <td><span class="fw-bold text-primary">{{ user.employee_id }}</span></td>
                                 <td class="fw-semibold text-dark">{{ user.full_name }}</td>
-                                <td class="text-muted">{{ user.email }}</td>
+                                <td class="text-muted"><code style="background:#F1F5F9;color:#0F172A;padding:2px 6px;border-radius:4px;font-size:11px;" title="Security Hash: {{ user.email_hash or user.email }}"><i data-lucide="shield-check" style="width:12px;height:12px;color:#0D9488;" class="me-1"></i>{{ user.display_email if user.display_email else (user.email_hash[:16] + '...' if user.email_hash else user.email) }}</code></td>
                                 <td><span class="badge-role">{{ user.role_name }}</span></td>
                                 <td class="small text-muted">{{ user.created_at }}</td>
                                 <td><span class="badge-status-pending" id="statusBadge-{{ user.id }}">{{ user.status }}</span></td>
                                 <td class="text-end">
-                                    <button class="btn-action-view me-1" onclick="viewUserDetails({{ user.id }}, '{{ user.full_name }}', '{{ user.email }}', '{{ user.employee_id }}', '{{ user.role_name }}', '{{ user.created_at }}')">
+                                    <button class="btn-action-view me-1" onclick="viewUserDetails({{ user.id }}, '{{ user.full_name }}', '{{ user.email_hash or user.email }}', '{{ user.employee_id }}', '{{ user.role_name }}', '{{ user.created_at }}')">
                                         <i data-lucide="eye" style="width: 14px; height: 14px; vertical-align: -2px;"></i> View
                                     </button>
                                     <button class="btn-action-approve me-1" onclick="processApproval({{ user.id }}, 'approve')">

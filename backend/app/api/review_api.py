@@ -35,9 +35,10 @@ def create_review(
     response_model=List[ReviewResponse]
 )
 def get_all_reviews(
+    user_id: int = None,
     db: Session = Depends(get_db)
 ):
-    return ReviewService.get_all_reviews(db)
+    return ReviewService.get_all_reviews(db, user_id=user_id)
 
 
 @router.get(

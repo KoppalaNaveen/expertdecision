@@ -20,6 +20,8 @@ class User(Base):
     full_name = Column(String(100), nullable=False)
 
     email = Column(String(100), unique=True, nullable=False)
+    email_hash = Column(String(64), index=True, nullable=True)
+    email_original = Column(String(100), nullable=True)
 
     employee_id = Column(String(50), unique=True, index=True)
 

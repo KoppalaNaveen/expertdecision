@@ -89,6 +89,29 @@
     
     <!-- STEP 1: BASIC INFO -->
     <div id="wizard-step-1" class="wizard-step">
+        
+        <!-- PREVIOUS REVIEW & REJECTION COMMENTS BANNER -->
+        <div id="rejectionFeedbackBanner" class="card border-0 shadow-sm rounded-4 mb-4 d-none" style="overflow: hidden; border: 1px solid #FCD34D !important;">
+            <div class="card-header bg-warning bg-opacity-10 border-bottom-0 py-3 px-4 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-warning text-dark d-flex align-items-center justify-content-center shadow-sm" style="width: 36px; height: 36px; flex-shrink: 0;">
+                        <i class="bi bi-exclamation-triangle-fill fs-6"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold text-dark mb-0 fs-6">This decision was previously rejected</h5>
+                        <small class="text-muted">Please review the Reviewer and Manager comments below before making changes and resubmitting.</small>
+                    </div>
+                </div>
+                <span class="badge bg-danger text-white fw-bold px-3 py-1 shadow-sm">Action Required</span>
+            </div>
+            <div class="card-body p-4 bg-white">
+                <h6 class="fw-bold text-dark mb-3" style="font-size: 14px;">Previous Review Comments</h6>
+                <div id="bannerCommentsContainer" class="d-flex flex-column gap-3">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+        </div>
+
         <h4 class="fw-bold text-dark mb-4">Basic Information</h4>
         
         <div class="mb-4">
@@ -134,12 +157,26 @@
         </div>
         
         <div class="mb-5">
-            <label class="form-label fw-semibold text-dark text-sm">Tags</label>
-            <div class="d-flex align-items-center border rounded-3 p-2">
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2 me-2">Budget</span>
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2 me-2">Q4</span>
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2 me-2">Technology</span>
-                <input type="text" class="form-control border-0 shadow-none p-0 ms-2" placeholder="+ Add tag" style="width: 100px; font-size: 14px;">
+            <label class="form-label fw-semibold text-dark text-sm mb-1">Tags</label>
+            <p class="text-muted small mb-2" style="font-size: 12.5px;">Click or drag and drop tags from the available pool into your decision tags list, or type a custom tag.</p>
+
+            <!-- Selected Tags Drop & List Area -->
+            <div id="selectedTagsDropArea" class="border rounded-3 p-3 mb-3 bg-white shadow-sm d-flex flex-wrap align-items-center gap-2" style="min-height: 54px; border: 2px dashed #CBD5E1 !important; transition: all 0.2s ease;">
+                <div id="selectedTagsList" class="d-flex flex-wrap align-items-center gap-2">
+                    <!-- Selected tags rendered dynamically -->
+                </div>
+                <input type="text" id="customTagInput" class="form-control border-0 shadow-none p-0 ms-1 flex-grow-1" placeholder="+ Type custom tag & press Enter..." style="min-width: 180px; font-size: 13.5px;" onkeydown="handleCustomTagKeydown(event)">
+            </div>
+
+            <!-- Available Tags Pool / Drag & Drop Bank -->
+            <div class="p-3 bg-light rounded-3 border">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="fw-bold text-secondary uppercase tracking-wider" style="font-size: 11px;"><i class="bi bi-tag-fill me-1 text-primary"></i> AVAILABLE TAGS (CLICK OR DRAG & DROP)</span>
+                    <span class="text-muted" style="font-size: 11px;">Drag tags into the dashed box above</span>
+                </div>
+                <div id="availableTagsBank" class="d-flex flex-wrap gap-2 align-items-center">
+                    <!-- Available tag pills rendered here -->
+                </div>
             </div>
         </div>
     </div>
@@ -477,13 +514,24 @@
         try {
             const res = await fetch("http://127.0.0.1:8000/users/");
             if (res.ok) {
-                allUsers = await res.json();
+                const rawUsers = await res.json();
+                // Rule: Filter out decision owner, Employees, and Administrators
+                allUsers = rawUsers.filter(u => {
+                    if (u.id === currentUserId) return false;
+                    const rName = (u.role_name || "").toLowerCase();
+                    const empId = (u.employee_id || "").toLowerCase();
+                    if (rName.includes("admin") || rName.includes("administrator") || empId.startsWith("ad")) return false;
+                    if (rName === "employee" && !rName.includes("reviewer") && !rName.includes("manager")) return false;
+                    return rName.includes("reviewer") || rName.includes("manager") || empId.startsWith("rw") || empId.startsWith("mn");
+                });
+
+                // Rule: Sort reviewer dropdown alphabetically by Full Name
+                allUsers.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+
                 const select = document.getElementById("userSelect");
                 select.innerHTML = '<option value="">Select Reviewer...</option>';
                 allUsers.forEach(u => {
-                    // Rule: Decision owner must NOT be assigned as reviewer
-                    if (u.id === currentUserId) return;
-                    select.innerHTML += `<option value="${u.id}">${u.full_name} (${u.employee_id || 'User'})</option>`;
+                    select.innerHTML += `<option value="${u.id}">${u.full_name} (${u.employee_id || 'ID'})</option>`;
                 });
             }
         } catch (e) {
@@ -498,13 +546,11 @@
             return;
         }
         
-        // Rule: Decision owner cannot be assigned as a reviewer
         if (userId === currentUserId) {
-            alert("The decision owner (user who created the decision) cannot be assigned as a reviewer.");
+            alert("The decision owner cannot be assigned as a reviewer.");
             return;
         }
         
-        // Rule: The same reviewer must not be assigned more than once
         if (decisionPayload.reviewers.some(r => r.reviewer_id === userId)) {
             alert("This reviewer has already been assigned.");
             return;
@@ -520,7 +566,9 @@
             reviewer_id: userId,
             approval_type: approvalType,
             deadline: deadline ? deadline + "T23:59:59Z" : null,
-            _name: user.full_name // UI purpose only
+            _name: user.full_name,
+            _emp_id: user.employee_id,
+            _role: user.role_name
         });
         
         renderReviewers();
@@ -543,21 +591,37 @@
         countSpan.innerText = decisionPayload.reviewers.length;
         
         if (decisionPayload.reviewers.length === 0) {
-            list.innerHTML = '<div class="text-muted small py-4 text-center border rounded-3 bg-white">No reviewers added yet. Click "Auto-assign Reviewers" or select a reviewer above.</div>';
+            list.innerHTML = '<div class="text-muted small py-4 text-center border rounded-3 bg-white">No reviewers added yet. Select a reviewer above or leave empty for auto-assignment.</div>';
             return;
         }
         
         list.innerHTML = "";
-        decisionPayload.reviewers.forEach(r => {
-            const initials = r._name ? r._name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : "U";
+        decisionPayload.reviewers.forEach((r, idx) => {
+            const userObj = allUsers.find(u => u.id === r.reviewer_id) || {};
+            const empId = r._emp_id || userObj.employee_id || "ID";
+            const roleName = r._role || userObj.role_name || (idx === 0 ? "Reviewer" : "Manager");
+            const stepName = `Step ${idx + 1}`;
+            const statusName = idx === 0 ? "Pending" : "Queued";
+            const statusClass = idx === 0 ? "bg-warning-subtle text-warning border-warning-subtle" : "bg-secondary-subtle text-secondary border-secondary-subtle";
+            const initials = (r._name || userObj.full_name || "U").split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+
             list.innerHTML += `
-            <div class="d-flex align-items-center border rounded-3 p-3 mb-3 bg-white shadow-sm">
-                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold me-3" style="width: 44px; height: 44px;">${initials}</div>
-                <div class="flex-grow-1">
-                    <h6 class="fw-bold mb-1 text-dark">${r._name}</h6>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1" style="font-size: 11px;">${r.approval_type}</span>
+            <div class="d-flex align-items-center justify-content-between border rounded-3 p-3 mb-3 bg-white shadow-sm">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width: 44px; height: 44px; font-size: 13px;">${initials}</div>
+                    <div>
+                        <h6 class="fw-bold mb-0.5 text-dark">${r._name || userObj.full_name} <span class="text-muted text-xs">(${empId})</span></h6>
+                        <div class="d-flex align-items-center gap-2 text-xs text-muted">
+                            <span><strong>Role:</strong> ${roleName}</span>
+                            <span>•</span>
+                            <span><strong>Approval:</strong> ${stepName} (${r.approval_type || 'Sequential'})</span>
+                        </div>
+                    </div>
                 </div>
-                <button type="button" class="btn btn-light text-danger border-0 rounded-circle p-2" onclick="removeReviewer(${r.reviewer_id})" title="Remove"><i data-lucide="x" style="width:18px;"></i></button>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="badge ${statusClass} border px-2.5 py-1 rounded-pill text-xs fw-semibold">Status: ${statusName}</span>
+                    <button type="button" class="btn btn-light text-danger border-0 rounded-circle p-2" onclick="removeReviewer(${r.reviewer_id})" title="Remove"><i data-lucide="x" style="width:18px;"></i></button>
+                </div>
             </div>`;
         });
         
@@ -1296,19 +1360,168 @@
         if (window.lucide) window.lucide.createIcons();
     }
     
+    function escapeHtml(str) {
+        if (!str) return "";
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    const defaultTagBank = ["Budget", "Finance", "Q4", "Technology", "Operations", "Strategy", "Policy", "Security", "HR", "Urgent", "Compliance"];
+    let selectedTags = [];
+
+    function initTagsUI() {
+        renderTagsUI();
+        setupTagDragAndDrop();
+    }
+
+    function renderTagsUI() {
+        const selectedContainer = document.getElementById("selectedTagsList");
+        const bankContainer = document.getElementById("availableTagsBank");
+        if (!selectedContainer || !bankContainer) return;
+
+        selectedContainer.innerHTML = "";
+        if (selectedTags.length === 0) {
+            selectedContainer.innerHTML = `<span class="text-muted small italic ms-1" style="font-size:12.5px;">No tags selected yet. Drag or click tags below to add.</span>`;
+        } else {
+            selectedTags.forEach(tag => {
+                selectedContainer.innerHTML += `
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2 d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 12.5px; font-weight: 600;">
+                        ${escapeHtml(tag)}
+                        <i data-lucide="x" style="width: 13px; height: 13px; cursor: pointer;" onclick="removeTag('${escapeHtml(tag)}')"></i>
+                    </span>
+                `;
+            });
+        }
+
+        bankContainer.innerHTML = "";
+        const available = defaultTagBank.filter(t => !selectedTags.includes(t));
+        if (available.length === 0) {
+            bankContainer.innerHTML = `<span class="text-muted small" style="font-size: 12px;">All default tags selected!</span>`;
+        } else {
+            available.forEach(tag => {
+                bankContainer.innerHTML += `
+                    <span class="badge bg-white text-secondary border rounded-pill px-3 py-2 cursor-pointer shadow-sm tag-bank-item" 
+                          draggable="true" 
+                          style="cursor: grab; font-weight: 500; font-size: 12.5px; transition: all 0.2s ease;" 
+                          onclick="addTag('${escapeHtml(tag)}')" 
+                          ondragstart="handleTagDragStart(event, '${escapeHtml(tag)}')">
+                        + ${escapeHtml(tag)}
+                    </span>
+                `;
+            });
+        }
+
+        decisionPayload.tags = selectedTags.join(", ");
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function addTag(tag) {
+        const cleanTag = tag.trim();
+        if (cleanTag && !selectedTags.includes(cleanTag)) {
+            selectedTags.push(cleanTag);
+            renderTagsUI();
+        }
+    }
+
+    function removeTag(tag) {
+        selectedTags = selectedTags.filter(t => t !== tag);
+        renderTagsUI();
+    }
+
+    function handleCustomTagKeydown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const input = document.getElementById("customTagInput");
+            if (input && input.value.trim()) {
+                addTag(input.value.trim());
+                input.value = "";
+            }
+        }
+    }
+
+    function handleTagDragStart(e, tag) {
+        e.dataTransfer.setData("text/plain", tag);
+        e.dataTransfer.effectAllowed = "copy";
+    }
+
+    function setupTagDragAndDrop() {
+        const dropArea = document.getElementById("selectedTagsDropArea");
+        if (!dropArea) return;
+
+        dropArea.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+            dropArea.style.borderColor = "#2563EB";
+            dropArea.style.backgroundColor = "#EFF6FF";
+        });
+
+        dropArea.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = "#CBD5E1";
+            dropArea.style.backgroundColor = "#FFFFFF";
+        });
+
+        dropArea.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropArea.style.borderColor = "#CBD5E1";
+            dropArea.style.backgroundColor = "#FFFFFF";
+            const tag = e.dataTransfer.getData("text/plain");
+            if (tag) {
+                addTag(tag);
+            }
+        });
+    }
+
     let isEditMode = false;
     let editDecisionId = null;
 
     async function loadDecisionForEdit(id) {
         try {
-            const res = await fetch(`http://127.0.0.1:8000/decisions/${id}`);
-            if (!res.ok) throw new Error("Failed to load decision details");
+            // Determine logged in user ID reliably
+            let loggedInUserId = 0;
+            const sessUserId = "{{ session.get('user_id', '') }}";
+            if (sessUserId && sessUserId !== "None" && sessUserId !== "undefined") {
+                loggedInUserId = parseInt(sessUserId, 10);
+            }
+            if (!loggedInUserId && typeof USER_ID !== 'undefined' && USER_ID) {
+                loggedInUserId = parseInt(USER_ID, 10);
+            }
+            if (!loggedInUserId && typeof LOGGED_USER_ID !== 'undefined' && LOGGED_USER_ID) {
+                loggedInUserId = parseInt(LOGGED_USER_ID, 10);
+            }
+
+            const userParam = loggedInUserId ? `?user_id=${loggedInUserId}` : '';
+            const res = await fetch(`http://127.0.0.1:8000/decisions/${id}${userParam}`);
+            if (!res.ok) {
+                let errorMsg = "Failed to load decision details";
+                try {
+                    const errData = await res.json();
+                    if (errData && errData.detail) errorMsg = errData.detail;
+                } catch (_) {}
+                throw new Error(errorMsg);
+            }
             const decision = await res.json();
 
-            const loggedInUserId = parseInt("{{ session.get('user_id', 1) }}", 10);
-            if (decision.created_by !== loggedInUserId || decision.status !== 'Draft') {
-                alert("Access Denied: Only the decision owner can edit a decision while it is in Draft status.");
-                window.location.href = `/decision/${id}`;
+            const ownerId = Number(decision.created_by);
+            const currentUserId = Number(loggedInUserId);
+            const isOwner = (ownerId > 0 && currentUserId > 0 && ownerId === currentUserId);
+            const statusClean = String(decision.status || '').trim().toLowerCase();
+
+            const isAllowedStatus = statusClean === 'draft' || statusClean === 'rejected';
+
+            if (!isOwner || !isAllowedStatus) {
+                if (typeof showGlobalErrorNotification === 'function') {
+                    showGlobalErrorNotification("Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.");
+                } else {
+                    alert("Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.");
+                }
+                setTimeout(() => {
+                    window.location.href = `/decision/${id}`;
+                }, 1500);
                 return;
             }
 
@@ -1329,14 +1542,12 @@
             decisionPayload.decision_date = decision.decision_date ? decision.decision_date.split('T')[0] : '';
             decisionPayload.tags = decision.tags || '';
 
-            const tagsContainer = document.getElementById('tagsContainer');
-            if (tagsContainer && decision.tags) {
-                const tags = decision.tags.split(',').map(t => t.trim()).filter(Boolean);
-                tagsContainer.innerHTML = '';
-                tags.forEach(tag => {
-                    tagsContainer.innerHTML += `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill py-1 px-3 me-2 mb-2 d-inline-flex align-items-center">${tag}<i data-lucide="x" class="ms-1" style="width:12px; height:12px; cursor:pointer;" onclick="removeTag('${tag}')"></i></span>`;
-                });
-                if (window.lucide) window.lucide.createIcons();
+            if (decision.tags) {
+                selectedTags = decision.tags.split(',').map(t => t.trim()).filter(Boolean);
+                renderTagsUI();
+            } else {
+                selectedTags = [];
+                renderTagsUI();
             }
 
             decisionPayload.alternatives = decision.alternatives || [];
@@ -1360,6 +1571,65 @@
                     });
                 }
             }
+
+            // Populate Rejection Feedback Banner if comments exist or status is Rejected
+            const banner = document.getElementById('rejectionFeedbackBanner');
+            const bannerContainer = document.getElementById('bannerCommentsContainer');
+            if (banner && bannerContainer && decision.reviews && decision.reviews.length > 0) {
+                bannerContainer.innerHTML = '';
+                let revCommentsHtml = '';
+                let mgrCommentsHtml = '';
+
+                decision.reviews.forEach(r => {
+                    if (!r.comments) return;
+                    const rRole = (r.reviewer_role || '').toLowerCase();
+                    const rName = r.reviewer_name || `Reviewer #${r.reviewer_id}`;
+                    const timeStr = r.reviewed_at ? new Date(r.reviewed_at).toLocaleString() : 'Recently';
+
+                    if (rRole.includes('manager') || rRole.includes('mn') || rRole.includes('lead')) {
+                        mgrCommentsHtml += `
+                            <div class="p-3 rounded-3 border bg-warning-subtle border-warning-subtle text-dark">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold text-dark small"><i class="bi bi-person-badge me-1 text-warning fs-6"></i> Manager: ${escapeHtml(rName)}</span>
+                                    <span class="text-muted" style="font-size: 11px;">${timeStr}</span>
+                                </div>
+                                <div class="small text-dark mt-1">• ${escapeHtml(r.comments)}</div>
+                            </div>
+                        `;
+                    } else {
+                        revCommentsHtml += `
+                            <div class="p-3 rounded-3 border bg-primary-subtle border-primary-subtle text-dark">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold text-dark small"><i class="bi bi-person-check me-1 text-primary fs-6"></i> Reviewer: ${escapeHtml(rName)}</span>
+                                    <span class="text-muted" style="font-size: 11px;">${timeStr}</span>
+                                </div>
+                                <div class="small text-dark mt-1">• ${escapeHtml(r.comments)}</div>
+                            </div>
+                        `;
+                    }
+                });
+
+                if (revCommentsHtml) {
+                    bannerContainer.innerHTML += `
+                        <div>
+                            <h6 class="fw-bold text-primary mb-2" style="font-size: 13px;">Reviewer Comments</h6>
+                            ${revCommentsHtml}
+                        </div>
+                    `;
+                }
+                if (mgrCommentsHtml) {
+                    bannerContainer.innerHTML += `
+                        <div>
+                            <h6 class="fw-bold text-warning-emphasis mb-2" style="font-size: 13px;">Manager Comments</h6>
+                            ${mgrCommentsHtml}
+                        </div>
+                    `;
+                }
+
+                if (revCommentsHtml || mgrCommentsHtml || decision.status === 'Rejected') {
+                    banner.classList.remove('d-none');
+                }
+            }
         } catch (err) {
             console.error(err);
             alert("Error loading decision for editing: " + err.message);
@@ -1367,13 +1637,67 @@
     }
 
     async function submitDecision(targetStatus = "Pending") {
-        const btn = document.getElementById('btnSubmit');
+        // Collect latest inputs
+        const titleInput = document.getElementById('cdTitle') ? document.getElementById('cdTitle').value.trim() : '';
+        const descInput = document.getElementById('cdDescription') ? document.getElementById('cdDescription').value.trim() : '';
+        const catInput = document.getElementById('cdCategory') ? parseInt(document.getElementById('cdCategory').value, 10) : 1;
+        const prioInput = document.getElementById('cdPriority') ? document.getElementById('cdPriority').value : 'Medium';
+        const deptInput = document.getElementById('cdDepartment') ? document.getElementById('cdDepartment').value : 'Finance & Operations';
+        const dateInput = document.getElementById('cdDate') ? document.getElementById('cdDate').value : '';
+
+        decisionPayload.title = titleInput || decisionPayload.title;
+        decisionPayload.description = descInput || decisionPayload.description;
+        decisionPayload.category_id = catInput || decisionPayload.category_id;
+        decisionPayload.priority_level = prioInput;
+        decisionPayload.department = deptInput;
+        decisionPayload.decision_date = dateInput;
+
+        // Validation Rules
         if (targetStatus === 'Draft') {
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving Draft...';
+            if (!decisionPayload.title || !decisionPayload.title.trim()) {
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Please enter a Decision Title before saving as draft.", "warning", "Title Required");
+                } else {
+                    alert("Please enter a Decision Title before saving as draft.");
+                }
+                return;
+            }
         } else {
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...';
+            // Submit Decision Validation
+            if (!decisionPayload.title || !decisionPayload.title.trim()) {
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Decision Title is required. Please fill in the Title.", "warning", "Validation Error");
+                } else {
+                    alert("Decision Title is required.");
+                }
+                goToStep(1);
+                return;
+            }
+            if (!decisionPayload.description || !decisionPayload.description.trim()) {
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Decision Description is required. Please fill in the Description.", "warning", "Validation Error");
+                } else {
+                    alert("Decision Description is required.");
+                }
+                goToStep(1);
+                return;
+            }
         }
-        btn.disabled = true;
+
+        const btnDraft = document.getElementById('btnDraft');
+        const btnSubmit = document.getElementById('btnSubmit');
+
+        if (targetStatus === 'Draft') {
+            if (btnDraft) {
+                btnDraft.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Saving Draft...';
+                btnDraft.disabled = true;
+            }
+        } else {
+            if (btnSubmit) {
+                btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Submitting...';
+                btnSubmit.disabled = true;
+            }
+        }
         
         const payload = {
             title: decisionPayload.title,
@@ -1420,21 +1744,51 @@
             
             if (res.ok) {
                 if (targetStatus === 'Draft') {
-                    window.location.href = "/decisions?tab=Draft";
+                    if (typeof showCenterNotification === 'function') {
+                        showCenterNotification("Decision saved as draft successfully.", "success", "Draft Saved");
+                    }
+                    setTimeout(() => {
+                        window.location.href = "/decisions?tab=Draft";
+                    }, 2000);
                 } else {
-                    window.location.href = "{{ url_for('decisions') }}";
+                    if (typeof showCenterNotification === 'function') {
+                        showCenterNotification("Decision submitted successfully.", "success", "Submission Successful");
+                    }
+                    setTimeout(() => {
+                        window.location.href = "{{ url_for('decisions') }}";
+                    }, 2000);
                 }
             } else {
                 const data = await res.json();
-                showErrorOverlay(data.detail || "Failed to submit decision");
-                btn.innerHTML = 'Submit Decision <i data-lucide="check" style="width:18px;" class="ms-2"></i>';
-                btn.disabled = false;
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification(data.detail || "Failed to save/submit decision", "error", "Operation Failed");
+                } else {
+                    showErrorOverlay(data.detail || "Failed to submit decision");
+                }
+                if (btnDraft) {
+                    btnDraft.innerHTML = '<i class="bi bi-file-earmark me-2"></i> Save as Draft';
+                    btnDraft.disabled = false;
+                }
+                if (btnSubmit) {
+                    btnSubmit.innerHTML = 'Submit Decision <i data-lucide="check" style="width:18px;" class="ms-2"></i>';
+                    btnSubmit.disabled = false;
+                }
                 if (window.lucide) window.lucide.createIcons();
             }
         } catch (e) {
-            showErrorOverlay("Network error: Could not connect to the server.");
-            btn.innerHTML = 'Submit Decision <i data-lucide="check" style="width:18px;" class="ms-2"></i>';
-            btn.disabled = false;
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("Network error: Could not connect to the server.", "error", "Connection Error");
+            } else {
+                showErrorOverlay("Network error: Could not connect to the server.");
+            }
+            if (btnDraft) {
+                btnDraft.innerHTML = '<i class="bi bi-file-earmark me-2"></i> Save as Draft';
+                btnDraft.disabled = false;
+            }
+            if (btnSubmit) {
+                btnSubmit.innerHTML = 'Submit Decision <i data-lucide="check" style="width:18px;" class="ms-2"></i>';
+                btnSubmit.disabled = false;
+            }
             if (window.lucide) window.lucide.createIcons();
         }
     }
@@ -1451,6 +1805,7 @@
     
     // Add default alternative to match mockup Step 2 initially
     window.addEventListener('DOMContentLoaded', () => {
+        initTagsUI();
         loadUsers();
         renderAlts();
         updateApprovalFlowCard();
@@ -1463,11 +1818,13 @@
         // Check if we are in Edit Mode
         const urlParams = new URLSearchParams(window.location.search);
         const editId = urlParams.get('edit');
-        if (editId) {
+        if (editId && !isNaN(parseInt(editId, 10))) {
             isEditMode = true;
             editDecisionId = parseInt(editId, 10);
-            document.getElementById('breadcrumb-step').innerText = "Edit Decision";
-            document.querySelector('h2.fw-bold').innerText = "Edit Decision";
+            const breadcrumbEl = document.getElementById('breadcrumb-step');
+            if (breadcrumbEl) breadcrumbEl.innerText = "Edit Decision";
+            const headerEl = document.querySelector('h2.fw-bold');
+            if (headerEl) headerEl.innerText = "Edit Decision";
             loadDecisionForEdit(editDecisionId);
         }
         

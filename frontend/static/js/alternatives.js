@@ -114,7 +114,14 @@ function renderGrid(items) {
     }
 
     grid.innerHTML = items.map(a => {
-        const feasPct = a.feasibility_score ? a.feasibility_score * 10 : 0;
+        let rawVal = parseFloat(a.feasibility_score);
+        let feasPct = 0;
+        if (!isNaN(rawVal) && rawVal > 0) {
+            if (rawVal <= 1.0) feasPct = rawVal * 100;
+            else if (rawVal <= 10.0) feasPct = rawVal * 10;
+            else feasPct = rawVal;
+            feasPct = Math.min(100, Math.max(0, Math.round(feasPct)));
+        }
         const decisionTitle = a._decision?.title || `Decision #${a.decision_id}`;
         const decisionId    = a.decision_id;
         const cost   = a.cost != null ? `$${parseFloat(a.cost).toLocaleString("en-US", { minimumFractionDigits: 0 })}` : "—";

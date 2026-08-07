@@ -27,12 +27,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function fetchDecisions() {
     try {
-        const response = await fetch(`${API_URL}/decisions/`);
-        if (!response.ok) throw new Error("Failed to load decisions");
-        allDecisions = await response.json();
+        let userParam = (typeof USER_ID !== 'undefined' && USER_ID) ? USER_ID : '';
+        let roleParam = (typeof CURRENT_USER_ROLE !== 'undefined' && CURRENT_USER_ROLE) ? CURRENT_USER_ROLE : '';
+        let queryParams = [];
+        if (userParam) queryParams.push(`user_id=${userParam}`);
+        if (roleParam) queryParams.push(`role_name=${encodeURIComponent(roleParam)}`);
+        let queryStr = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+
+        let response;
+        try {
+            response = await fetch(`/api/decisions${queryStr}`);
+            if (!response.ok) {
+                response = await fetch(`${API_URL}/decisions/${queryStr}`);
+            }
+        } catch (_) {
+            response = await fetch(`${API_URL}/decisions/${queryStr}`);
+        }
+        if (!response || !response.ok) throw new Error("Failed to load decisions");
+        const data = await response.json();
+        allDecisions = Array.isArray(data) ? data : [];
+
+        // Additional client-side check: Employee role should strictly see only their own decisions
+        if (roleParam && roleParam.toLowerCase().includes('employee') && userParam) {
+            allDecisions = allDecisions.filter(d => Number(d.created_by) === Number(userParam));
+        }
+
         renderTable();
     } catch (error) {
-        showToast("Danger", error.message);
+        console.error("Error loading decisions:", error);
+        if (typeof showToast === 'function') {
+            showToast("Danger", error.message);
+        }
     }
 }
 
@@ -48,15 +73,16 @@ function updateTabCounts() {
     };
 
     allDecisions.forEach(d => {
-        if (d.status === 'Archived') {
+        const st = (d.status || '').trim().toLowerCase();
+        if (st === 'archived') {
             counts['Archived']++;
         } else {
             counts['All']++;
-            if (d.status === 'Draft') counts['Draft']++;
-            else if (d.status === 'Pending') counts['Pending']++;
-            else if (d.status === 'In Review' || d.status === 'Under Review') counts['In Review']++;
-            else if (d.status === 'Approved') counts['Approved']++;
-            else if (d.status === 'Rejected') counts['Rejected']++;
+            if (st === 'draft') counts['Draft']++;
+            else if (st === 'pending') counts['Pending']++;
+            else if (st === 'in review' || st === 'under review' || st === 'review') counts['In Review']++;
+            else if (st === 'approved') counts['Approved']++;
+            else if (st === 'rejected') counts['Rejected']++;
         }
     });
 
@@ -117,13 +143,16 @@ function renderTable() {
             (d.title && d.title.toLowerCase().includes(searchQuery)) || 
             (d.description && d.description.toLowerCase().includes(searchQuery));
         
+        const stLower = (d.status || '').trim().toLowerCase();
+        const filterLower = (currentStatusFilter || 'All').trim().toLowerCase();
+
         let matchesStatus = false;
-        if (currentStatusFilter === 'All') {
-            matchesStatus = (d.status !== 'Archived');
-        } else if (currentStatusFilter === 'In Review') {
-            matchesStatus = (d.status === 'In Review' || d.status === 'Under Review');
+        if (filterLower === 'all') {
+            matchesStatus = (stLower !== 'archived');
+        } else if (filterLower === 'in review' || filterLower === 'review') {
+            matchesStatus = (stLower === 'in review' || stLower === 'under review' || stLower === 'review');
         } else {
-            matchesStatus = (d.status === currentStatusFilter);
+            matchesStatus = (stLower === filterLower);
         }
         
         return matchesSearch && matchesStatus;
@@ -151,11 +180,18 @@ function renderTable() {
             const isAdmin = typeof CURRENT_USER_ROLE !== 'undefined' && CURRENT_USER_ROLE && String(CURRENT_USER_ROLE).toLowerCase().includes('admin');
             const canDelete = isAdmin || (d.status !== "Approved" && d.status !== "Rejected" && d.status !== "Archived");
 
-            let draftActions = "";
-            if (d.status === "Draft") {
-                draftActions = `
+            const isOwner = typeof USER_ID !== 'undefined' && USER_ID && Number(d.created_by) === Number(USER_ID);
+            let actionButtons = "";
+
+            if (d.status === "Draft" && isOwner) {
+                actionButtons = `
                     <a href="/create_decision?edit=${d.id}" class="btn btn-sm btn-outline-secondary fw-semibold px-2 me-1" title="Edit Draft"><i class="bi bi-pencil me-1"></i>Edit</a>
                     <button onclick="submitDraftFromTable(${d.id})" class="btn btn-sm btn-success fw-semibold px-2 me-1" title="Submit Decision"><i class="bi bi-send me-1"></i>Submit</button>
+                `;
+            } else if (d.status === "Rejected" && isOwner) {
+                actionButtons = `
+                    <button onclick="openRejectionCommentsModal(${d.id})" class="btn btn-sm btn-outline-warning text-dark fw-semibold px-2 me-1" title="View Rejection Comments"><i class="bi bi-chat-left-text me-1"></i>View Comments</button>
+                    <a href="/create_decision?edit=${d.id}&resubmit=true" class="btn btn-sm btn-primary fw-semibold px-2 me-1" title="Edit & Resubmit"><i class="bi bi-pencil-square me-1"></i>Edit & Resubmit</a>
                 `;
             }
 
@@ -176,7 +212,7 @@ function renderTable() {
                     <td><span class="badge ${statusBadge}">${d.status}</span></td>
                     <td class="text-end pe-4">
                         <a href="/decision/${d.id}" class="btn btn-sm btn-outline-primary fw-semibold px-2 me-1">View</a>
-                        ${draftActions}
+                        ${actionButtons}
                         ${canDelete ? `<button onclick="deleteDecision(${d.id})" class="btn btn-sm btn-outline-danger fw-semibold px-2" title="Delete Decision"><i class="bi bi-trash me-1"></i>Delete</button>` : ''}
                     </td>
                 </tr>
@@ -296,6 +332,160 @@ async function deleteDecision(id) {
             showCenterNotification(error.message || "Failed to delete decision", 'error', 'Error Deleting Decision');
         } else {
             showToast("Danger", error.message);
+        }
+    }
+}
+
+async function openRejectionCommentsModal(decisionId) {
+    try {
+        if (!decisionId || isNaN(parseInt(decisionId))) {
+            throw new Error("Invalid Decision ID provided.");
+        }
+
+        const userParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
+        let res;
+        try {
+            res = await fetch(`${API_URL}/decisions/${decisionId}?user_id=${userParam}`);
+        } catch (fetchErr) {
+            throw new Error("Failed to fetch decision comments.");
+        }
+
+        if (!res.ok) {
+            let errorDetail = "Failed to fetch decision comments.";
+            try {
+                const errJson = await res.json();
+                if (errJson && errJson.detail) errorDetail = errJson.detail;
+            } catch (_) {}
+            throw new Error(errorDetail);
+        }
+
+        const dec = await res.json();
+
+        const titleHeader = document.getElementById("modalDecisionTitleHeader");
+        if (titleHeader) {
+            titleHeader.innerText = `Review feedback for DEC-${dec.id || decisionId}: ${dec.title || 'Untitled'}`;
+        }
+
+        const editBtn = document.getElementById("modalEditResubmitBtn");
+        if (editBtn) {
+            editBtn.href = `/create_decision?edit=${dec.id || decisionId}&resubmit=true`;
+        }
+
+        const container = document.getElementById("modalCommentsContainer");
+        if (!container) return;
+
+        container.innerHTML = "";
+
+        // Safe Datatype Validator & Formatter for comments
+        function safeExtractString(val) {
+            if (val == null || val === undefined) return "";
+            if (typeof val === "string") return val.trim();
+            if (typeof val === "number" || typeof val === "boolean") return String(val).trim();
+            if (Array.isArray(val)) {
+                return val.map(item => safeExtractString(item)).filter(Boolean).join("\n");
+            }
+            if (typeof val === "object") {
+                if (val.content && typeof val.content === "string") return val.content.trim();
+                if (val.comments && typeof val.comments === "string") return val.comments.trim();
+                if (val.text && typeof val.text === "string") return val.text.trim();
+                if (val.comment && typeof val.comment === "string") return val.comment.trim();
+                if (val.message && typeof val.message === "string") return val.message.trim();
+                try {
+                    return JSON.stringify(val);
+                } catch (_) {
+                    return "";
+                }
+            }
+            return "";
+        }
+
+        const reviews = Array.isArray(dec.reviews) ? dec.reviews : [];
+        let validCommentsCount = 0;
+        let reviewerBlock = "";
+        let managerBlock = "";
+
+        reviews.forEach(r => {
+            if (!r) return;
+            const commentStr = safeExtractString(r.comments);
+            if (!commentStr) return;
+            validCommentsCount++;
+
+            const rRole = typeof r.reviewer_role === "string" ? r.reviewer_role.toLowerCase() : "";
+            const rName = r.reviewer_name || `Reviewer #${r.reviewer_id || ''}`;
+            const timeStr = r.reviewed_at ? new Date(r.reviewed_at).toLocaleString() : 'Recently';
+
+            if (rRole.includes("manager") || rRole.includes("mn") || rRole.includes("lead")) {
+                managerBlock += `
+                    <div class="p-3 rounded-3 border bg-warning-subtle border-warning-subtle text-dark">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-dark small"><i class="bi bi-person-badge me-1 text-warning fs-6"></i> Manager: ${rName}</span>
+                            <span class="text-muted" style="font-size: 11px;">${timeStr}</span>
+                        </div>
+                        <div class="small text-dark mt-1">
+                            • ${commentStr}
+                        </div>
+                    </div>
+                `;
+            } else {
+                reviewerBlock += `
+                    <div class="p-3 rounded-3 border bg-primary-subtle border-primary-subtle text-dark">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-dark small"><i class="bi bi-person-check me-1 text-primary fs-6"></i> Reviewer: ${rName}</span>
+                            <span class="text-muted" style="font-size: 11px;">${timeStr}</span>
+                        </div>
+                        <div class="small text-dark mt-1">
+                            • ${commentStr}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        if (validCommentsCount === 0 && dec.comments) {
+            const topCommentStr = safeExtractString(dec.comments);
+            if (topCommentStr) {
+                validCommentsCount++;
+                reviewerBlock += `
+                    <div class="p-3 rounded-3 border bg-primary-subtle border-primary-subtle text-dark">
+                        <div class="small text-dark mt-1">• ${topCommentStr}</div>
+                    </div>
+                `;
+            }
+        }
+
+        if (reviewerBlock) {
+            container.innerHTML += `
+                <div>
+                    <h6 class="fw-bold text-primary mb-2" style="font-size:13px;">Reviewer Comments</h6>
+                    ${reviewerBlock}
+                </div>
+            `;
+        }
+
+        if (managerBlock) {
+            container.innerHTML += `
+                <div>
+                    <h6 class="fw-bold text-warning-emphasis mb-2" style="font-size:13px;">Manager Comments</h6>
+                    ${managerBlock}
+                </div>
+            `;
+        }
+
+        if (validCommentsCount === 0) {
+            container.innerHTML = `<div class="text-muted text-center py-4 fw-medium">No comments available for this decision.</div>`;
+        }
+
+        const modalEl = document.getElementById("rejectionCommentsModal");
+        if (modalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modalInstance.show();
+        }
+    } catch (err) {
+        console.error("View Comments Error:", err);
+        if (typeof showGlobalErrorNotification === "function") {
+            showGlobalErrorNotification(err.message || "Failed to fetch decision comments.");
+        } else {
+            alert(err.message || "Failed to fetch decision comments.");
         }
     }
 }

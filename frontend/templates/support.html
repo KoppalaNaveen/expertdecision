@@ -1,402 +1,706 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 class="fw-bold text-dark mb-1">Email Support &amp; Help Desk</h2>
-        <p class="text-muted mb-0">Submit support requests, track ticket status, and receive support email responses.</p>
-    </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-primary d-flex align-items-center gap-2 px-4 py-2 fw-bold shadow-sm" style="border-radius:10px;" onclick="openNewTicketModal()">
-            <i data-lucide="life-buoy" style="width:16px;height:16px;"></i> Submit Support Ticket
-        </button>
-    </div>
+<style>
+    .support-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+    }
+    .hero-search-card {
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+        color: #ffffff;
+        border-radius: 20px;
+    }
+    .action-grid-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        padding: 1.25rem 0.75rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 4px 15px -2px rgba(0, 0, 0, 0.04);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 125px;
+    }
+    .action-grid-card:hover, .action-grid-card.active {
+        border-color: #3b82f6;
+        box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.15);
+        transform: translateY(-3px);
+    }
+    .action-grid-card .icon-box {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.75rem;
+        font-size: 1.25rem;
+    }
+    .icon-purple { background-color: #f3e8ff; color: #9333ea; }
+    .icon-blue { background-color: #eff6ff; color: #2563eb; }
+    .icon-red { background-color: #fef2f2; color: #ef4444; }
+    .icon-amber { background-color: #fffbeb; color: #f59e0b; }
+
+    /* Ticket Status Cards Right Column (Matching PDF Page 10) */
+    .status-box-open {
+        background-color: #eff6ff;
+        border: 1px solid #dbeafe;
+        border-radius: 12px;
+        padding: 0.9rem 1.25rem;
+    }
+    .status-box-progress {
+        background-color: #fffbeb;
+        border: 1px solid #fef3c7;
+        border-radius: 12px;
+        padding: 0.9rem 1.25rem;
+    }
+    .status-box-resolved {
+        background-color: #f0fdf4;
+        border: 1px solid #dcfce7;
+        border-radius: 12px;
+        padding: 0.9rem 1.25rem;
+    }
+
+    /* Ticket Item Cards Right Column */
+    .ticket-item-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 1rem;
+        transition: all 0.15s ease;
+        cursor: pointer;
+    }
+    .ticket-item-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+
+    .chat-bubble-ai {
+        background-color: #f1f5f9;
+        color: #0f172a;
+        border-radius: 16px;
+        border-top-left-radius: 4px;
+    }
+    .chat-bubble-user {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: #ffffff;
+        border-radius: 16px;
+        border-top-right-radius: 4px;
+    }
+    .suggested-chip {
+        border-radius: 20px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .suggested-chip:hover {
+        background-color: #eff6ff !important;
+        border-color: #3b82f6 !important;
+        color: #1d4ed8 !important;
+    }
+    .faq-accordion .accordion-button:not(.collapsed) {
+        background-color: #eff6ff;
+        color: #1d4ed8;
+    }
+</style>
+
+<!-- Breadcrumb Header -->
+<div class="mb-3">
+    <div class="text-xs text-muted mb-1">Home &gt; Support Center</div>
+    <h3 class="fw-bold text-dark mb-0">Support Center</h3>
 </div>
 
-<!-- Alert Banner -->
 <div id="supportAlertContainer"></div>
 
-<!-- Stats Row -->
-<div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm rounded-3 p-3 h-100 bg-white">
-            <div class="d-flex align-items-center gap-3">
-                <div style="width:40px;height:40px;border-radius:10px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;color:#4F46E5;">
-                    <i data-lucide="ticket" style="width:18px;height:18px;"></i>
-                </div>
-                <div><div id="statTotalTickets" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Total Tickets</div></div>
+<!-- Top Grid Row: Hero Search Banner (Left ~60%) & Ticket Status (Right ~40%) -->
+<div class="row g-4 mb-4">
+    
+    <!-- Hero Search Card -->
+    <div class="col-lg-7">
+        <div class="hero-search-card p-4 p-md-5 h-100 shadow-sm d-flex flex-column justify-content-center">
+            <h3 class="fw-bold text-white mb-2">How can we help you?</h3>
+            <p class="text-white opacity-90 text-sm mb-3">Search our knowledge base or start an AI-powered support chat for instant resolution.</p>
+            <div class="input-group input-group-lg shadow-sm" style="max-width: 580px;">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="knowledgeSearchInput" class="form-control border-start-0 text-sm fs-6" placeholder="Search help articles, FAQs, guides..." oninput="handleFaqSearch()">
+                <button class="btn btn-primary fw-bold px-4 text-sm" onclick="handleFaqSearch()">Search</button>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm rounded-3 p-3 h-100 bg-white">
-            <div class="d-flex align-items-center gap-3">
-                <div style="width:40px;height:40px;border-radius:10px;background:#FFF7ED;display:flex;align-items:center;justify-content:center;color:#D97706;">
-                    <i data-lucide="clock" style="width:18px;height:18px;"></i>
+
+    <!-- Ticket Status Card (Page 10 Matching Vertical Stack) -->
+    <div class="col-lg-5">
+        <div class="support-card p-4 h-100">
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Ticket Status</h6>
+            
+            <div class="d-flex flex-column gap-2.5">
+                <div class="status-box-open d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-primary text-xs d-flex align-items-center gap-2">
+                        <i class="bi bi-circle-fill text-primary" style="font-size: 8px;"></i> Open
+                    </span>
+                    <span class="fw-bold text-primary fs-4" id="cntOpenTickets">0</span>
                 </div>
-                <div><div id="statOpenTickets" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Open</div></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm rounded-3 p-3 h-100 bg-white">
-            <div class="d-flex align-items-center gap-3">
-                <div style="width:40px;height:40px;border-radius:10px;background:#FEF3C7;display:flex;align-items:center;justify-content:center;color:#B45309;">
-                    <i data-lucide="loader" style="width:18px;height:18px;"></i>
+
+                <div class="status-box-progress d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-warning-emphasis text-xs d-flex align-items-center gap-2">
+                        <i class="bi bi-circle-fill text-warning-emphasis" style="font-size: 8px;"></i> In Progress
+                    </span>
+                    <span class="fw-bold text-warning-emphasis fs-4" id="cntProgressTickets">0</span>
                 </div>
-                <div><div id="statInProgressTickets" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">In Progress</div></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm rounded-3 p-3 h-100 bg-white">
-            <div class="d-flex align-items-center gap-3">
-                <div style="width:40px;height:40px;border-radius:10px;background:#ECFDF5;display:flex;align-items:center;justify-content:center;color:#059669;">
-                    <i data-lucide="check-circle-2" style="width:18px;height:18px;"></i>
+
+                <div class="status-box-resolved d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-success text-xs d-flex align-items-center gap-2">
+                        <i class="bi bi-circle-fill text-success" style="font-size: 8px;"></i> Resolved
+                    </span>
+                    <span class="fw-bold text-success fs-4" id="cntResolvedTickets">0</span>
                 </div>
-                <div><div id="statResolvedTickets" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Resolved</div></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Support Tickets Table Card -->
-<div class="card border-0 shadow-sm" style="border-radius:12px;overflow:hidden;">
-    <div class="card-header bg-white py-3 px-4 border-bottom d-flex justify-content-between align-items-center">
-        <h6 class="fw-bold text-dark mb-0">Support Ticket History</h6>
-        <div class="input-group" style="width:240px;">
-            <span class="input-group-text bg-white border-end-0">
-                <i data-lucide="search" style="width:14px;height:14px;color:#94a3b8;"></i>
-            </span>
-            <input type="text" id="supportSearch" class="form-control border-start-0 ps-0" placeholder="Search tickets..." oninput="filterSupportTickets()">
-        </div>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" style="font-size:0.875rem;">
-            <thead class="table-light text-secondary" style="font-size:0.75rem;text-transform:uppercase;">
-                <tr>
-                    <th class="px-4 py-3 border-bottom-0">Ticket #</th>
-                    <th class="px-4 py-3 border-bottom-0">Subject &amp; Query</th>
-                    <th class="px-4 py-3 border-bottom-0">Category</th>
-                    <th class="px-4 py-3 border-bottom-0">Priority</th>
-                    <th class="px-4 py-3 border-bottom-0">Status</th>
-                    <th class="px-4 py-3 border-bottom-0">Created At</th>
-                    <th class="px-4 py-3 border-bottom-0 text-end">Action</th>
-                </tr>
-            </thead>
-            <tbody id="supportTableBody">
-                <tr><td colspan="7" class="text-center py-5 text-muted">
-                    <div class="spinner-border spinner-border-sm me-2"></div>Loading support tickets...
-                </td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Submit New Support Ticket Modal -->
-<div class="modal fade" id="newTicketModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
-            <div class="modal-header bg-primary text-white py-3 px-4 border-0">
-                <div class="d-flex align-items-center gap-3">
-                    <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;">
-                        <i data-lucide="headphone-off" style="width:20px;height:20px;"></i>
+<!-- Main Content Grid Row: AI Chat & Action Cards (Left) vs Previous Requests & FAQs (Right) -->
+<div class="row g-4">
+    
+    <!-- LEFT COLUMN (~60% width): 4 Action Cards & AI Support Chat Card -->
+    <div class="col-lg-7">
+        
+        <!-- 4 Feature Action Cards (Matching Screenshot & PDF Page 10) -->
+        <div class="row g-3 mb-4">
+            <div class="col-3">
+                <div class="action-grid-card active" onclick="activateActionCard('chat', this)">
+                    <div class="icon-box icon-purple">
+                        <i class="bi bi-robot"></i>
                     </div>
-                    <div>
-                        <h5 class="modal-title fw-bold mb-0">Submit Support Ticket</h5>
-                        <div class="small opacity-90">Our support team will email you a response shortly</div>
-                    </div>
+                    <div class="fw-bold text-dark text-xs">AI Support Chat</div>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4" style="background:#F8FAFC;">
-                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white mb-3">
-                    <div class="row g-3">
-                        <div class="col-md-12">
-                            <label class="form-label fw-semibold text-dark small">Ticket Subject <span class="text-danger">*</span></label>
-                            <input type="text" id="ticketSubject" class="form-control" placeholder="Brief summary of your issue or request...">
+            <div class="col-3">
+                <div class="action-grid-card" onclick="activateActionCard('ask', this)">
+                    <div class="icon-box icon-blue">
+                        <i class="bi bi-pencil-square"></i>
+                    </div>
+                    <div class="fw-bold text-dark text-xs">Ask a Question</div>
+                </div>
+            </div>
+            <div class="col-3">
+                <div class="action-grid-card" onclick="activateActionCard('issue', this)">
+                    <div class="icon-box icon-red">
+                        <i class="bi bi-exclamation-circle"></i>
+                    </div>
+                    <div class="fw-bold text-dark text-xs">Report an Issue</div>
+                </div>
+            </div>
+            <div class="col-3">
+                <div class="action-grid-card" onclick="openNewTicketModal()">
+                    <div class="icon-box icon-amber">
+                        <i class="bi bi-ticket-perforated"></i>
+                    </div>
+                    <div class="fw-bold text-dark text-xs">Create Ticket</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Support Chat Card -->
+        <div class="support-card p-4 d-flex flex-column justify-content-between" style="min-height: 540px;">
+            <div>
+                <!-- Chat Header -->
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="avatar-sm bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px;">
+                            <i class="bi bi-robot fs-5"></i>
                         </div>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0 text-sm">AI Support Chat</h6>
+                            <span class="text-xs text-success fw-semibold"><i class="bi bi-circle-fill me-1" style="font-size: 7px;"></i>Online — Typical response &lt;1 min</span>
+                        </div>
+                    </div>
+                    <span class="text-xs text-muted font-monospace" id="activeChatTicketNum">Ticket #TKT-0051</span>
+                </div>
+
+                <!-- Live Chat Feed Container -->
+                <div class="d-flex flex-column gap-3 p-3 bg-light rounded-3 mb-3 border overflow-y-auto" id="aiChatFeed" style="max-height: 320px; min-height: 240px;">
+                    <!-- Welcome Initial AI Message -->
+                    <div class="d-flex flex-column align-items-start">
+                        <div class="chat-bubble-ai p-3 text-xs shadow-2xs" style="max-width: 85%;">
+                            Hello! I am your EDRP AI Support Assistant. How can I help you today? Ask any question or click a suggested question below.
+                        </div>
+                        <span class="text-muted opacity-75 mt-1" style="font-size: 10px;">Just now</span>
+                    </div>
+                </div>
+
+                <!-- Suggested Quick Questions Chips -->
+                <div class="mb-3">
+                    <span class="text-xs fw-bold text-secondary text-uppercase d-block mb-1.5">Suggested Questions</span>
+                    <div class="d-flex flex-wrap gap-1.5">
+                        <span class="badge bg-light text-dark border suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('How do I reset my password?')">How do I reset my password?</span>
+                        <span class="badge bg-light text-dark border suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('Explain the approval workflow')">Explain the approval workflow</span>
+                        <span class="badge bg-light text-dark border suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('How do I export a report?')">How do I export a report?</span>
+                        <span class="badge bg-light text-dark border suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('What is a decision rationale?')">What is a decision rationale?</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Width Chat Input Form -->
+            <form onsubmit="handleAiChatSubmit(event)" class="w-100 mt-3 pt-3 border-top">
+                <div class="input-group input-group-lg shadow-2xs">
+                    <input type="text" id="aiChatInputText" class="form-control text-sm px-3" placeholder="Type your question or issue message..." required style="height: 46px;">
+                    <button type="submit" class="btn btn-primary fw-bold px-4 text-sm d-inline-flex align-items-center gap-2" style="height: 46px;">
+                        <i class="bi bi-send-fill"></i> Send
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN (~40% width): Previous Requests, FAQs & Contact Support -->
+    <div class="col-lg-5">
+        
+        <!-- Previous Requests Card (Matching PDF Page 10 Layout) -->
+        <div class="support-card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h6 class="fw-bold text-dark mb-0">Previous Requests</h6>
+                <button type="button" class="btn btn-link text-xs text-primary p-0 text-decoration-none fw-bold" onclick="loadMySupportTickets()">View all &rarr;</button>
+            </div>
+
+            <!-- List of Previous Requests (Loaded live from DB backend) -->
+            <div class="d-flex flex-column gap-3" id="supportTicketsListContainer">
+                <div class="text-center py-4 text-muted text-xs">
+                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading requests...
+                </div>
+            </div>
+        </div>
+
+        <!-- Frequently Asked Questions (FAQ Accordion) -->
+        <div class="support-card p-4 mb-4">
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3 d-flex align-items-center gap-2">
+                <i class="bi bi-question-circle text-primary fs-5"></i> Frequently Asked Questions
+            </h6>
+            
+            <div class="accordion accordion-flush faq-accordion" id="faqAccordion">
+                <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
+                    <h2 class="accordion-header" id="faqHeadOne">
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColOne" aria-expanded="false" aria-controls="faqColOne">
+                            Q: How do I create a new decision?
+                        </button>
+                    </h2>
+                    <div id="faqColOne" class="accordion-collapse collapse" aria-labelledby="faqHeadOne" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-xs text-muted py-2.5 px-3">
+                            Navigate to <strong>'Create Decision'</strong> in the sidebar. Follow the 4-step guided wizard to fill in title, rationale alternatives, supporting files, and reviewers.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
+                    <h2 class="accordion-header" id="faqHeadTwo">
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColTwo" aria-expanded="false" aria-controls="faqColTwo">
+                            Q: How do I track approval status?
+                        </button>
+                    </h2>
+                    <div id="faqColTwo" class="accordion-collapse collapse" aria-labelledby="faqHeadTwo" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-xs text-muted py-2.5 px-3">
+                            Open any decision from <strong>'My Decisions'</strong> to view the complete sequential Approval Chain (Reviewer → Manager → Administrator) in real time.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
+                    <h2 class="accordion-header" id="faqHeadThree">
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColThree" aria-expanded="false" aria-controls="faqColThree">
+                            Q: Can I edit a submitted decision?
+                        </button>
+                    </h2>
+                    <div id="faqColThree" class="accordion-collapse collapse" aria-labelledby="faqHeadThree" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-xs text-muted py-2.5 px-3">
+                            Yes — decisions in Draft or Review status can be edited by the owner or administrator. Approved decisions are permanently locked for compliance.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
+                    <h2 class="accordion-header" id="faqHeadFour">
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColFour" aria-expanded="false" aria-controls="faqColFour">
+                            Q: How do I add a reviewer to my decision?
+                        </button>
+                    </h2>
+                    <div id="faqColFour" class="accordion-collapse collapse" aria-labelledby="faqHeadFour" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-xs text-muted py-2.5 px-3">
+                            In Step 4 of the Create Decision Wizard, search and assign reviewers by Employee ID, Name, or Department role.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
+                    <h2 class="accordion-header" id="faqHeadFive">
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColFive" aria-expanded="false" aria-controls="faqColFive">
+                            Q: What file formats can I upload as documents?
+                        </button>
+                    </h2>
+                    <div id="faqColFive" class="accordion-collapse collapse" aria-labelledby="faqHeadFive" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body text-xs text-muted py-2.5 px-3">
+                            PDF, DOCX, XLSX, and PPTX are fully supported up to 50 MB per file.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Support Card -->
+        <div class="support-card p-4 bg-light">
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Contact Support</h6>
+            <div class="d-flex flex-column gap-2 text-xs text-muted">
+                <div><strong class="text-dark"><i class="bi bi-envelope me-1.5 text-primary"></i> Email Support:</strong> support@edrp.enterprise.com</div>
+                <div><strong class="text-dark"><i class="bi bi-chat-dots me-1.5 text-primary"></i> Live Chat:</strong> Available 9 AM – 6 PM IST</div>
+                <div><strong class="text-dark"><i class="bi bi-journal-code me-1.5 text-primary"></i> Help Docs:</strong> docs.edrp.enterprise.com</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Submit Support Ticket Modal -->
+<div class="modal fade" id="newSupportTicketModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3 px-4">
+                <h6 class="modal-title fw-bold text-dark"><i class="bi bi-ticket-perforated text-primary me-1"></i> Submit Support Ticket</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form onsubmit="handleCreateSupportTicket(event)">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Subject</label>
+                        <input type="text" id="ticketSubjectInput" class="form-control text-sm" placeholder="Brief summary of issue..." required>
+                    </div>
+                    <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-dark small">Category</label>
-                            <select id="ticketCategory" class="form-select">
-                                <option value="Account & Access">Account &amp; Access</option>
-                                <option value="Decision Workflow" selected>Decision Workflow</option>
-                                <option value="Email & Notifications">Email &amp; Notifications</option>
-                                <option value="Bug Report">Bug Report</option>
+                            <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Category</label>
+                            <select id="ticketCategorySelect" class="form-select text-sm">
                                 <option value="General Query">General Query</option>
+                                <option value="Technical Issue">Technical Issue</option>
+                                <option value="Account Access">Account Access</option>
+                                <option value="Data Export">Data Export</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-dark small">Priority</label>
-                            <select id="ticketPriority" class="form-select">
+                            <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Priority</label>
+                            <select id="ticketPrioritySelect" class="form-select text-sm">
                                 <option value="Low">Low</option>
                                 <option value="Medium" selected>Medium</option>
                                 <option value="High">High</option>
-                                <option value="Urgent">Urgent</option>
+                                <option value="Critical">Critical</option>
                             </select>
                         </div>
-                        <div class="col-md-12">
-                            <label class="form-label fw-semibold text-dark small">Detailed Description <span class="text-danger">*</span></label>
-                            <textarea id="ticketMessage" class="form-control" rows="4" placeholder="Explain the problem or query in detail so our support team can assist you effectively..."></textarea>
-                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Message / Query Details</label>
+                        <textarea id="ticketMessageTextarea" class="form-control text-sm" rows="4" placeholder="Describe your query or issue in detail..." required></textarea>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer bg-white border-top py-3 px-4 d-flex justify-content-between">
-                <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal" style="border-radius:10px;">Cancel</button>
-                <button type="button" id="btnSubmitTicket" class="btn btn-primary px-4 py-2 fw-bold d-flex align-items-center gap-2" style="border-radius:10px;" onclick="submitSupportTicket()">
-                    <i data-lucide="send" style="width:16px;height:16px;"></i> Submit Request
-                </button>
-            </div>
+                <div class="modal-footer border-top py-2.5 px-4">
+                    <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-2xs">Submit Ticket</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
-<!-- View / Reply Ticket Modal -->
-<div class="modal fade" id="viewTicketModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
-            <div class="modal-header bg-dark text-white py-3 px-4 border-0">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="badge bg-primary px-3 py-1 fw-bold fs-6" id="viewTicketNum">SUP-0000</span>
-                    <h5 class="modal-title fw-bold mb-0" id="viewTicketSubject">Ticket Subject</h5>
-                </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- Ticket Detail Viewer Modal -->
+<div class="modal fade" id="ticketDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3 px-4">
+                <h6 class="modal-title fw-bold text-dark d-flex align-items-center gap-2">
+                    <span id="detailTicketNumber" class="text-primary">SUP-0000</span>
+                    <span id="detailTicketStatus" class="badge rounded-pill text-xs">Status</span>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4" style="background:#F8FAFC;">
-                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="fw-bold text-dark" id="viewTicketUser">User Name</span>
-                            <span class="text-muted small" id="viewTicketEmail">(user@email.com)</span>
-                        </div>
-                        <span class="badge" id="viewTicketStatusBadge" style="background:#EEF2FF;color:#4F46E5;">Open</span>
-                    </div>
-                    <div class="p-3 bg-light rounded-3 text-dark small mb-2" id="viewTicketMessage" style="white-space:pre-line;">
-                        User query message...
-                    </div>
-                    <div class="text-muted" style="font-size:11px;" id="viewTicketCreated">Submitted at...</div>
+            <div class="modal-body p-4">
+                <h6 class="fw-bold text-dark mb-1" id="detailTicketSubject">Subject</h6>
+                <div class="text-xs text-muted mb-3" id="detailTicketMeta">Category · Priority</div>
+                
+                <div class="p-3 bg-light rounded-3 text-xs text-dark mb-3">
+                    <strong class="d-block mb-1 text-secondary">USER QUERY:</strong>
+                    <div id="detailTicketMessage" style="white-space: pre-wrap;">Message...</div>
                 </div>
 
-                <!-- Admin Response Box -->
-                <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
-                    <h6 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2">
-                        <i data-lucide="corner-down-right" style="width:16px;height:16px;color:#2563EB;"></i> Support Team Response
-                    </h6>
-                    
-                    {% if session.get('role_name') in ['Admin', 'Administrator'] %}
-                        <textarea id="replyText" class="form-control mb-3" rows="3" placeholder="Write support team response to send via email..."></textarea>
-                        <div class="d-flex justify-content-end gap-2">
-                            <button class="btn btn-success fw-bold px-3 py-1 text-sm" onclick="sendAdminTicketReply()">
-                                <i data-lucide="check-circle" style="width:14px;height:14px;" class="me-1"></i> Resolve &amp; Email Reply
-                            </button>
-                        </div>
-                    {% else %}
-                        <div id="userReplyView" class="p-3 bg-success-subtle text-success-emphasis rounded-3 small">
-                            No response from support team yet. You will receive an email as soon as an administrator replies.
-                        </div>
-                    {% endif %}
+                <div id="detailAdminReplyBox" class="p-3 bg-primary-subtle rounded-3 text-xs text-dark border border-primary-subtle d-none">
+                    <strong class="d-block mb-1 text-primary"><i class="bi bi-person-check-fill me-1"></i> SUPPORT TEAM RESPONSE:</strong>
+                    <div id="detailAdminReplyContent" style="white-space: pre-wrap;">Response...</div>
                 </div>
+            </div>
+            <div class="modal-footer border-top py-2.5 px-4">
+                <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    const API_URL = "http://127.0.0.1:8000";
-    let allSupportTickets = [];
-    let currentSelectedTicketId = null;
-    const currentUserId = {{ session.get('user_id', 1) }};
-    const isAdminUser = {% if session.get('role_name') in ['Admin', 'Administrator'] %}true{% else %}false{% endif %};
+const USER_ID = {{ session.get('user_id', 1) }};
+const IS_ADMIN = {{ 'true' if ('admin' in (session.get('role_name') or 'Employee')|string|lower) else 'false' }};
+// Robust dynamic API_URL detection with fallback
+const API_URL = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") 
+    ? `${window.location.protocol}//${window.location.hostname}:8000` 
+    : window.location.origin;
 
-    document.addEventListener("DOMContentLoaded", () => {
-        loadSupportTickets();
-    });
+let supportTicketsCache = [];
 
-    async function loadSupportTickets() {
-        try {
-            const endpoint = isAdminUser ? `${API_URL}/support/all` : `${API_URL}/support/my-tickets/${currentUserId}`;
-            const res = await fetch(endpoint);
-            if (res.ok) {
-                allSupportTickets = await res.json();
-                updateSupportStats();
-                renderSupportTable();
-            }
-        } catch (e) {
-            console.error("Failed to load tickets:", e);
+window.addEventListener('DOMContentLoaded', () => {
+    loadMySupportTickets();
+});
+
+function openNewTicketModal() {
+    new bootstrap.Modal(document.getElementById('newSupportTicketModal')).show();
+}
+
+function activateActionCard(type, cardEl) {
+    document.querySelectorAll('.action-grid-card').forEach(c => c.classList.remove('active'));
+    if (cardEl) cardEl.classList.add('active');
+
+    const input = document.getElementById('aiChatInputText');
+    if (type === 'ask') {
+        if (input) input.placeholder = "Ask any question about EDRP platform...";
+        if (input) input.focus();
+    } else if (type === 'issue') {
+        openNewTicketModal();
+    } else {
+        if (input) input.placeholder = "Type your question or issue message...";
+        if (input) input.focus();
+    }
+}
+
+function sendSuggestedQuestion(qText) {
+    const feed = document.getElementById('aiChatFeed');
+    if (!feed) return;
+
+    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Append User message
+    feed.innerHTML += `
+        <div class="d-flex flex-column align-items-end mb-2">
+            <div class="chat-bubble-user p-3 text-xs shadow-2xs" style="max-width: 85%;">
+                ${escapeHtml(qText)}
+            </div>
+            <span class="text-muted opacity-75 mt-1" style="font-size: 10px;">${timeNow}</span>
+        </div>
+    `;
+
+    let aiReply = "Thank you for asking! You can find detailed instructions in our knowledge base or submit a support ticket above.";
+    if (qText.includes("password")) {
+        aiReply = "To reset your password, click on Settings → Security → Update Password, or contact your Administrator.";
+    } else if (qText.includes("workflow")) {
+        aiReply = "The approval workflow follows a sequential chain: Submitter → Reviewer → Manager → Administrator.";
+    } else if (qText.includes("export")) {
+        aiReply = "You can export reports by navigating to 'Reports & Analytics' and clicking 'Export PDF / Excel'.";
+    } else if (qText.includes("rationale")) {
+        aiReply = "The Decision Rationale captures the core justification, business benefits ($ ROI), pros/cons analysis, and risk mitigation strategy.";
+    }
+
+    setTimeout(() => {
+        feed.innerHTML += `
+            <div class="d-flex flex-column align-items-start mb-2">
+                <div class="chat-bubble-ai p-3 text-xs shadow-2xs" style="max-width: 85%;">
+                    ${aiReply}
+                </div>
+                <span class="text-muted opacity-75 mt-1" style="font-size: 10px;">${timeNow}</span>
+            </div>
+        `;
+        feed.scrollTop = feed.scrollHeight;
+    }, 400);
+
+    setTimeout(() => { feed.scrollTop = feed.scrollHeight; }, 50);
+}
+
+function handleAiChatSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById('aiChatInputText');
+    if (!input) return;
+    const txt = input.value.trim();
+    if (!txt) return;
+
+    input.value = '';
+    sendSuggestedQuestion(txt);
+}
+
+function handleFaqSearch() {
+    const query = document.getElementById('knowledgeSearchInput').value.toLowerCase().trim();
+    const items = document.querySelectorAll('#faqAccordion .accordion-item');
+    items.forEach(item => {
+        const text = item.innerText.toLowerCase();
+        if (!query || text.includes(query)) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
         }
-    }
+    });
+}
 
-    function updateSupportStats() {
-        const total = allSupportTickets.length;
-        const open = allSupportTickets.filter(t => t.status === "Open").length;
-        const progress = allSupportTickets.filter(t => t.status === "In Progress").length;
-        const resolved = allSupportTickets.filter(t => t.status === "Resolved" || t.status === "Closed").length;
+async function loadMySupportTickets() {
+    const container = document.getElementById('supportTicketsListContainer');
+    if (!container) return;
 
-        document.getElementById("statTotalTickets").innerText = total;
-        document.getElementById("statOpenTickets").innerText = open;
-        document.getElementById("statInProgressTickets").innerText = progress;
-        document.getElementById("statResolvedTickets").innerText = resolved;
-    }
+    try {
+        const endpoint = IS_ADMIN ? `${API_URL}/support/all` : `${API_URL}/support/my-tickets/${USER_ID}`;
+        
+        let res = await fetch(endpoint).catch(() => null);
+        if (!res || !res.ok) {
+            // Fallback try port 8000 explicit
+            res = await fetch(`http://127.0.0.1:8000/support/my-tickets/${USER_ID}`).catch(() => null);
+        }
 
-    function filterSupportTickets() {
-        renderSupportTable();
-    }
+        if (!res || !res.ok) {
+            throw new Error("Unable to reach support backend server");
+        }
 
-    function renderSupportTable() {
-        const query = (document.getElementById("supportSearch")?.value || "").toLowerCase();
-        const filtered = allSupportTickets.filter(t => {
-            return !query || 
-                t.ticket_number.toLowerCase().includes(query) ||
-                t.subject.toLowerCase().includes(query) ||
-                t.category.toLowerCase().includes(query) ||
-                (t.user_name || "").toLowerCase().includes(query);
+        supportTicketsCache = await res.json();
+
+        let cntOpen = 0, cntProg = 0, cntRes = 0;
+
+        if (supportTicketsCache.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-4 text-muted text-xs">
+                    <i class="bi bi-ticket-perforated d-block fs-3 mb-1 text-secondary opacity-50"></i>
+                    No support requests found. Click "Create Ticket" above to submit one.
+                </div>
+            `;
+            if (document.getElementById('cntOpenTickets')) document.getElementById('cntOpenTickets').innerText = 0;
+            if (document.getElementById('cntProgressTickets')) document.getElementById('cntProgressTickets').innerText = 0;
+            if (document.getElementById('cntResolvedTickets')) document.getElementById('cntResolvedTickets').innerText = 0;
+            return;
+        }
+
+        container.innerHTML = '';
+        supportTicketsCache.forEach(t => {
+            const st = (t.status || 'Open').toLowerCase();
+            let badgeClass = "bg-warning-subtle text-warning-emphasis border border-warning-subtle";
+            if (st === 'open') { cntOpen++; }
+            else if (st === 'in progress' || st === 'inprogress') { cntProg++; badgeClass = "bg-primary-subtle text-primary border border-primary-subtle"; }
+            else if (st === 'resolved') { cntRes++; badgeClass = "bg-success-subtle text-success border border-success-subtle"; }
+
+            const timeStr = t.created_at ? new Date(t.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently';
+
+            container.innerHTML += `
+                <div class="ticket-item-card" onclick="viewTicketDetail(${t.id})">
+                    <div class="d-flex justify-content-between align-items-center mb-1.5">
+                        <span class="fw-bold text-primary text-xs font-monospace">${t.ticket_number || ('SUP-' + t.id)}</span>
+                        <span class="badge ${badgeClass} rounded-pill text-xs">${t.status}</span>
+                    </div>
+                    <h6 class="fw-bold text-dark text-xs mb-1.5 text-truncate">${escapeHtml(t.subject)}</h6>
+                    <div class="d-flex align-items-center gap-1.5 mb-2">
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill text-xs px-2">${t.priority}</span>
+                        <span class="badge bg-light text-secondary border rounded-pill text-xs px-2">${t.category}</span>
+                    </div>
+                    <div class="border-top pt-2 mt-2 text-xs text-muted">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Agent: <strong class="text-dark">Support Team</strong></span>
+                            <span>${timeStr}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
         });
 
-        const tbody = document.getElementById("supportTableBody");
-        if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted">No support tickets found.</td></tr>`;
-            return;
-        }
+        if (document.getElementById('cntOpenTickets')) document.getElementById('cntOpenTickets').innerText = cntOpen;
+        if (document.getElementById('cntProgressTickets')) document.getElementById('cntProgressTickets').innerText = cntProg;
+        if (document.getElementById('cntResolvedTickets')) document.getElementById('cntResolvedTickets').innerText = cntRes;
 
-        tbody.innerHTML = filtered.map(t => {
-            const dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
-            let statusStyle = "background:#FFF7ED;color:#D97706;";
-            if (t.status === "Resolved" || t.status === "Closed") statusStyle = "background:#ECFDF5;color:#059669;";
-            else if (t.status === "In Progress") statusStyle = "background:#FEF3C7;color:#B45309;";
+    } catch (e) {
+        console.error("Error loading tickets:", e);
+        container.innerHTML = `<div class="text-center py-3 text-muted text-xs">Error loading ticket requests: ${e.message}</div>`;
+    }
+}
 
-            let prioStyle = "background:#EEF2FF;color:#4F46E5;";
-            if (t.priority === "High" || t.priority === "Urgent") prioStyle = "background:#FEF2F2;color:#DC2626;";
+function viewTicketDetail(ticketId) {
+    const t = supportTicketsCache.find(x => x.id === ticketId);
+    if (!t) return;
 
-            return `
-            <tr>
-                <td class="px-4 py-3"><span class="fw-bold text-primary">${t.ticket_number}</span></td>
-                <td class="px-4">
-                    <div class="fw-semibold text-dark" style="font-size:13px;">${t.subject}</div>
-                    <div class="text-muted" style="font-size:11px;">By ${t.user_name || 'User'}</div>
-                </td>
-                <td class="px-4"><span style="background:#F1F5F9;color:#475569;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px;">${t.category}</span></td>
-                <td class="px-4"><span class="badge" style="${prioStyle}font-size:10px;">${t.priority}</span></td>
-                <td class="px-4"><span class="badge" style="${statusStyle}font-size:11px;font-weight:700;">${t.status}</span></td>
-                <td class="px-4 text-muted small">${dateStr}</td>
-                <td class="px-4 text-end">
-                    <button class="btn btn-sm btn-outline-primary px-3 fw-semibold" style="font-size:11px;" onclick="viewSupportTicketDetails(${t.id})">
-                        View &amp; Details
-                    </button>
-                </td>
-            </tr>`;
-        }).join("");
-        if (window.lucide) lucide.createIcons();
+    document.getElementById('detailTicketNumber').innerText = t.ticket_number || ('SUP-' + t.id);
+    document.getElementById('detailTicketSubject').innerText = t.subject;
+    document.getElementById('detailTicketMeta').innerText = `Category: ${t.category} · Priority: ${t.priority}`;
+    document.getElementById('detailTicketMessage').innerText = t.message;
+
+    const st = (t.status || 'Open').toLowerCase();
+    let badgeClass = "bg-warning-subtle text-warning-emphasis border border-warning-subtle";
+    if (st === 'in progress' || st === 'inprogress') badgeClass = "bg-primary-subtle text-primary border border-primary-subtle";
+    if (st === 'resolved') badgeClass = "bg-success-subtle text-success border border-success-subtle";
+
+    const statusBadge = document.getElementById('detailTicketStatus');
+    if (statusBadge) {
+        statusBadge.className = `badge ${badgeClass} rounded-pill text-xs`;
+        statusBadge.innerText = t.status;
     }
 
-    function openNewTicketModal() {
-        document.getElementById("ticketSubject").value = "";
-        document.getElementById("ticketMessage").value = "";
-        const modal = new bootstrap.Modal(document.getElementById("newTicketModal"));
-        modal.show();
+    const replyBox = document.getElementById('detailAdminReplyBox');
+    if (t.admin_reply && t.admin_reply.trim()) {
+        document.getElementById('detailAdminReplyContent').innerText = t.admin_reply;
+        replyBox.classList.remove('d-none');
+    } else {
+        replyBox.classList.add('d-none');
     }
 
-    async function submitSupportTicket() {
-        const subject = document.getElementById("ticketSubject").value.trim();
-        const category = document.getElementById("ticketCategory").value;
-        const priority = document.getElementById("ticketPriority").value;
-        const message = document.getElementById("ticketMessage").value.trim();
+    new bootstrap.Modal(document.getElementById('ticketDetailModal')).show();
+}
 
-        if (!subject || !message) {
-            alert("Please fill in both subject and description.");
-            return;
-        }
+async function handleCreateSupportTicket(e) {
+    e.preventDefault();
+    const subject = document.getElementById('ticketSubjectInput').value.trim();
+    const category = document.getElementById('ticketCategorySelect').value;
+    const priority = document.getElementById('ticketPrioritySelect').value;
+    const message = document.getElementById('ticketMessageTextarea').value.trim();
 
-        const btn = document.getElementById("btnSubmitTicket");
-        btn.disabled = true;
+    try {
+        const res = await fetch(`${API_URL}/support/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                user_id: USER_ID,
+                subject: subject,
+                category: category,
+                priority: priority,
+                message: message
+            })
+        });
 
-        try {
-            const res = await fetch(`${API_URL}/support/create`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id: currentUserId,
-                    subject: subject,
-                    category: category,
-                    priority: priority,
-                    message: message
-                })
-            });
+        if (!res.ok) throw new Error("Failed to submit support ticket");
 
-            if (res.ok) {
-                const modalEl = document.getElementById("newTicketModal");
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-                alert("Support ticket submitted successfully! A confirmation email has been dispatched to your address.");
-                loadSupportTickets();
-            } else {
-                alert("Failed to submit support ticket.");
-            }
-        } catch (e) {
-            alert("Network error occurred.");
-        } finally {
-            btn.disabled = false;
-        }
+        const modalEl = document.getElementById('newSupportTicketModal');
+        const bsModal = bootstrap.Modal.getInstance(modalEl);
+        if (bsModal) bsModal.hide();
+
+        showGlobalAlert("success", "Support ticket created successfully! Confirmation email sent.");
+        document.getElementById('ticketSubjectInput').value = '';
+        document.getElementById('ticketMessageTextarea').value = '';
+        loadMySupportTickets();
+    } catch (err) {
+        showGlobalAlert("danger", err.message);
     }
+}
 
-    function viewSupportTicketDetails(ticketId) {
-        const ticket = allSupportTickets.find(t => t.id === ticketId);
-        if (!ticket) return;
-        currentSelectedTicketId = ticketId;
+function showGlobalAlert(type, msg) {
+    const container = document.getElementById('supportAlertContainer');
+    if (!container) return;
+    container.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show text-xs fw-semibold rounded-3 mb-4" role="alert">
+            ${msg}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+}
 
-        document.getElementById("viewTicketNum").innerText = ticket.ticket_number;
-        document.getElementById("viewTicketSubject").innerText = ticket.subject;
-        document.getElementById("viewTicketUser").innerText = ticket.user_name || "User";
-        document.getElementById("viewTicketEmail").innerText = `(${ticket.user_email || 'user@email.com'})`;
-        document.getElementById("viewTicketMessage").innerText = ticket.message;
-        document.getElementById("viewTicketCreated").innerText = `Submitted on ${ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'N/A'}`;
-        document.getElementById("viewTicketStatusBadge").innerText = ticket.status;
-
-        const replyView = document.getElementById("userReplyView");
-        if (replyView) {
-            if (ticket.admin_reply) {
-                replyView.className = "p-3 bg-success-subtle text-success-emphasis rounded-3 small border border-success-subtle";
-                replyView.innerHTML = `<strong>Support Reply (${ticket.resolved_at ? new Date(ticket.resolved_at).toLocaleDateString() : 'Resolved'}):</strong><br>${ticket.admin_reply}`;
-            } else {
-                replyView.className = "p-3 bg-light text-muted rounded-3 small";
-                replyView.innerText = "No response from support team yet. You will receive an email as soon as an administrator replies.";
-            }
-        }
-
-        const modal = new bootstrap.Modal(document.getElementById("viewTicketModal"));
-        modal.show();
-    }
-
-    async function sendAdminTicketReply() {
-        const replyText = document.getElementById("replyText")?.value.trim();
-        if (!replyText) {
-            alert("Please enter a response to send to the user.");
-            return;
-        }
-
-        try {
-            const res = await fetch(`${API_URL}/support/reply`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ticket_id: currentSelectedTicketId,
-                    admin_reply: replyText,
-                    status: "Resolved"
-                })
-            });
-
-            if (res.ok) {
-                const modalEl = document.getElementById("viewTicketModal");
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-                alert("Response sent successfully! An email notification has been sent to the user.");
-                loadSupportTickets();
-            } else {
-                alert("Failed to send reply.");
-            }
-        } catch (e) {
-            alert("Network error occurred.");
-        }
-    }
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 </script>
 {% endblock %}

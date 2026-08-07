@@ -398,7 +398,13 @@
                             <div class="queue-title">{{ review.decision_title }}</div>
                             <div class="queue-meta">{{ review.author_name or review.requester_name or 'Team Member' }} · {{ review.department or review.category_name or 'General' }} · <span style="color: #D97706; font-weight: 600;">{{ review.time_ago or 'Recently' }}</span></div>
                         </div>
-                        <span style="font-size: 10px; font-weight: 700; color: {{ '#EF4444' if review.priority == 'Critical' else ('#D97706' if review.priority == 'High' else '#2563EB') }}; background: {{ '#FEF2F2' if review.priority == 'Critical' else ('#FFFBEB' if review.priority == 'High' else '#EFF6FF') }}; padding: 2px 8px; border-radius: 6px; margin-right: 12px;">{{ review.priority or 'Medium' }}</span>
+                        {% if review.priority == 'Critical' %}
+                        <span style="font-size: 10px; font-weight: 700; color: #EF4444; background: #FEF2F2; padding: 2px 8px; border-radius: 6px; margin-right: 12px;">Critical</span>
+                        {% elif review.priority == 'High' %}
+                        <span style="font-size: 10px; font-weight: 700; color: #D97706; background: #FFFBEB; padding: 2px 8px; border-radius: 6px; margin-right: 12px;">High</span>
+                        {% else %}
+                        <span style="font-size: 10px; font-weight: 700; color: #2563EB; background: #EFF6FF; padding: 2px 8px; border-radius: 6px; margin-right: 12px;">{{ review.priority or 'Medium' }}</span>
+                        {% endif %}
                         <div style="display: flex; gap: 8px;">
                             <button class="btn-approve" onclick="quickReviewAction('{{ review.decision_id }}', '{{ current_user_id }}', 'Approved')">Approve</button>
                             <a href="{{ url_for('decision_details', id=review.decision_id) }}" class="btn-review-outline">Review</a>
@@ -488,9 +494,16 @@
                 <div class="timeline-line"></div>
                 {% if recent_audit_logs %}
                     {% for log in recent_audit_logs %}
+                    {% set log_icon = 'alert-triangle' if log.severity == 'Critical' else ('eye' if log.severity == 'Warning' else 'activity') %}
                     <div class="timeline-item" {% if loop.last %}style="margin-bottom: 0;"{% endif %}>
-                        <div class="timeline-icon" style="color: {{ '#EF4444' if log.severity == 'Critical' else ('#F59E0B' if log.severity == 'Warning' else '#2563EB') }};">
-                            <i data-lucide="{% if log.severity == 'Critical' %}alert-triangle{% elif log.severity == 'Warning' %}eye{% else %}activity{% endif %}" style="width: 14px; height: 14px;"></i>
+                        {% if log.severity == 'Critical' %}
+                        <div class="timeline-icon" style="color: #EF4444;">
+                        {% elif log.severity == 'Warning' %}
+                        <div class="timeline-icon" style="color: #F59E0B;">
+                        {% else %}
+                        <div class="timeline-icon" style="color: #2563EB;">
+                        {% endif %}
+                            <i data-lucide="{{ log_icon }}" style="width: 14px; height: 14px;"></i>
                         </div>
                         <div>
                             <div style="font-size: 13px; color: #334155;"><b style="color: #0D9488;">{{ log.user_name }}</b> {{ log.action }}</div>

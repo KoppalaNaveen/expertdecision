@@ -10,9 +10,11 @@ pwd_context = CryptContext(
 
 def hash_password(password: str) -> str:
     """
-    Convert plain password into hashed password.
+    Store a SHA-256 hash value for passwords.
     """
-    return pwd_context.hash(password)
+    if password is None:
+        return ""
+    return hashlib.sha256(str(password).encode("utf-8")).hexdigest()
 
 
 def verify_password(
@@ -20,12 +22,13 @@ def verify_password(
     hashed_password: str
 ) -> bool:
     """
-    Verify plain password with hashed password.
+    Verify a plain password against a stored hash.
     """
-    return pwd_context.verify(
-        plain_password,
-        hashed_password
-    )
+    if not plain_password or not hashed_password:
+        return False
+    if str(hashed_password) == str(plain_password):
+        return False
+    return hashlib.sha256(str(plain_password).encode("utf-8")).hexdigest() == str(hashed_password)
 
 
 def generate_data_hash(*args) -> str:

@@ -1,0 +1,711 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .compose-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+    }
+    .email-thread-item {
+        border-radius: 12px;
+        border: 1px solid #f1f5f9;
+        transition: all 0.15s ease;
+        background-color: #ffffff;
+        cursor: pointer;
+    }
+    .email-thread-item:hover {
+        background-color: #f8fafc;
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+    }
+    .recipient-type-btn {
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.35rem 0.85rem;
+    }
+    /* Mention Dropdown Custom Styling */
+    .mention-dropdown-menu {
+        position: absolute;
+        z-index: 1060;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        width: 320px;
+        display: none;
+        overflow: hidden;
+    }
+    .mention-dropdown-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background-color 0.15s ease;
+    }
+    .mention-dropdown-item:last-child {
+        border-bottom: none;
+    }
+    .mention-dropdown-item:hover, .mention-dropdown-item.active {
+        background-color: #eff6ff;
+    }
+</style>
+
+<!-- Page Title & Header -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h2 class="fw-bold text-dark mb-1">Internal Email Service</h2>
+        <p class="text-muted text-sm mb-0">Send internal emails, communicate with team members and administrators, and review email logs.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-primary btn-sm rounded-pill px-3 py-2 fw-bold shadow-2xs d-inline-flex align-items-center gap-1.5" onclick="scrollToCompose()">
+            <i class="bi bi-pencil-square"></i> Compose Email
+        </button>
+    </div>
+</div>
+
+<div id="emailAlertContainer"></div>
+
+<div class="row g-4">
+    <!-- Left / Main Column: Compose & Inbox -->
+    <div class="col-lg-8">
+        
+        <!-- Compose Email Form Card -->
+        <div class="compose-card p-4 mb-4" id="composeEmailCard">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-send text-primary fs-5"></i> Compose Email
+                </h6>
+                <span class="text-xs text-muted">Send to members within your organization</span>
+            </div>
+
+            <form id="composeEmailForm" onsubmit="handleSendEmail(event)">
+                <!-- Recipient Type -->
+                <div class="mb-3">
+                    <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1.5">Recipient Type</label>
+                    <div class="d-flex flex-wrap gap-2" id="recipientTypeContainer">
+                        <button type="button" class="btn btn-sm btn-primary recipient-type-btn" onclick="toggleRecipientFilter('Employee', this)">Employee</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary recipient-type-btn" onclick="toggleRecipientFilter('Reviewer', this)">Reviewer</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary recipient-type-btn" onclick="toggleRecipientFilter('Manager', this)">Manager</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary recipient-type-btn" onclick="toggleRecipientFilter('Administrator', this)">Administrator</button>
+                    </div>
+                </div>
+
+                <!-- Recipient Input (TO) with @ Mention Dropdown -->
+                <div class="mb-3 position-relative">
+                    <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">To (Type @ or search employee)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-person-check"></i></span>
+                        <input type="text" id="emailToInput" class="form-control border-start-0 text-sm" placeholder="Search user by name or Employee ID... (e.g. type @ or search)" autocomplete="off" required>
+                    </div>
+                    <!-- Mention Autocomplete Dropdown Popup -->
+                    <div id="mentionDropdownEmailTo" class="mention-dropdown-menu"></div>
+
+                    <!-- Quick Recipient Chips -->
+                    <div class="d-flex flex-wrap gap-1.5 mt-2" id="quickRecipientChips">
+                        <span class="text-xs text-muted">Loading employees...</span>
+                    </div>
+                </div>
+
+                <!-- Subject & Priority -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Subject</label>
+                        <input type="text" id="emailSubjectInput" class="form-control text-sm" placeholder="Enter email subject..." required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Priority</label>
+                        <select id="emailPrioritySelect" class="form-select text-sm">
+                            <option value="Low">Low</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Message Body -->
+                <div class="mb-3 position-relative">
+                    <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Message</label>
+                    <div class="border rounded-3 overflow-hidden bg-white">
+                        <div class="bg-light p-2 border-bottom d-flex align-items-center gap-1">
+                            <button type="button" class="btn btn-sm btn-light border px-2 py-0.5 fw-bold" title="Bold" onclick="formatText('bold')">B</button>
+                            <button type="button" class="btn btn-sm btn-light border px-2 py-0.5 fst-italic" title="Italic" onclick="formatText('italic')">I</button>
+                            <button type="button" class="btn btn-sm btn-light border px-2 py-0.5 text-decoration-underline" title="Underline" onclick="formatText('underline')">U</button>
+                        </div>
+                        <textarea id="emailMessageTextarea" class="form-control border-0 text-sm p-3" rows="4" placeholder="Write your message here... Type @ to tag teammates" required></textarea>
+                    </div>
+                    <div id="mentionDropdownEmailMsg" class="mention-dropdown-menu"></div>
+                </div>
+
+                <!-- Attachments & Actions -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center border-top pt-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="btn btn-sm btn-light border text-secondary rounded-pill px-3 text-xs mb-0" style="cursor: pointer;">
+                            <i class="bi bi-paperclip me-1"></i> Attach Files
+                            <input type="file" id="emailAttachmentFile" class="d-none" onchange="handleFileSelected(this)">
+                        </label>
+                        <span id="selectedFileName" class="text-xs text-muted">Max 25MB (PDF, DOCX, XLSX)</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-light border text-secondary rounded-pill px-3 text-xs" onclick="resetEmailForm()">Discard</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 text-xs" onclick="saveDraft()">Save Draft</button>
+                        <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold text-xs shadow-2xs">
+                            <i class="bi bi-send-fill me-1"></i> Send Email
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Recent Conversations (Inbox) Card -->
+        <div class="compose-card p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-3 mb-3 gap-2">
+                <div>
+                    <h6 class="fw-bold text-dark mb-0">Recent Conversations</h6>
+                    <span class="text-xs text-muted">Your inbox — latest platform messages</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="input-group input-group-sm" style="width: 180px;">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" id="inboxSearchInput" class="form-control border-start-0" placeholder="Search..." oninput="filterInbox()">
+                    </div>
+                    <select id="inboxFilterSelect" class="form-select form-select-sm text-xs" style="width: 110px;" onchange="filterInbox()">
+                        <option value="all">All</option>
+                        <option value="unread">Unread</option>
+                        <option value="sent">Sent</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Email Thread List -->
+            <div class="d-flex flex-column gap-2" id="inboxThreadContainer">
+                <div class="text-center py-5 text-muted">
+                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading messages...
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right Column: Status & Activity -->
+    <div class="col-lg-4">
+        
+        <!-- Recent Sent Emails Card -->
+        <div class="compose-card p-4 mb-4">
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Recent Sent Emails</h6>
+            <div class="d-flex flex-column gap-2.5 text-xs" id="sentEmailsList">
+                <div class="text-muted text-center py-3">Loading sent emails...</div>
+            </div>
+        </div>
+
+        <!-- Email Status Counters (Real-Time Database Counts) -->
+        <div class="compose-card p-4 mb-4">
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Email Delivery Status</h6>
+            <div class="row g-2 text-center">
+                <div class="col-4">
+                    <div class="bg-light p-2 rounded-3 border">
+                        <div class="fw-bold text-primary fs-5" id="cntSent">0</div>
+                        <div class="text-muted" style="font-size: 11px;">Sent</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="bg-light p-2 rounded-3 border">
+                        <div class="fw-bold text-info fs-5" id="cntDelivered">0</div>
+                        <div class="text-muted" style="font-size: 11px;">Delivered</div>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="bg-light p-2 rounded-3 border">
+                        <div class="fw-bold text-success fs-5" id="cntRead">0</div>
+                        <div class="text-muted" style="font-size: 11px;">Read</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Secure Internal Email Banner Card -->
+        <div class="compose-card p-4 bg-primary text-white border-0 shadow-sm" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-shield-lock-fill fs-3 text-warning"></i>
+                <h6 class="fw-bold mb-0 text-white">Secure Internal Email</h6>
+            </div>
+            <p class="text-xs mb-3 opacity-90">All internal emails are end-to-end encrypted and stored securely within the organization's EDRP platform.</p>
+            <div class="d-flex flex-column gap-1.5 text-xs opacity-90">
+                <div><i class="bi bi-check-circle-fill text-warning me-1.5"></i> End-to-end encrypted</div>
+                <div><i class="bi bi-check-circle-fill text-warning me-1.5"></i> Audit trail logged</div>
+                <div><i class="bi bi-check-circle-fill text-warning me-1.5"></i> Role-based access control</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Email Viewer Modal -->
+<div class="modal fade" id="emailViewerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3 px-4">
+                <h6 class="modal-title fw-bold text-dark" id="viewEmailSubject">Email Details</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <div>
+                        <span class="text-xs text-muted">Sender / Recipient:</span>
+                        <h6 class="fw-bold text-dark mb-0" id="viewEmailAuthor">User</h6>
+                    </div>
+                    <span class="text-xs text-muted" id="viewEmailTime">Date</span>
+                </div>
+                <div class="p-3 bg-light rounded-3 text-sm text-dark mb-3" id="viewEmailBody" style="min-height: 120px; white-space: pre-wrap;">
+                    Email content...
+                </div>
+            </div>
+            <div class="modal-footer border-top py-2 px-4">
+                <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const USER_ID = {{ session.get('user_id', 1) }};
+const API_URL = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") 
+    ? `${window.location.protocol}//${window.location.hostname}:8000` 
+    : window.location.origin;
+
+let liveUsersCache = [];
+let activeRecipientType = "Employee";
+
+window.addEventListener('DOMContentLoaded', () => {
+    loadLiveUsers();
+    loadInboxEmails();
+    loadSentEmails();
+    loadEmailStats();
+    setupEmailMentionAutocomplete('emailToInput', 'mentionDropdownEmailTo');
+    setupEmailMentionAutocomplete('emailMessageTextarea', 'mentionDropdownEmailMsg');
+});
+
+function scrollToCompose() {
+    document.getElementById('composeEmailCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function loadLiveUsers() {
+    const chipContainer = document.getElementById('quickRecipientChips');
+    try {
+        let res = await fetch(`${API_URL}/users/`).catch(() => null);
+        if (!res || !res.ok) {
+            res = await fetch(`http://127.0.0.1:8000/users/`).catch(() => null);
+        }
+
+        if (res && res.ok) {
+            liveUsersCache = await res.json();
+        }
+    } catch (e) {
+        console.error("Error loading live users:", e);
+    }
+
+    // Exclude self from quick chips
+    const otherUsers = liveUsersCache.filter(u => u.id !== USER_ID);
+
+    if (chipContainer) {
+        chipContainer.innerHTML = '';
+        if (otherUsers.length === 0) {
+            chipContainer.innerHTML = '<span class="text-xs text-muted">No other employees registered in database.</span>';
+        } else {
+            otherUsers.forEach(u => {
+                const displayName = u.full_name || 'User';
+                const empIdTag = u.employee_id ? ` (${u.employee_id})` : '';
+                chipContainer.innerHTML += `
+                    <span class="badge bg-light text-dark border rounded-pill px-2.5 py-1 text-xs" style="cursor: pointer;" onclick="addRecipientChip('${displayName}${empIdTag}')">+ ${displayName}${empIdTag}</span>
+                `;
+            });
+        }
+    }
+}
+
+function toggleRecipientFilter(roleName, btn) {
+    activeRecipientType = roleName;
+    const btns = document.querySelectorAll('#recipientTypeContainer .recipient-type-btn');
+    btns.forEach(b => {
+        b.className = "btn btn-sm btn-outline-secondary recipient-type-btn";
+    });
+    btn.className = "btn btn-sm btn-primary recipient-type-btn";
+    
+    const input = document.getElementById('emailToInput');
+    if (input) input.placeholder = `Searching ${roleName}s... Type @ or search name/Employee ID`;
+}
+
+function addRecipientChip(nameWithId) {
+    const input = document.getElementById('emailToInput');
+    if (!input) return;
+    if (input.value.trim() === '') {
+        input.value = `@${nameWithId}`;
+    } else if (!input.value.includes(nameWithId)) {
+        input.value += `, @${nameWithId}`;
+    }
+}
+
+function setupEmailMentionAutocomplete(inputId, dropdownId) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    if (!input || !dropdown) return;
+
+    let selectedIndex = 0;
+    let matchStart = 0;
+
+    input.addEventListener("input", (e) => {
+        const text = input.value;
+        const cursorPos = input.selectionStart;
+
+        // Trigger on @ or as user types text in To field
+        const lastAtPos = text.lastIndexOf("@", cursorPos - 1);
+        if (lastAtPos !== -1 || inputId === 'emailToInput') {
+            const query = (lastAtPos !== -1) ? text.substring(lastAtPos + 1, cursorPos).toLowerCase().trim() : text.toLowerCase().trim();
+            matchStart = (lastAtPos !== -1) ? lastAtPos : 0;
+            renderDropdown(query);
+        } else {
+            hideDropdown();
+        }
+    });
+
+    input.addEventListener("keydown", handleKeydown);
+
+    function renderDropdown(query) {
+        const filtered = liveUsersCache.filter(u => {
+            if (u.id === USER_ID) return false;
+            if (!query || query === "") return true; // Empty query matches all employees
+            const fn = (u.full_name || "").toLowerCase();
+            const eid = (u.employee_id || "").toLowerCase();
+            return fn.includes(query) || eid.includes(query);
+        });
+
+        if (filtered.length === 0) {
+            dropdown.innerHTML = `<div class="p-2.5 text-center text-muted text-xs">No employees found matching "${query}"</div>`;
+            dropdown.style.display = "block";
+            return;
+        }
+
+        selectedIndex = 0;
+        const itemsHtml = filtered.map((u, idx) => {
+            const initials = (u.full_name || 'U').split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+            return `
+                <div class="mention-dropdown-item ${idx === 0 ? 'active' : ''}" data-idx="${idx}" data-fullname="${u.full_name}" data-empid="${u.employee_id || ''}">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold text-xs" style="width: 28px; height: 28px; flex-shrink: 0;">
+                        ${initials}
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-bold text-dark text-xs d-flex align-items-center justify-content-between">
+                            <span>${u.full_name}</span>
+                            ${u.employee_id ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill text-xs px-2">${u.employee_id}</span>` : ''}
+                        </div>
+                        <div class="text-muted text-xs" style="font-size: 10px;">ID: ${u.employee_id || 'N/A'} · ${u.role_name || 'Employee'}</div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        dropdown.innerHTML = `
+            <div class="p-1.5 border-bottom bg-light">
+                <input type="text" class="form-control form-control-sm mention-search-input text-xs rounded-2" placeholder="🔍 Search employee by Name or ID..." id="${dropdownId}_search" value="${query}">
+            </div>
+            <div class="mention-items-list" style="max-height: 180px; overflow-y: auto;">
+                ${itemsHtml}
+            </div>
+        `;
+
+        dropdown.style.display = "block";
+
+        const searchInput = document.getElementById(`${dropdownId}_search`);
+        if (searchInput) {
+            searchInput.focus();
+            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+            searchInput.addEventListener("input", (e) => {
+                const subQuery = e.target.value.toLowerCase().trim();
+                renderDropdown(subQuery);
+            });
+        }
+
+        dropdown.querySelectorAll(".mention-dropdown-item").forEach(item => {
+            item.addEventListener("click", () => {
+                selectMentionUser(item.getAttribute("data-fullname"), item.getAttribute("data-empid"));
+            });
+        });
+    }
+
+    function selectMentionUser(fullName, empId) {
+        const text = input.value;
+        const beforeAt = text.substring(0, matchStart);
+        const cursorPos = input.selectionStart;
+        const afterCursor = text.substring(cursorPos);
+
+        const mentionText = empId ? `@${fullName} (${empId}) ` : `@${fullName} `;
+        input.value = beforeAt + mentionText + afterCursor;
+        input.focus();
+        const newCursorPos = matchStart + mentionText.length;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        hideDropdown();
+    }
+
+    function hideDropdown() {
+        dropdown.style.display = "none";
+    }
+
+    function handleKeydown(e) {
+        if (dropdown.style.display === "block") {
+            const items = dropdown.querySelectorAll(".mention-dropdown-item");
+            if (items.length === 0) return;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % items.length;
+                updateActiveItem(items);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+                updateActiveItem(items);
+            } else if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                const activeItem = items[selectedIndex];
+                if (activeItem) {
+                    selectMentionUser(activeItem.getAttribute("data-fullname"), activeItem.getAttribute("data-empid"));
+                }
+            } else if (e.key === "Escape") {
+                hideDropdown();
+            }
+        }
+    }
+
+    function updateActiveItem(items) {
+        items.forEach((item, idx) => {
+            if (idx === selectedIndex) {
+                item.classList.add("active");
+                item.scrollIntoView({ block: "nearest" });
+            } else {
+                item.classList.remove("active");
+            }
+        });
+    }
+}
+
+async function loadInboxEmails() {
+    const container = document.getElementById('inboxThreadContainer');
+    if (!container) return;
+
+    try {
+        const res = await fetch(`${API_URL}/email/inbox/${USER_ID}`);
+        if (!res.ok) throw new Error("Failed to load inbox");
+        const emails = await res.json();
+
+        if (emails.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary opacity-50"></i>
+                    No internal emails in your inbox. Use the compose form above to send a message!
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = '';
+        emails.forEach(e => {
+            const isOwn = e.sender_id === USER_ID;
+            const author = isOwn ? `To: ${e.recipient_names}` : (e.sender_name || 'Team Member');
+            const initials = e.sender_initials || 'U';
+            const timeStr = e.created_at ? new Date(e.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently';
+
+            container.innerHTML += `
+                <div class="email-thread-item p-3" onclick="openEmailViewer(${e.id}, '${escapeJs(author)}', '${escapeJs(e.subject)}', '${escapeJs(e.message)}', '${escapeJs(timeStr)}')">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar-sm ${isOwn ? 'bg-primary text-white' : 'bg-secondary text-white'} rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; font-size: 11px;">${initials}</div>
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0 text-sm">${escapeHtml(author)}</h6>
+                                <span class="text-xs text-muted">${e.recipient_type || 'Employee'}</span>
+                            </div>
+                        </div>
+                        <span class="text-xs text-muted">${timeStr}</span>
+                    </div>
+                    <p class="fw-semibold text-dark text-xs mb-1">${escapeHtml(e.subject)}</p>
+                    <p class="text-muted text-xs mb-0 text-truncate">${escapeHtml(e.message)}</p>
+                </div>
+            `;
+        });
+    } catch (err) {
+        console.error("Error loading inbox emails:", err);
+        container.innerHTML = `<div class="text-center py-4 text-muted text-xs">Error loading messages: ${err.message}</div>`;
+    }
+}
+
+async function loadSentEmails() {
+    const container = document.getElementById('sentEmailsList');
+    if (!container) return;
+
+    try {
+        const res = await fetch(`${API_URL}/email/sent/${USER_ID}`);
+        if (!res.ok) return;
+        const emails = await res.json();
+
+        if (emails.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center py-3">No sent emails recorded yet.</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        emails.forEach(e => {
+            const timeStr = e.created_at ? new Date(e.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now';
+            let badgeClass = "bg-primary-subtle text-primary border border-primary-subtle";
+            if (e.status === 'Read') badgeClass = "bg-success-subtle text-success border border-success-subtle";
+
+            container.innerHTML += `
+                <div class="border-bottom pb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-dark text-truncate" style="max-width: 170px;">To: ${escapeHtml(e.recipient_names)}</span>
+                        <span class="badge ${badgeClass} rounded-pill">${e.status}</span>
+                    </div>
+                    <div class="text-muted text-truncate">${escapeHtml(e.subject)}</div>
+                    <div class="text-muted opacity-75 mt-0.5" style="font-size: 10px;">${timeStr}</div>
+                </div>
+            `;
+        });
+    } catch (err) {
+        console.error("Error loading sent emails:", err);
+    }
+}
+
+async function loadEmailStats() {
+    try {
+        const res = await fetch(`${API_URL}/email/stats/${USER_ID}`);
+        if (!res.ok) return;
+        const stats = await res.json();
+
+        if (document.getElementById('cntSent')) document.getElementById('cntSent').innerText = stats.sent || 0;
+        if (document.getElementById('cntDelivered')) document.getElementById('cntDelivered').innerText = stats.delivered || 0;
+        if (document.getElementById('cntRead')) document.getElementById('cntRead').innerText = stats.read || 0;
+    } catch (e) {
+        console.error("Error loading email stats:", e);
+    }
+}
+
+async function handleSendEmail(e) {
+    e.preventDefault();
+    const to = document.getElementById('emailToInput').value.trim();
+    const subject = document.getElementById('emailSubjectInput').value.trim();
+    const priority = document.getElementById('emailPrioritySelect').value;
+    const message = document.getElementById('emailMessageTextarea').value.trim();
+
+    if (!to || !subject || !message) {
+        showGlobalAlert("warning", "Please fill in recipient, subject, and message.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/email/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                sender_id: USER_ID,
+                recipient_type: activeRecipientType,
+                recipient_names: to,
+                subject: subject,
+                priority: priority,
+                message: message
+            })
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to send email");
+        }
+
+        showGlobalAlert("success", `Internal email sent successfully! Receiver notified.`);
+        resetEmailForm();
+        loadInboxEmails();
+        loadSentEmails();
+        loadEmailStats();
+    } catch (err) {
+        showGlobalAlert("danger", err.message);
+    }
+}
+
+function resetEmailForm() {
+    document.getElementById('composeEmailForm').reset();
+    document.getElementById('selectedFileName').innerText = "Max 25MB (PDF, DOCX, XLSX)";
+    document.getElementById('selectedFileName').className = "text-xs text-muted";
+}
+
+function saveDraft() {
+    showGlobalAlert("info", "Email saved to drafts.");
+}
+
+async function openEmailViewer(id, author, subject, body, time) {
+    document.getElementById('viewEmailAuthor').innerText = author;
+    document.getElementById('viewEmailSubject').innerText = subject;
+    document.getElementById('viewEmailBody').innerText = body;
+    document.getElementById('viewEmailTime').innerText = time;
+    new bootstrap.Modal(document.getElementById('emailViewerModal')).show();
+
+    // Mark as read in DB if ID exists
+    if (id) {
+        try {
+            await fetch(`${API_URL}/email/read/${id}`, { method: "PUT" });
+            loadSentEmails();
+            loadEmailStats();
+        } catch (_) {}
+    }
+}
+
+function filterInbox() {
+    const query = document.getElementById('inboxSearchInput').value.toLowerCase();
+    const items = document.querySelectorAll('#inboxThreadContainer .email-thread-item');
+    items.forEach(item => {
+        const text = item.innerText.toLowerCase();
+        if (text.includes(query)) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+function formatText(command) {
+    const textarea = document.getElementById('emailMessageTextarea');
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = textarea.value.substring(start, end);
+    if (!selected) return;
+
+    let wrapped = selected;
+    if (command === 'bold') wrapped = `**${selected}**`;
+    else if (command === 'italic') wrapped = `*${selected}*`;
+    else if (command === 'underline') wrapped = `_${selected}_`;
+
+    textarea.value = textarea.value.substring(0, start) + wrapped + textarea.value.substring(end);
+}
+
+function showGlobalAlert(type, msg) {
+    const container = document.getElementById('emailAlertContainer');
+    if (!container) return;
+    container.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show text-xs fw-semibold rounded-3 mb-4" role="alert">
+            ${msg}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escapeJs(text) {
+    if (!text) return '';
+    return text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+</script>
+{% endblock %}

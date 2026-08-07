@@ -28,14 +28,14 @@ def create_decision_full(decision: DecisionFullCreate, db: Session = Depends(get
     return DecisionService.create_decision_full(db, decision)
 
 @router.get("/", response_model=List[DecisionResponse])
-def get_all_decisions(db: Session = Depends(get_db)):
-    return DecisionService.get_all_decisions(db)
+def get_all_decisions(user_id: int = None, role_name: str = None, db: Session = Depends(get_db)):
+    return DecisionService.get_all_decisions(db, user_id=user_id, role_name=role_name)
 
 @router.get("/{decision_id}", response_model=DecisionFullResponse)
 def get_decision(decision_id: int, user_id: int = None, db: Session = Depends(get_db)):
     decision = DecisionService.get_decision_by_id(db, decision_id, user_id=user_id)
     if not decision:
-        raise HTTPException(status_code=404, detail="Decision not found")
+        raise HTTPException(status_code=403, detail="Access Denied: You are not authorized to view this decision record.")
     return decision
 
 @router.get("/{decision_id}/versions")
@@ -55,8 +55,11 @@ def update_decision(decision_id: int, decision: DecisionUpdate, user_id: int = N
     if not db_decision:
         raise HTTPException(status_code=404, detail="Decision not found")
     updater_id = user_id or decision.created_by
-    if updater_id and db_decision.created_by != updater_id:
-        raise HTTPException(status_code=403, detail="Only the owner of this decision can edit or submit it.")
+    if updater_id and int(db_decision.created_by) != int(updater_id):
+        raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.")
+    status_clean = (db_decision.status or "").strip().lower()
+    if status_clean not in ["draft", "rejected"]:
+        raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.")
     updated_decision = DecisionService.update_decision(db, decision_id, decision)
     return updated_decision
 
@@ -66,8 +69,11 @@ def update_decision_full(decision_id: int, decision: DecisionFullCreate, user_id
     if not db_decision:
         raise HTTPException(status_code=404, detail="Decision not found")
     updater_id = user_id or decision.created_by
-    if updater_id and db_decision.created_by != updater_id:
-        raise HTTPException(status_code=403, detail="Only the owner of this decision can edit or submit it.")
+    if updater_id and int(db_decision.created_by) != int(updater_id):
+        raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.")
+    status_clean = (db_decision.status or "").strip().lower()
+    if status_clean not in ["draft", "rejected"]:
+        raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.")
     updated_decision = DecisionService.update_decision_full(db, decision_id, decision)
     return updated_decision
 

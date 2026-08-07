@@ -17,8 +17,8 @@ class ReviewService:
         )
 
     @staticmethod
-    def get_all_reviews(db: Session):
-        return ReviewRepository.get_all_reviews(db)
+    def get_all_reviews(db: Session, user_id: int = None):
+        return ReviewRepository.get_all_reviews(db, user_id=user_id)
 
     @staticmethod
     def get_reviews_by_decision(

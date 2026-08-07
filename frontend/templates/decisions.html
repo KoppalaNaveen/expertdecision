@@ -88,11 +88,38 @@
     </div>
 </div>
 
+<!-- Rejection Comments Modal -->
+<div class="modal fade" id="rejectionCommentsModal" tabindex="-1" aria-labelledby="rejectionCommentsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+      <div class="modal-header border-bottom-0 pb-0">
+        <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="rejectionCommentsModalLabel">
+          <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i> Review & Rejection Feedback
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="text-muted small mb-3" id="modalDecisionTitleHeader">Review comments for decision.</p>
+        <div id="modalCommentsContainer" class="d-flex flex-column gap-3">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      <div class="modal-footer border-top-0 pt-0">
+        <button type="button" class="btn btn-light border px-4 fw-semibold" data-bs-dismiss="modal">Close</button>
+        <a id="modalEditResubmitBtn" href="#" class="btn btn-primary px-4 fw-semibold shadow-sm">
+          <i class="bi bi-pencil-square me-1"></i> Edit & Resubmit
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 
 <script>
     const API_URL = "http://127.0.0.1:8000";
     const USER_ID = parseInt("{{ session.get('user_id', 0) }}", 10);
+    const CURRENT_USER_ROLE = "{{ session.get('role_name', 'Employee') }}";
 </script>
 <script src="{{ url_for('static', filename='js/decision.js') }}"></script>
 {% endblock %}

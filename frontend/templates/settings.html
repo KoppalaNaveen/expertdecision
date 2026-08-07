@@ -606,7 +606,7 @@
 
 <script>
     const API_URL = "http://127.0.0.1:8000";
-    const CURRENT_USER_ID = {{ session.get('user_id', 1) }};
+    const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
 
     document.addEventListener("DOMContentLoaded", () => {
         loadAllSettingsFromBackend();

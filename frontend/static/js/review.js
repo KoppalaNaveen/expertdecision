@@ -16,7 +16,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function fetchReviews() {
     try {
-        const res = await fetch(`${API_URL}/reviews/`);
+        const userParam = typeof USER_ID !== 'undefined' && USER_ID ? `?user_id=${USER_ID}` : '';
+        const res = await fetch(`${API_URL}/reviews/${userParam}`);
         if (!res.ok) throw new Error("Failed to load reviews");
         allReviews = await res.json();
         updateStats();

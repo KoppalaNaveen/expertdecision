@@ -38,7 +38,7 @@ class Decision(Base):
         server_default=func.now()
     )
 
-    creator = relationship("User")
+    creator = relationship("User", foreign_keys=[created_by])
     alternatives = relationship("Alternative", back_populates="decision", cascade="all, delete-orphan")
     reviews = relationship("Review", back_populates="decision", cascade="all, delete-orphan")
     attachments = relationship("Attachment", back_populates="decision", cascade="all, delete-orphan")
@@ -47,6 +47,15 @@ class Decision(Base):
     versions = relationship("DecisionVersion", backref="decision", cascade="all, delete-orphan", order_by="desc(DecisionVersion.version_number)")
 
     content_hash = Column(String(64), nullable=True)
+
+    rationale_why = Column(Text, nullable=True)
+    rationale_justification = Column(Text, nullable=True)
+    rationale_benefits = Column(Text, nullable=True)
+    rationale_risks = Column(Text, nullable=True)
+    rationale_assumptions = Column(Text, nullable=True)
+    rationale_updated_at = Column(DateTime(timezone=True), nullable=True)
+    rationale_updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    rationale_updater = relationship("User", foreign_keys=[rationale_updated_by])
 
     @property
     def creator_name(self):

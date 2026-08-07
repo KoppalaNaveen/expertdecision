@@ -166,7 +166,12 @@
                 <i data-lucide="mail" style="width: 32px; height: 32px;"></i>
             </div>
             <h2 class="title">Email Verification</h2>
-            <p class="subtitle">Enter the 6-digit verification code sent to<br><span class="email-badge">{{ email }}</span></p>
+            <p class="subtitle" style="margin-bottom: 12px;">Enter the 6-digit verification code sent to<br><span class="email-badge">{{ email }}</span></p>
+
+            <div class="timer-box mb-4 p-2.5 rounded-3" id="timerBox" style="background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i data-lucide="clock" style="width: 16px; height: 16px; color: #2563EB;"></i>
+                <span>Code time limit: <b>2 minutes</b> &bull; Expires in <span id="timerDisplay" style="font-weight: 800; font-family: monospace; font-size: 15px; color: #2563EB;">02:00</span></span>
+            </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -181,8 +186,8 @@
             <div id="ajaxAlert" style="display: none;" class="alert small py-2 mb-3"></div>
 
             <form method="POST" action="{{ url_for('verify_email') }}">
-                <input type="text" name="otp_code" class="otp-input" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required autofocus autocomplete="off">
-                <button type="submit" class="btn-verify">Verify Email</button>
+                <input type="text" name="otp_code" id="otpInput" class="otp-input" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required autofocus autocomplete="off">
+                <button type="submit" id="btnVerify" class="btn-verify">Verify Email</button>
             </form>
 
             <button type="button" class="btn-resend" id="btnResend" onclick="resendOTP()">Resend OTP Code</button>
@@ -191,6 +196,54 @@
 
     <script>
         lucide.createIcons();
+
+        let timeLeft = 120; // 2 minutes (120 seconds)
+        let timerInterval = null;
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 120;
+            const timerDisplay = document.getElementById('timerDisplay');
+            const btnVerify = document.getElementById('btnVerify');
+            const otpInput = document.getElementById('otpInput');
+            const alertBox = document.getElementById('ajaxAlert');
+
+            if (btnVerify) btnVerify.disabled = false;
+            if (otpInput) otpInput.disabled = false;
+
+            function updateDisplay() {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                const formattedMin = minutes < 10 ? '0' + minutes : minutes;
+                const formattedSec = seconds < 10 ? '0' + seconds : seconds;
+                
+                if (timerDisplay) {
+                    timerDisplay.textContent = `${formattedMin}:${formattedSec}`;
+                    if (timeLeft <= 30) {
+                        timerDisplay.style.color = '#EF4444'; // Highlight red when under 30 seconds
+                    } else {
+                        timerDisplay.style.color = '#2563EB';
+                    }
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    if (timerDisplay) timerDisplay.textContent = "00:00";
+                    if (btnVerify) btnVerify.disabled = true;
+                    if (otpInput) otpInput.disabled = true;
+                    if (alertBox) {
+                        alertBox.style.display = 'block';
+                        alertBox.className = 'alert alert-danger small py-2 mb-3';
+                        alertBox.textContent = 'Verification code has expired (2-minute limit). Please click "Resend OTP Code" to receive a new code.';
+                    }
+                } else {
+                    timeLeft--;
+                }
+            }
+
+            updateDisplay();
+            timerInterval = setInterval(updateDisplay, 1000);
+        }
 
         async function resendOTP() {
             const btn = document.getElementById('btnResend');
@@ -208,7 +261,8 @@
                 alertBox.style.display = 'block';
                 if (res.ok) {
                     alertBox.className = 'alert alert-success small py-2 mb-3';
-                    alertBox.textContent = 'Verification code resent successfully!';
+                    alertBox.textContent = 'New verification code sent successfully! Valid for 2 minutes.';
+                    startTimer();
                 } else {
                     alertBox.className = 'alert alert-danger small py-2 mb-3';
                     alertBox.textContent = data.detail || 'Failed to resend code.';
@@ -222,6 +276,10 @@
                 btn.textContent = 'Resend OTP Code';
             }
         }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            startTimer();
+        });
     </script>
 </body>
 </html>

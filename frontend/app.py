@@ -6,6 +6,7 @@ from flask import (
     url_for,
     session,
     flash,
+    make_response,
 )
 import requests
 from datetime import timedelta
@@ -18,32 +19,79 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=72)
 # Maximum upload size set to 200 MB
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 
+@app.after_request
+def disable_client_caching(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 # FastAPI Backend URL
 API_URL = "http://127.0.0.1:8000"
 
+def make_backend_request(method, path, **kwargs):
+    """
+    Sends an HTTP request to the FastAPI backend with automatic retry and host fallback.
+    """
+    if "timeout" not in kwargs:
+        kwargs["timeout"] = 10
+
+    urls = [API_URL, "http://127.0.0.1:8000", "http://localhost:8000"]
+    seen = set()
+    unique_urls = []
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            unique_urls.append(u)
+
+    last_exception = None
+    for base in unique_urls:
+        full_url = f"{base}{path}" if path.startswith("/") else f"{base}/{path}"
+        try:
+            res = requests.request(method, full_url, **kwargs)
+            return res
+        except requests.exceptions.RequestException as e:
+            last_exception = e
+            print(f"[BACKEND CONNECT ATTEMPT] {method} {full_url} note: {e}")
+
+    if last_exception:
+        raise last_exception
+    return None
+
+CONTACT_CONFIG = {
+    "company_email": "contact@edrp.org",
+    "support_email": "support@edrp-platform.com",
+    "office_hours": "Mon - Fri: 9:00 AM - 6:00 PM EST",
+    "location": "Enterprise Tech Tower, Suite 500, New York, NY 10001"
+}
+
 @app.context_processor
 def inject_global_stats():
+    base_data = {
+        "contact_config": CONTACT_CONFIG,
+        "unread_notifications_count": 0,
+        "pending_reviews": 0
+    }
     if not session.get("logged_in"):
-        return {}
+        return base_data
     
     try:
         user_id = session.get("user_id")
         token = session.get("token")
         if not user_id or not token:
-            return {}
+            return base_data
             
         headers = {"Authorization": f"Bearer {token}"}
         response = requests.get(f"{API_URL}/dashboard/{user_id}", headers=headers, timeout=2.0)
         if response.status_code == 200:
             data = response.json()
-            return {
-                "unread_notifications_count": data.get("unread_notifications_count", 0),
-                "pending_reviews": data.get("pending_reviews", 0)
-            }
+            base_data["unread_notifications_count"] = data.get("unread_notifications_count", 0)
+            base_data["pending_reviews"] = data.get("pending_reviews", 0)
     except Exception:
         pass
     
-    return {"unread_notifications_count": 0, "pending_reviews": 0}
+    return base_data
+
 
 # ===========================
 # HOME
@@ -69,52 +117,62 @@ def home():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get("logged_in") and "token" in session:
+    if request.method == "GET" and session.get("logged_in") and "token" in session:
         return redirect(url_for("dashboard"))
 
     if request.method == "POST":
+        session.clear()
         remember_me = request.form.get("remember_me") or request.form.get("remember")
         payload = {
             "employee_id": request.form.get("employee_id", "").strip(),
             "password": request.form.get("password", "")
         }
 
-        try:
-            response = requests.post(f"{API_URL}/users/login", json=payload, timeout=5)
-            if response.status_code == 200:
-                token = response.json()
-                if remember_me:
-                    session.permanent = True
-                else:
-                    session.permanent = False
-                session["logged_in"] = True
-                session["token"] = token["access_token"]
-                session["user_id"] = token["user_id"]
-                session["role_name"] = token.get("role_name", "User")
-                full_name = token.get("full_name", "User")
-                session["full_name"] = full_name
-                
-                parts = full_name.split()
-                session["initials"] = (parts[0][0] + (parts[-1][0] if len(parts) > 1 else "")).upper()
+        response = None
+        for base_api in [API_URL, "http://127.0.0.1:8000", "http://localhost:8000"]:
+            try:
+                response = requests.post(f"{base_api}/users/login", json=payload, timeout=8)
+                if response is not None:
+                    break
+            except Exception as e:
+                print(f"Login connection attempt to {base_api} note: {e}")
 
-                try:
-                    requests.post(f"{API_URL}/audit/log", json={
-                        "user_id": token["user_id"],
-                        "action": f"User login successful: {full_name}",
-                        "details": f"Role: {session['role_name']}"
-                    }, timeout=2)
-                except Exception as log_err:
-                    print(f"Frontend audit log note: {log_err}")
+        if response is not None and response.status_code == 200:
+            token = response.json()
+            session.clear()
+            if remember_me:
+                session.permanent = True
+            else:
+                session.permanent = False
+            session["logged_in"] = True
+            session["token"] = token["access_token"]
+            session["user_id"] = token["user_id"]
+            session["role_name"] = token.get("role_name", "User")
+            full_name = token.get("full_name", "User")
+            session["full_name"] = full_name
+            
+            parts = full_name.split()
+            session["initials"] = (parts[0][0] + (parts[-1][0] if len(parts) > 1 else "")).upper()
 
-                flash("Login Successful", "success")
-                return redirect(url_for("dashboard"))
+            try:
+                requests.post(f"{API_URL}/audit/log", json={
+                    "user_id": token["user_id"],
+                    "action": f"User login successful: {full_name}",
+                    "details": f"Role: {session['role_name']}"
+                }, timeout=2)
+            except Exception as log_err:
+                print(f"Frontend audit log note: {log_err}")
 
+            flash("Login Successful", "success")
+            return redirect(url_for("dashboard"))
+
+        if response is not None:
             try:
                 error_msg = response.json().get("detail", "Invalid Employee ID or Password.")
             except Exception:
                 error_msg = "Invalid Employee ID or Password."
             flash(error_msg, "danger")
-        except requests.exceptions.RequestException:
+        else:
             flash("Backend connection error. Ensure FastAPI server is running.", "danger")
 
     return render_template("login.html")
@@ -148,19 +206,27 @@ def register():
         }
 
         try:
-            response = requests.post(f"{API_URL}/users/register/step1", json=payload, timeout=15)
-            if response.status_code == 200:
+            response = make_backend_request("POST", "/users/register/step1", json=payload, timeout=12)
+            if response is not None and response.status_code == 200:
                 session["reg_data"] = payload
                 flash("Verification code sent to your email.", "info")
                 return redirect(url_for("verify_email"))
 
-            try:
-                err_detail = response.json().get("detail", "Registration failed.")
-            except Exception:
-                err_detail = response.text
-            flash(err_detail, "danger")
-        except requests.exceptions.RequestException:
-            flash("Backend connection error.", "danger")
+            if response is not None:
+                try:
+                    err_json = response.json()
+                    if isinstance(err_json.get("detail"), list):
+                        err_detail = err_json["detail"][0].get("msg", "Validation error.")
+                    else:
+                        err_detail = err_json.get("detail", "Registration failed.")
+                except Exception:
+                    err_detail = response.text or "Registration failed."
+                flash(err_detail, "danger")
+            else:
+                flash("Backend connection error. Ensure FastAPI server is running on port 8000.", "danger")
+        except requests.exceptions.RequestException as req_err:
+            print(f"[API ERROR] /users/register/step1 failed: {req_err}")
+            flash("Backend connection error. Ensure FastAPI server is running on port 8000.", "danger")
 
     return render_template("register.html")
 
@@ -183,19 +249,22 @@ def verify_email():
         }
 
         try:
-            response = requests.post(f"{API_URL}/users/check-verification-code", json=payload, timeout=15)
-            if response.status_code == 200:
+            response = make_backend_request("POST", "/users/check-verification-code", json=payload, timeout=10)
+            if response is not None and response.status_code == 200:
                 session["email_verified"] = True
                 flash("Email verified successfully! Now create your Employee ID.", "success")
                 return redirect(url_for("create_employee_id"))
 
-            try:
-                err_msg = response.json().get("detail", "Invalid verification code.")
-            except Exception:
-                err_msg = "Invalid verification code."
-            flash(err_msg, "danger")
+            if response is not None:
+                try:
+                    err_msg = response.json().get("detail", "Invalid verification code.")
+                except Exception:
+                    err_msg = "Invalid verification code."
+                flash(err_msg, "danger")
+            else:
+                flash("Backend connection error. Ensure FastAPI server is running on port 8000.", "danger")
         except requests.exceptions.RequestException:
-            flash("Backend connection error.", "danger")
+            flash("Backend connection error. Ensure FastAPI server is running on port 8000.", "danger")
 
     return render_template("verify_email.html", email=email)
 
@@ -233,21 +302,24 @@ def create_employee_id():
         }
 
         try:
-            response = requests.post(f"{API_URL}/users/save-employee-id", json=payload, timeout=15)
-            if response.status_code == 200:
+            response = make_backend_request("POST", "/users/save-employee-id", json=payload, timeout=12)
+            if response is not None and response.status_code == 200:
                 res_json = response.json()
                 session.pop("reg_data", None)
                 session.pop("email_verified", None)
                 return render_template("create_employee_id.html", success=True, msg=res_json.get("message"), sub_msg=res_json.get("sub_message"))
 
-            try:
-                err_msg = response.json().get("detail", "Failed to save Employee ID.")
-            except Exception:
-                err_msg = "Failed to save Employee ID."
-            flash(err_msg, "danger")
+            if response is not None:
+                try:
+                    err_msg = response.json().get("detail", "Failed to save Employee ID.")
+                except Exception:
+                    err_msg = "Failed to save Employee ID."
+                flash(err_msg, "danger")
+            else:
+                flash("Backend connection error. Ensure FastAPI server is running on port 8000.", "danger")
         except requests.exceptions.RequestException as req_err:
             print(f"[API ERROR] /users/save-employee-id failed: {req_err}")
-            flash(f"Backend connection error: {req_err}", "danger")
+            flash("Backend connection error. Ensure FastAPI server is running on port 8000.", "danger")
 
     return render_template("create_employee_id.html", prefix=prefix, reg_data=reg_data)
 
@@ -295,10 +367,28 @@ def api_delete_user(user_id):
         return jsonify({"detail": "Access Denied: Only Administrators can delete accounts."}), 403
 
     try:
-        response = requests.delete(f"{API_URL}/users/{user_id}", timeout=5)
+        response = requests.delete(f"{API_URL}/users/{user_id}", timeout=30)
         return jsonify(response.json()), response.status_code
     except Exception as e:
         return jsonify({"detail": f"Error deleting user: {e}"}), 500
+
+
+@app.route("/api/support/<ticket_id>", methods=["DELETE"])
+def api_delete_support_ticket(ticket_id):
+    if "token" not in session:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    role = session.get("role_name", "User")
+    if role not in ("Administrator", "Admin"):
+        return jsonify({"detail": "Access Denied: Only Administrators can delete support tickets."}), 403
+
+    try:
+        response = requests.delete(f"{API_URL}/support/{ticket_id}", timeout=5)
+        if response.status_code == 404:
+            response = requests.delete(f"{API_URL}/support/delete/{ticket_id}", timeout=5)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({"detail": f"Error deleting support ticket: {e}"}), 500
 
 
 @app.route("/api/pending-approvals/action", methods=["POST"])
@@ -329,14 +419,13 @@ from flask import jsonify
 def send_code():
     data = request.json
     try:
-        response = requests.post(
-            f"{API_URL}/users/send-verification-code",
-            json=data
-        )
-        if response.status_code == 200:
+        response = make_backend_request("POST", "/users/send-verification-code", json=data, timeout=10)
+        if response is not None and response.status_code == 200:
             return jsonify(response.json()), 200
-        return jsonify(response.json()), response.status_code
-    except requests.exceptions.RequestException as e:
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
+    except requests.exceptions.RequestException:
         return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
     except ValueError:
         return jsonify({"detail": "Received an invalid response from the backend server."}), 500
@@ -345,14 +434,13 @@ def send_code():
 def verify_code():
     data = request.json
     try:
-        response = requests.post(
-            f"{API_URL}/users/check-verification-code",
-            json=data
-        )
-        if response.status_code == 200:
+        response = make_backend_request("POST", "/users/check-verification-code", json=data, timeout=10)
+        if response is not None and response.status_code == 200:
             return jsonify(response.json()), 200
-        return jsonify(response.json()), response.status_code
-    except requests.exceptions.RequestException as e:
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
+    except requests.exceptions.RequestException:
         return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
     except ValueError:
         return jsonify({"detail": "Received an invalid response from the backend server."}), 500
@@ -361,14 +449,13 @@ def verify_code():
 def reset_password():
     data = request.json
     try:
-        response = requests.post(
-            f"{API_URL}/users/reset-password",
-            json=data
-        )
-        if response.status_code == 200:
+        response = make_backend_request("POST", "/users/reset-password", json=data, timeout=10)
+        if response is not None and response.status_code == 200:
             return jsonify(response.json()), 200
-        return jsonify(response.json()), response.status_code
-    except requests.exceptions.RequestException as e:
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
+    except requests.exceptions.RequestException:
         return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
     except ValueError:
         return jsonify({"detail": "Received an invalid response from the backend server."}), 500
@@ -392,6 +479,37 @@ def admin_create_user_proxy():
         return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
     except ValueError:
         return jsonify({"detail": "Received an invalid response from the backend server."}), 500
+
+# ===========================
+# DASHBOARD & DECISION API PROXIES
+# ===========================
+
+@app.route("/api/dashboard", methods=["GET"])
+def api_dashboard():
+    if not session.get("logged_in"):
+        return jsonify({"detail": "Unauthorized"}), 401
+    user_id = session.get("user_id", 1)
+    try:
+        response = make_backend_request("GET", f"/dashboard/{user_id}", timeout=5)
+        if response is not None and response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify({"detail": "Error loading dashboard"}), response.status_code if response else 500
+    except Exception as e:
+        return jsonify({"detail": str(e)}), 500
+
+@app.route("/api/decisions", methods=["GET"])
+def api_decisions():
+    if not session.get("logged_in"):
+        return jsonify({"detail": "Unauthorized"}), 401
+    user_id = session.get("user_id")
+    role_name = session.get("role_name", "Employee")
+    try:
+        response = make_backend_request("GET", f"/decisions/?user_id={user_id}&role_name={role_name}", timeout=5)
+        if response is not None and response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify([]), 200
+    except Exception:
+        return jsonify([]), 200
 
 # ===========================
 # NOTIFICATIONS PROXIES
@@ -432,14 +550,22 @@ def clear_all_notifications(user_id):
 
 @app.route("/api/decisions")
 def api_get_decisions():
-    if "token" not in session:
+    if not session.get("logged_in") and "token" not in session:
         return jsonify([]), 401
     try:
-        response = requests.get(f"{API_URL}/decisions/", timeout=5)
+        params = {}
+        user_id = request.args.get("user_id") or session.get("user_id")
+        role_name = request.args.get("role_name") or session.get("role_name")
+        if user_id:
+            params["user_id"] = user_id
+        if role_name:
+            params["role_name"] = role_name
+        response = requests.get(f"{API_URL}/decisions/", params=params, timeout=5)
         if response.status_code == 200:
             return jsonify(response.json()), 200
         return jsonify([]), response.status_code
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching decisions in frontend proxy: {e}")
         return jsonify([]), 500
 
 @app.route("/api/dashboard")
@@ -482,11 +608,14 @@ def dashboard():
     if response.status_code == 200:
         dashboard = response.json()
 
-    role = session.get("role_name", "User")
-    if role == "Manager":
+    role = (session.get("role_name") or "Employee").strip()
+    role_lower = role.lower()
+    if "manager" in role_lower or "lead" in role_lower:
         template = "manager_dashboard.html"
-    elif role == "Administrator" or role == "Admin":
+    elif "admin" in role_lower:
         template = "dashboard.html"
+    elif "reviewer" in role_lower:
+        template = "reviewer_dashboard.html"
     else:
         template = "employee_dashboard.html"
 
@@ -583,6 +712,12 @@ def teams():
 def create_decision():
     if "token" not in session:
         return redirect(url_for("login"))
+    
+    role = (session.get("role_name") or "Employee").strip().lower()
+    if "reviewer" in role:
+        flash("Access Denied: Creating decisions is restricted to Employees.", "danger")
+        return redirect(url_for("dashboard"))
+
     return render_template("create_decision.html")
 
 # ===========================
@@ -591,9 +726,13 @@ def create_decision():
 
 @app.route("/decisions")
 def decisions():
-
     if "token" not in session:
         return redirect(url_for("login"))
+
+    role = (session.get("role_name") or "Employee").strip().lower()
+    if "reviewer" in role:
+        flash("Access Denied: My Decisions page is restricted to Employees.", "danger")
+        return redirect(url_for("dashboard"))
 
     return render_template("decisions.html")
 
@@ -646,6 +785,11 @@ def reviews():
 
     if "token" not in session:
         return redirect(url_for("login"))
+
+    role = (session.get("role_name") or "Employee").strip().lower()
+    if "employee" in role:
+        flash("Access Denied: Pending Reviews page is restricted to Reviewers and Managers.", "danger")
+        return redirect(url_for("dashboard"))
 
     return render_template("reviews.html")
 
@@ -716,8 +860,10 @@ def profile():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
 
+    current_user_id = session.get("user_id")
     response = requests.get(
-        f"{API_URL}/profile/{session['user_id']}"
+        f"{API_URL}/profile/{current_user_id}",
+        params={"current_user_id": current_user_id}
     )
 
     if response.status_code != 200:
@@ -730,7 +876,8 @@ def profile():
 
     return render_template(
         "profile.html",
-        profile=profile
+        profile=profile,
+        current_user_id=current_user_id
     )
 
 
@@ -804,6 +951,18 @@ def settings():
         return redirect(url_for("login"))
     return render_template("settings.html")
 
+@app.route("/admin-backup")
+def admin_backup():
+    if "token" not in session:
+        return redirect(url_for("login"))
+
+    role = session.get("role_name", "User")
+    if role not in ("Administrator", "Admin"):
+        flash("Access Denied: Only Administrators can access backup management.", "danger")
+        return redirect(url_for("dashboard"))
+
+    return render_template("admin_backup.html")
+
 @app.route("/support")
 def support():
     if "token" not in session:
@@ -814,7 +973,7 @@ def support():
 def email_service():
     if "token" not in session:
         return redirect(url_for("login"))
-    return render_template("support.html")
+    return render_template("email_service.html")
 
 
 # ===========================
@@ -823,12 +982,14 @@ def email_service():
 
 @app.route("/logout")
 def logout():
-
     session.clear()
-
+    session.permanent = False
     flash("Logged Out Successfully", "info")
-
-    return redirect(url_for("login"))
+    res = make_response(redirect(url_for("login")))
+    res.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    res.headers["Pragma"] = "no-cache"
+    res.headers["Expires"] = "0"
+    return res
 
 
 # ===========================

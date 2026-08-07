@@ -22,10 +22,11 @@ router = APIRouter(
 )
 def get_profile(
     user_id: int,
+    current_user_id: int = None,
     db: Session = Depends(get_db)
 ):
 
-    profile = ProfileService.get_profile(db, user_id)
+    profile = ProfileService.get_profile(db, user_id, current_user_id)
 
     if not profile:
         raise HTTPException(

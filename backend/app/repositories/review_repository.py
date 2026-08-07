@@ -14,6 +14,12 @@ class ReviewRepository:
         from app.models.decision import Decision
         from fastapi import HTTPException
 
+        if review.status == "Rejected" and not (review.comments and review.comments.strip()):
+            raise HTTPException(
+                status_code=400,
+                detail="Rejection comment is mandatory. Please provide a clear explanation for the rejection before submitting."
+            )
+
         dec = db.query(Decision).filter(Decision.id == review.decision_id).first()
         if dec and dec.created_by == review.reviewer_id:
             raise HTTPException(
@@ -42,6 +48,7 @@ class ReviewRepository:
             db.add(new_review)
             db.commit()
             db.refresh(new_review)
+            target_review = new_review
         from app.models.activity_log import ActivityLog
         act_log = ActivityLog(
             user_id=review.reviewer_id,
@@ -64,7 +71,7 @@ class ReviewRepository:
                     NotificationService.create_notification(
                         db,
                         user_id=dec.created_by,
-                        message=f"Your decision 'DEC-{dec.id}: {dec.title}' was rejected by reviewer.",
+                        message=f"Your decision 'DEC-{dec.id}: {dec.title}' was rejected. Please review feedback comments and resubmit.",
                         notification_type="Decision Status"
                     )
                 except Exception as e:
@@ -109,8 +116,12 @@ class ReviewRepository:
         return target_review
 
     @staticmethod
-    def get_all_reviews(db: Session):
-        return db.query(Review).all()
+    def get_all_reviews(db: Session, user_id: int = None):
+        from app.models.decision import Decision
+        query = db.query(Review)
+        if user_id:
+            query = query.join(Decision, Review.decision_id == Decision.id).filter(Decision.created_by == user_id)
+        return query.order_by(Review.id.desc()).all()
 
     @staticmethod
     def get_reviews_by_decision(

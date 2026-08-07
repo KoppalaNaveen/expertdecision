@@ -101,6 +101,16 @@ function renderDecisionDetails() {
     const statusSel = document.getElementById("statusSelect");
     if (statusSel) statusSel.value = currentDecision.status;
 
+    const updateStatusContainer = document.getElementById("updateStatusContainer");
+    if (updateStatusContainer) {
+        const userRole = typeof CURRENT_USER_ROLE !== 'undefined' ? CURRENT_USER_ROLE : '';
+        if (['Administrator', 'Admin', 'System Administrator'].includes(userRole)) {
+            updateStatusContainer.classList.remove('d-none');
+        } else {
+            updateStatusContainer.classList.add('d-none');
+        }
+    }
+
     // Check if current user is the FIRST pending reviewer in sequential sequence
     const pendingReviews = currentDecision.reviews ? currentDecision.reviews.filter(r => r.status === "Pending") : [];
     const firstPending = pendingReviews.length > 0 ? pendingReviews[0] : null;
@@ -478,6 +488,8 @@ window.addEventListener('load', () => {
     } else {
         switchTab('overview');
     }
+    // Preload discussion threads so they are available immediately
+    loadThreads();
 });
 
 // ==========================================
@@ -580,12 +592,18 @@ function renderThreadsList() {
     filtered.forEach(t => {
         const isActive = activeThreadId === t.id;
         const badgeClass = t.status === 'Open' ? 'bg-primary-subtle text-primary border-primary-subtle' : 'bg-success-subtle text-success border-success-subtle';
-        
+        const escapedTopic = String(t.topic || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
         container.innerHTML += `
-            <div class="border rounded p-3 hover-shadow transition" style="cursor: pointer; background: ${isActive ? '#f8fafc' : '#fff'}; border-color: ${isActive ? '#3b82f6 !important' : '#e2e8f0'};" onclick="selectThread(${t.id})">
-                <div class="d-flex justify-content-between align-items-start mb-1">
-                    <span class="fw-bold text-sm text-dark">${t.topic}</span>
-                    <span class="badge ${badgeClass} border rounded-pill" style="font-size: 9px;">${t.status}</span>
+            <div class="border rounded p-3 hover-shadow transition position-relative" style="cursor: pointer; background: ${isActive ? '#f8fafc' : '#fff'}; border-color: ${isActive ? '#3b82f6 !important' : '#e2e8f0'};" onclick="selectThread(${t.id})">
+                <div class="d-flex justify-content-between align-items-start mb-1 gap-2">
+                    <span class="fw-bold text-sm text-dark flex-grow-1 text-truncate">${t.topic}</span>
+                    <div class="d-flex align-items-center gap-1.5 flex-shrink-0">
+                        <span class="badge ${badgeClass} border rounded-pill" style="font-size: 9px;">${t.status}</span>
+                        <button class="btn btn-sm text-muted p-0 text-hover-danger ms-1" style="line-height:1;" onclick="event.stopPropagation(); deleteDiscussionThread(${t.id}, '${escapedTopic}')" title="Delete Thread">
+                            <i class="bi bi-trash text-secondary"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="d-flex justify-content-between text-muted mt-2" style="font-size: 10px;">
                     <span>${t.comments ? t.comments.length : 0} comments</span>
@@ -644,6 +662,183 @@ async function submitNewThread() {
     }
 }
 
+let cachedUsersForMentions = [];
+
+async function fetchUsersForMentions() {
+    if (cachedUsersForMentions.length > 0) return cachedUsersForMentions;
+    try {
+        const res = await fetch(`${API_URL}/users/`);
+        if (res.ok) {
+            cachedUsersForMentions = await res.json();
+        }
+    } catch (_) {}
+    return cachedUsersForMentions;
+}
+
+function formatMentionsInContent(content, usersList = []) {
+    if (!content) return "";
+
+    let safeContent = String(content)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // Replace @Name (EMP123) or @[Name](EMP123) or @EMP123
+    safeContent = safeContent.replace(/@([^\(\n\r<]+?)\s*\(([^)]+)\)/g, (match, name, empId) => {
+        return `<span class="mention-pill"><i class="bi bi-at"></i> ${name.trim()} <span class="mention-empid">${empId.trim()}</span></span>`;
+    });
+
+    safeContent = safeContent.replace(/@\[([^\]]+)\]\(([^\)]+)\)/g, (match, name, empId) => {
+        return `<span class="mention-pill"><i class="bi bi-at"></i> ${name.trim()} <span class="mention-empid">${empId.trim()}</span></span>`;
+    });
+
+    usersList.forEach(u => {
+        if (u.employee_id) {
+            const empRegex = new RegExp(`@${u.employee_id}\\b`, 'gi');
+            safeContent = safeContent.replace(empRegex, `<span class="mention-pill"><i class="bi bi-at"></i> ${u.full_name} <span class="mention-empid">${u.employee_id}</span></span>`);
+        }
+    });
+
+    return safeContent;
+}
+
+let mentionAutocompleteInitialized = false;
+function setupMentionAutocomplete() {
+    const textarea = document.getElementById("newCommentContent");
+    const dropdown = document.getElementById("mentionDropdown");
+    if (!textarea || !dropdown || mentionAutocompleteInitialized) return;
+    
+    mentionAutocompleteInitialized = true;
+
+    let selectedIndex = 0;
+    let matchStart = -1;
+
+    fetchUsersForMentions();
+
+    textarea.addEventListener("input", handleInput);
+    textarea.addEventListener("keydown", handleKeydown);
+
+    async function handleInput() {
+        const text = textarea.value;
+        const cursorPos = textarea.selectionStart;
+        const textBeforeCursor = text.substring(0, cursorPos);
+        const atIndex = textBeforeCursor.lastIndexOf("@");
+
+        if (atIndex !== -1) {
+            const query = textBeforeCursor.substring(atIndex + 1);
+            const charBeforeAt = atIndex > 0 ? textBeforeCursor[atIndex - 1] : " ";
+            if (/[\s\n]/.test(charBeforeAt) || atIndex === 0) {
+                if (!/\s\s/.test(query) && query.length <= 30) {
+                    matchStart = atIndex;
+                    await renderMentionDropdown(query.toLowerCase());
+                    return;
+                }
+            }
+        }
+        hideMentionDropdown();
+    }
+
+    async function renderMentionDropdown(query) {
+        const users = await fetchUsersForMentions();
+        const filtered = users.filter(u => {
+            // Exclude current user's own account from mention suggestions
+            if (u.id === USER_ID) return false;
+            const nameMatch = (u.full_name || "").toLowerCase().includes(query);
+            const empMatch = (u.employee_id || "").toLowerCase().includes(query);
+            return nameMatch || empMatch;
+        });
+
+        if (filtered.length === 0) {
+            hideMentionDropdown();
+            return;
+        }
+
+        selectedIndex = 0;
+        dropdown.innerHTML = filtered.map((u, idx) => {
+            const initials = (u.full_name || 'U').split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+            return `
+                <div class="mention-dropdown-item ${idx === 0 ? 'active' : ''}" data-idx="${idx}" data-fullname="${u.full_name}" data-empid="${u.employee_id || ''}">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold text-xs" style="width: 28px; height: 28px; flex-shrink: 0;">
+                        ${initials}
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-bold text-dark text-xs d-flex align-items-center justify-content-between">
+                            <span>${u.full_name}</span>
+                            ${u.employee_id ? `<span class="employee-id-badge">${u.employee_id}</span>` : ''}
+                        </div>
+                        <div class="text-muted" style="font-size: 10.5px;">${u.role_name || 'Team Member'}</div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        dropdown.style.display = "block";
+
+        dropdown.querySelectorAll(".mention-dropdown-item").forEach(item => {
+            item.addEventListener("click", () => {
+                selectMentionUser(item.getAttribute("data-fullname"), item.getAttribute("data-empid"));
+            });
+        });
+    }
+
+    function selectMentionUser(fullName, empId) {
+        const text = textarea.value;
+        const beforeAt = text.substring(0, matchStart);
+        const cursorPos = textarea.selectionStart;
+        const afterCursor = text.substring(cursorPos);
+
+        const mentionText = empId ? `@${fullName} (${empId}) ` : `@${fullName} `;
+        textarea.value = beforeAt + mentionText + afterCursor;
+        textarea.focus();
+        const newCursorPos = matchStart + mentionText.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        hideMentionDropdown();
+    }
+
+    function hideMentionDropdown() {
+        dropdown.style.display = "none";
+    }
+
+    function handleKeydown(e) {
+        if (dropdown.style.display === "block") {
+            const items = dropdown.querySelectorAll(".mention-dropdown-item");
+            if (items.length === 0) return;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % items.length;
+                updateActiveItem(items);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+                updateActiveItem(items);
+            } else if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                const activeItem = items[selectedIndex];
+                if (activeItem) {
+                    selectMentionUser(activeItem.getAttribute("data-fullname"), activeItem.getAttribute("data-empid"));
+                }
+            } else if (e.key === "Escape") {
+                hideMentionDropdown();
+            }
+        } else if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            submitComment();
+        }
+    }
+
+    function updateActiveItem(items) {
+        items.forEach((item, idx) => {
+            if (idx === selectedIndex) {
+                item.classList.add("active");
+                item.scrollIntoView({ block: "nearest" });
+            } else {
+                item.classList.remove("active");
+            }
+        });
+    }
+}
+
 async function selectThread(threadId) {
     activeThreadId = threadId;
     renderThreadsList();
@@ -654,55 +849,109 @@ async function selectThread(threadId) {
     document.getElementById('currentThreadTopic').innerText = thread.topic;
     
     const statusBadge = document.getElementById('currentThreadStatus');
-    statusBadge.innerText = thread.status;
-    statusBadge.style.display = 'inline-block';
-    statusBadge.className = `badge ${thread.status === 'Open' ? 'bg-primary-subtle text-primary border-primary-subtle' : 'bg-success-subtle text-success border-success-subtle'} border rounded-pill text-xs mt-1`;
+    if (statusBadge) {
+        statusBadge.innerText = thread.status;
+        statusBadge.style.display = 'inline-block';
+        statusBadge.className = `badge ${thread.status === 'Open' ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-success-subtle text-success border border-success-subtle'} rounded-pill text-xs`;
+    }
+
+    const subtext = document.getElementById('currentThreadSubtext');
+    if (subtext) {
+        const count = thread.comments ? thread.comments.length : 0;
+        subtext.innerText = `${count} message${count === 1 ? '' : 's'} in discussion`;
+    }
 
     const feed = document.getElementById('commentsFeedContainer');
     feed.innerHTML = '';
 
+    const users = await fetchUsersForMentions();
+    const userMap = {};
+    users.forEach(u => { userMap[u.id] = u; });
+
     if (!thread.comments || thread.comments.length === 0) {
         feed.innerHTML = `
-            <div class="text-center text-muted py-5">
-                <i class="bi bi-chat-dots-fill fs-2 mb-2 d-block text-secondary"></i>
-                No comments posted yet. Start the discussion!
+            <div class="text-center text-muted py-5 my-auto">
+                <div class="rounded-circle bg-white border d-inline-flex align-items-center justify-content-center p-3 mb-3 shadow-sm">
+                    <i class="bi bi-chat-dots text-primary fs-2"></i>
+                </div>
+                <h6 class="fw-bold text-dark">No Messages Yet</h6>
+                <p class="small text-muted mb-0">Start the conversation by sending a message below.</p>
             </div>
         `;
     } else {
-        // Fetch users to map comments authors name
-        const uRes = await fetch(`${API_URL}/users/`);
-        const users = uRes.ok ? await uRes.json() : [];
-        const userMap = {};
-        users.forEach(u => { userMap[u.id] = u; });
-
         thread.comments.forEach(c => {
-            const author = userMap[c.user_id] || { full_name: "Anonymous User" };
-            const initials = author.full_name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+            const isOwn = c.user_id === USER_ID;
+            const author = userMap[c.user_id] || { full_name: "Team Member", employee_id: "" };
+            const initials = (author.full_name || "TM").split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
             
+            const timeStr = c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            const dateStr = c.created_at ? new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+            const fullTime = `${dateStr} at ${timeStr}`;
+
+            const isDeleted = c.is_deleted || c.content === "This message was deleted.";
+            let formattedContent = isDeleted ? '<span class="fst-italic text-muted opacity-75">This message was deleted.</span>' : formatMentionsInContent(c.content, users);
+            if (c.is_edited && !isDeleted) {
+                formattedContent += ' <small class="text-muted opacity-75" style="font-size: 10px;">(edited)</small>';
+            }
+
+            const safeContent = (c.content || '').replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\${/g, '\\${');
+            const editDeleteButtons = (isOwn && !isDeleted) ? `
+                <div class="d-inline-flex gap-2 ms-2 opacity-75">
+                    <button type="button" class="btn btn-link p-0 text-primary text-xs text-decoration-none" onclick="editChatMessage(${c.id}, \`${safeContent}\`, false)" title="Edit Message">
+                        <i class="bi bi-pencil-fill" style="font-size: 11px;"></i> Edit
+                    </button>
+                    <button type="button" class="btn btn-link p-0 text-danger text-xs text-decoration-none" onclick="deleteChatMessage(${c.id}, false)" title="Delete Message">
+                        <i class="bi bi-trash-fill" style="font-size: 11px;"></i> Delete
+                    </button>
+                </div>
+            ` : '';
+
             feed.innerHTML += `
-                <div class="d-flex align-items-start mb-3 border-bottom pb-2">
-                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0 fw-bold shadow-sm" style="width: 32px; height: 32px; font-size: 11px;">
+                <div class="chat-msg-row ${isOwn ? 'own-msg' : 'other-msg'}">
+                    <div class="chat-avatar ${isOwn ? 'bg-primary text-white' : 'bg-white text-primary border'}">
                         ${initials}
                     </div>
-                    <div class="ms-3 flex-grow-1">
-                        <div class="d-flex justify-content-between align-items-baseline mb-1">
-                            <span class="fw-bold text-dark small">${author.full_name}</span>
-                            <span class="text-muted" style="font-size: 10px;">${new Date(c.created_at).toLocaleDateString()}</span>
+                    <div class="chat-bubble-wrap">
+                        <div class="chat-msg-header d-flex align-items-center">
+                            <span class="chat-msg-author">${isOwn ? 'You' : author.full_name}</span>
+                            ${(!isOwn && author.employee_id) ? `<span class="chat-msg-empid">${author.employee_id}</span>` : ''}
+                            <span class="chat-msg-time me-auto">${fullTime}</span>
+                            ${editDeleteButtons}
                         </div>
-                        <p class="text-muted small mb-0" style="line-height: 1.4;">${c.content}</p>
+                        <div class="chat-bubble">
+                            ${formattedContent}
+                        </div>
                     </div>
                 </div>
             `;
         });
     }
 
-    document.getElementById('addCommentFormBox').style.display = 'block';
+    const deleteBtn = document.getElementById('btnDeleteActiveThread');
+    if (deleteBtn) {
+        deleteBtn.classList.remove('d-none');
+        deleteBtn.classList.add('d-flex');
+    }
+
+    const formBox = document.getElementById('addCommentFormBox');
+    if (formBox) {
+        formBox.style.display = 'block';
+    }
+    
+    setupMentionAutocomplete();
+    
+    // Auto-scroll chat feed to latest message
+    setTimeout(() => {
+        feed.scrollTop = feed.scrollHeight;
+    }, 50);
 }
 
 async function submitComment() {
-    const content = document.getElementById('newCommentContent').value.trim();
+    const contentInput = document.getElementById('newCommentContent');
+    if (!contentInput) return;
+    const content = contentInput.value.trim();
     if (!content) {
-        showToast("Warning", "Comment cannot be empty");
+        showToast("Warning", "Message cannot be empty");
         return;
     }
 
@@ -716,14 +965,68 @@ async function submitComment() {
             })
         });
 
-        if (!res.ok) throw new Error("Failed to post comment");
+        if (!res.ok) throw new Error("Failed to post message");
         
-        document.getElementById('newCommentContent').value = '';
-        showToast("Success", "Comment posted");
+        contentInput.value = '';
+        showToast("Success", "Message sent");
         loadThreads().then(() => selectThread(activeThreadId));
     } catch (err) {
         showToast("Danger", err.message);
     }
+}
+
+async function deleteDiscussionThread(threadId, topicTitle) {
+    if (!confirm(`Are you sure you want to delete thread "${topicTitle}"?`)) return;
+
+    try {
+        const res = await fetch(`${API_URL}/decisions/threads/${threadId}?user_id=${USER_ID}`, {
+            method: "DELETE"
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to delete thread");
+        }
+
+        showToast("Danger", "Thread deleted");
+
+        if (activeThreadId === threadId) {
+            activeThreadId = null;
+            document.getElementById('currentThreadTopic').innerText = "Select a Thread";
+            const statusBadge = document.getElementById('currentThreadStatus');
+            if (statusBadge) statusBadge.style.display = 'none';
+            const deleteBtn = document.getElementById('btnDeleteActiveThread');
+            if (deleteBtn) {
+                deleteBtn.classList.remove('d-flex');
+                deleteBtn.classList.add('d-none');
+            }
+            const feed = document.getElementById('commentsFeedContainer');
+            if (feed) {
+                feed.innerHTML = `
+                    <div class="text-center text-muted py-5 my-auto">
+                        <div class="rounded-circle bg-white border d-inline-flex align-items-center justify-content-center p-3 mb-3 shadow-sm">
+                            <i class="bi bi-chat-dots text-primary fs-2"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark">No Thread Selected</h6>
+                        <p class="small text-muted mb-0">Select a thread from the panel on the left to view conversation messages.</p>
+                    </div>
+                `;
+            }
+            const formBox = document.getElementById('addCommentFormBox');
+            if (formBox) formBox.style.display = 'none';
+        }
+
+        loadThreads();
+    } catch (err) {
+        showToast("Danger", err.message);
+    }
+}
+
+function deleteActiveThread() {
+    if (!activeThreadId) return;
+    const thread = threadsCache.find(t => t.id === activeThreadId);
+    const title = thread ? thread.topic : "this thread";
+    deleteDiscussionThread(activeThreadId, title);
 }
 
 // ==========================================
@@ -743,9 +1046,249 @@ async function loadMeetingNotes() {
     }
 }
 
+function getMeetingStatusInfo(note) {
+    if (!note) {
+        return { label: "Not Scheduled", badgeClass: "bg-secondary-subtle text-secondary border border-secondary-subtle" };
+    }
+
+    const rawStatus = (note.status || "").trim().toLowerCase();
+
+    if (rawStatus === "cancelled" || rawStatus === "canceled") {
+        return { label: "Cancelled", badgeClass: "bg-danger-subtle text-danger border border-danger-subtle" };
+    }
+    if (rawStatus === "scheduled") {
+        return { label: "Scheduled", badgeClass: "bg-primary-subtle text-primary border border-primary-subtle" };
+    }
+    if (rawStatus === "in progress" || rawStatus === "inprogress" || rawStatus === "active") {
+        return { label: "In Progress", badgeClass: "bg-warning-subtle text-warning-emphasis border border-warning-subtle" };
+    }
+    if (rawStatus === "completed" || rawStatus === "finished") {
+        return { label: "Completed", badgeClass: "bg-success-subtle text-success border border-success-subtle" };
+    }
+    if (rawStatus === "not scheduled") {
+        return { label: "Not Scheduled", badgeClass: "bg-secondary-subtle text-secondary border border-secondary-subtle" };
+    }
+
+    if (!note.meeting_date) {
+        return { label: "Not Scheduled", badgeClass: "bg-secondary-subtle text-secondary border border-secondary-subtle" };
+    }
+
+    const now = new Date();
+    const meetingStart = new Date(note.meeting_date);
+
+    if (isNaN(meetingStart.getTime())) {
+        return { label: "Not Scheduled", badgeClass: "bg-secondary-subtle text-secondary border border-secondary-subtle" };
+    }
+
+    const meetingEnd = new Date(meetingStart.getTime() + 60 * 60 * 1000);
+
+    if (now < meetingStart) {
+        return { label: "Scheduled", badgeClass: "bg-primary-subtle text-primary border border-primary-subtle" };
+    } else if (now >= meetingStart && now <= meetingEnd) {
+        return { label: "In Progress", badgeClass: "bg-warning-subtle text-warning-emphasis border border-warning-subtle" };
+    } else {
+        return { label: "Completed", badgeClass: "bg-success-subtle text-success border border-success-subtle" };
+    }
+}
+
+let activeMeetingNoteId = null;
+
+function setupGenericMentionAutocomplete(inputId, dropdownId) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    if (!input || !dropdown) return;
+    if (input.dataset.mentionAttached) return;
+    input.dataset.mentionAttached = "true";
+
+    let selectedIndex = 0;
+    let matchStart = -1;
+
+    fetchUsersForMentions();
+
+    input.addEventListener("input", handleInput);
+    input.addEventListener("focus", handleFocus);
+    input.addEventListener("keydown", handleKeydown);
+
+    function handleFocus() {
+        if (inputId === 'newMeetingParticipants' && (!input.value || input.value.trim() === '')) {
+            matchStart = 0;
+            renderDropdown("");
+        }
+    }
+
+    async function handleInput() {
+        const text = input.value;
+        const cursorPos = input.selectionStart;
+        const textBeforeCursor = text.substring(0, cursorPos);
+        const atIndex = textBeforeCursor.lastIndexOf("@");
+
+        if (atIndex !== -1) {
+            const query = textBeforeCursor.substring(atIndex + 1);
+            const charBeforeAt = atIndex > 0 ? textBeforeCursor[atIndex - 1] : " ";
+            if (/[\s\n]/.test(charBeforeAt) || atIndex === 0) {
+                if (!/\s\s/.test(query) && query.length <= 30) {
+                    matchStart = atIndex;
+                    await renderDropdown(query.toLowerCase());
+                    return;
+                }
+            }
+        } else if (inputId === 'newMeetingParticipants') {
+            matchStart = 0;
+            await renderDropdown(text.trim().toLowerCase());
+            return;
+        }
+        hideDropdown();
+    }
+
+    async function renderDropdown(query) {
+        const users = await fetchUsersForMentions();
+        const filtered = users.filter(u => {
+            if (u.id === USER_ID) return false;
+            const nameMatch = (u.full_name || "").toLowerCase().includes(query);
+            const empMatch = (u.employee_id || "").toLowerCase().includes(query);
+            return nameMatch || empMatch;
+        });
+
+        if (filtered.length === 0) {
+            dropdown.innerHTML = `<div class="p-2 text-center text-muted text-xs">No employees found matching "${query}"</div>`;
+            dropdown.style.display = "block";
+            return;
+        }
+
+        selectedIndex = 0;
+        const itemsHtml = filtered.map((u, idx) => {
+            const initials = (u.full_name || 'U').split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+            return `
+                <div class="mention-dropdown-item ${idx === 0 ? 'active' : ''}" data-idx="${idx}" data-fullname="${u.full_name}" data-empid="${u.employee_id || ''}">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold text-xs" style="width: 28px; height: 28px; flex-shrink: 0;">
+                        ${initials}
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-bold text-dark text-xs d-flex align-items-center justify-content-between">
+                            <span>${u.full_name}</span>
+                            ${u.employee_id ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill text-xs px-2">${u.employee_id}</span>` : ''}
+                        </div>
+                        <div class="text-muted text-xs" style="font-size: 10px;">ID: ${u.employee_id || 'N/A'} · ${u.role_name || 'Employee'}</div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        dropdown.innerHTML = `
+            <div class="p-1 border-bottom bg-light">
+                <input type="text" class="form-control form-control-sm mention-search-input text-xs rounded-2" placeholder="🔍 Search employee by Name or ID..." id="${dropdownId}_search" value="${query}">
+            </div>
+            <div class="mention-items-list" style="max-height: 180px; overflow-y: auto;">
+                ${itemsHtml}
+            </div>
+        `;
+
+        dropdown.style.display = "block";
+
+        const searchInput = document.getElementById(`${dropdownId}_search`);
+        if (searchInput) {
+            searchInput.focus();
+            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+            searchInput.addEventListener("input", (e) => {
+                const subQuery = e.target.value.toLowerCase().trim();
+                renderDropdown(subQuery);
+            });
+        }
+
+        dropdown.querySelectorAll(".mention-dropdown-item").forEach(item => {
+            item.addEventListener("click", () => {
+                selectMentionUser(item.getAttribute("data-fullname"), item.getAttribute("data-empid"));
+            });
+        });
+    }
+
+    function selectMentionUser(fullName, empId) {
+        const text = input.value;
+        const beforeAt = text.substring(0, matchStart);
+        const cursorPos = input.selectionStart;
+        const afterCursor = text.substring(cursorPos);
+
+        const mentionText = empId ? `@${fullName} (${empId}) ` : `@${fullName} `;
+        input.value = beforeAt + mentionText + afterCursor;
+        input.focus();
+        const newCursorPos = matchStart + mentionText.length;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        hideDropdown();
+    }
+
+    function hideDropdown() {
+        dropdown.style.display = "none";
+    }
+
+    function handleKeydown(e) {
+        if (dropdown.style.display === "block") {
+            const items = dropdown.querySelectorAll(".mention-dropdown-item");
+            if (items.length === 0) return;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % items.length;
+                updateActiveItem(items);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+                updateActiveItem(items);
+            } else if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                const activeItem = items[selectedIndex];
+                if (activeItem) {
+                    selectMentionUser(activeItem.getAttribute("data-fullname"), activeItem.getAttribute("data-empid"));
+                }
+            } else if (e.key === "Escape") {
+                hideDropdown();
+            }
+        }
+    }
+
+    function updateActiveItem(items) {
+        items.forEach((item, idx) => {
+            if (idx === selectedIndex) {
+                item.classList.add("active");
+                item.scrollIntoView({ block: "nearest" });
+            } else {
+                item.classList.remove("active");
+            }
+        });
+    }
+}
+
+let currentMeetingFilter = 'all';
+
+function filterMeetingNotes(statusFilter) {
+    currentMeetingFilter = statusFilter;
+
+    ['all', 'scheduled', 'in_progress', 'completed'].forEach(f => {
+        const btn = document.getElementById(`filter-btn-${f}`);
+        if (btn) {
+            if (f === statusFilter) {
+                btn.className = "btn btn-sm filter-pill-btn btn-primary text-white fw-bold px-3 py-1.5 rounded-2 shadow-2xs";
+                const badge = btn.querySelector('.badge');
+                if (badge) badge.className = "badge bg-white text-primary rounded-pill ms-1";
+            } else {
+                btn.className = "btn btn-sm filter-pill-btn text-secondary fw-semibold px-3 py-1.5 rounded-2";
+                const badge = btn.querySelector('.badge');
+                if (badge) {
+                    if (f === 'scheduled') badge.className = "badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill ms-1";
+                    else if (f === 'in_progress') badge.className = "badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill ms-1";
+                    else if (f === 'completed') badge.className = "badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-1";
+                    else badge.className = "badge bg-secondary text-white rounded-pill ms-1";
+                }
+            }
+        }
+    });
+
+    renderMeetingNotesList();
+}
+
 function renderMeetingNotesList() {
     const container = document.getElementById('meetingNotesContainer');
     const partContainer = document.getElementById('meetingParticipantsContainer');
+    const nextSessionContainer = document.getElementById('nextScheduledSessionContainer');
     
     if (!container) return;
     container.innerHTML = '';
@@ -757,47 +1300,148 @@ function renderMeetingNotesList() {
                 No meeting notes recorded.
             </div>
         `;
+        if (nextSessionContainer) {
+            nextSessionContainer.innerHTML = '<div class="text-muted text-xs py-2 text-center">No upcoming meeting scheduled.</div>';
+        }
+        if (partContainer) {
+            partContainer.innerHTML = '<span class="text-muted text-xs">No active participants.</span>';
+        }
         return;
     }
 
+    // Calculate Counts for Status Badges
+    let countAll = meetingNotesCache.length;
+    let countScheduled = 0;
+    let countInProgress = 0;
+    let countCompleted = 0;
+
     meetingNotesCache.forEach(n => {
+        const statusInfo = getMeetingStatusInfo(n);
+        const st = statusInfo.label.toLowerCase();
+        if (st === 'scheduled') countScheduled++;
+        else if (st === 'in progress' || st === 'inprogress' || st === 'active') countInProgress++;
+        else if (st === 'completed' || st === 'finished') countCompleted++;
+    });
+
+    if (document.getElementById('count-all')) document.getElementById('count-all').innerText = countAll;
+    if (document.getElementById('count-scheduled')) document.getElementById('count-scheduled').innerText = countScheduled;
+    if (document.getElementById('count-in_progress')) document.getElementById('count-in_progress').innerText = countInProgress;
+    if (document.getElementById('count-completed')) document.getElementById('count-completed').innerText = countCompleted;
+
+    const now = new Date();
+    let upcomingNote = null;
+
+    // Filter next scheduled upcoming meeting (where meeting_date > now)
+    const sortedNotes = [...meetingNotesCache].sort((a, b) => new Date(a.meeting_date || 0) - new Date(b.meeting_date || 0));
+    for (let n of sortedNotes) {
+        if (n.meeting_date && new Date(n.meeting_date) > now) {
+            upcomingNote = n;
+            break;
+        }
+    }
+
+    // Dynamic Next Scheduled Session Panel
+    if (nextSessionContainer) {
+        if (upcomingNote) {
+            const mDate = new Date(upcomingNote.meeting_date);
+            const dateStr = mDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeStr = mDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const hasLink = upcomingNote.meeting_link && upcomingNote.meeting_link.trim().startsWith('http');
+            const joinBtn = hasLink ? `<a href="${upcomingNote.meeting_link.trim()}" target="_blank" class="btn btn-primary btn-sm rounded-pill text-xs fw-bold px-3 shadow-2xs mt-2 d-inline-flex align-items-center gap-1.5"><i class="bi bi-camera-video-fill"></i> Join Google Meet</a>` : '';
+
+            nextSessionContainer.innerHTML = `
+                <div class="d-flex align-items-start gap-3">
+                    <div class="rounded-3 bg-primary-subtle text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                        <i class="bi bi-calendar-event fs-4"></i>
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <h6 class="fw-bold mb-1 text-dark text-sm text-truncate">${upcomingNote.title}</h6>
+                        <div class="text-muted text-xs"><i class="bi bi-clock me-1"></i>${dateStr} at ${timeStr}</div>
+                        ${joinBtn}
+                    </div>
+                </div>
+            `;
+        } else {
+            nextSessionContainer.innerHTML = `
+                <div class="text-center py-2 text-muted text-xs">
+                    <i class="bi bi-calendar-check me-1"></i> No upcoming meeting scheduled.
+                </div>
+            `;
+        }
+    }
+
+    // Filter Meetings according to currentMeetingFilter
+    const filteredNotes = meetingNotesCache.filter(n => {
+        if (currentMeetingFilter === 'all') return true;
+        const statusInfo = getMeetingStatusInfo(n);
+        const st = statusInfo.label.toLowerCase();
+        if (currentMeetingFilter === 'scheduled') return st === 'scheduled';
+        if (currentMeetingFilter === 'in_progress') return st === 'in progress' || st === 'inprogress' || st === 'active';
+        if (currentMeetingFilter === 'completed') return st === 'completed' || st === 'finished';
+        return true;
+    });
+
+    if (filteredNotes.length === 0) {
+        const filterName = currentMeetingFilter === 'all' ? '' : currentMeetingFilter.replace('_', ' ');
+        container.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-funnel fs-2 d-block mb-2 text-secondary opacity-50"></i>
+                No ${filterName} meetings found.
+            </div>
+        `;
+        return;
+    }
+
+    filteredNotes.forEach(n => {
         const date = n.meeting_date ? new Date(n.meeting_date).toLocaleDateString() : 'N/A';
         const time = n.meeting_date ? new Date(n.meeting_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+        const statusInfo = getMeetingStatusInfo(n);
+        const hasMeet = n.meeting_link && n.meeting_link.trim().startsWith('http');
+        const meetBadge = hasMeet ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill text-xs ms-2"><i class="bi bi-camera-video-fill me-1"></i>Google Meet</span>` : '';
         
         container.innerHTML += `
             <div class="border rounded p-3 mb-3 hover-shadow transition" style="cursor: pointer;" onclick="viewMeetingNoteDetail(${n.id})">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="fw-bold text-dark mb-0">${n.title}</h6>
-                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill text-xs">Completed</span>
+                    <div class="d-flex align-items-center gap-1">
+                        <h6 class="fw-bold text-dark mb-0">${n.title}</h6>
+                        ${meetBadge}
+                    </div>
+                    <span class="badge ${statusInfo.badgeClass} rounded-pill text-xs">${statusInfo.label}</span>
                 </div>
                 <p class="text-muted text-sm mb-2 text-truncate" style="max-width: 600px;">${n.notes}</p>
                 <div class="d-flex align-items-center justify-content-between text-muted text-xs">
                     <span><i class="bi bi-calendar me-1"></i> ${date} ${time ? '· ' + time : ''}</span>
-                    <span>View Note Details <i class="bi bi-chevron-right"></i></span>
+                    <span class="fw-semibold text-primary">View Note Details & Chat <i class="bi bi-chevron-right"></i></span>
                 </div>
             </div>
         `;
     });
 
-    // Populate unique authors as participants
+    // Populate Participants List
     if (partContainer) {
         partContainer.innerHTML = '';
-        const uniqueParticipants = new Set();
-        meetingNotesCache.forEach(n => uniqueParticipants.add(n.created_by));
+        const allParticipantsText = meetingNotesCache.map(n => (n.participants || '') + ' ' + (n.author_name || '')).join(' ');
         
-        fetch(`${API_URL}/users/`).then(r => r.ok ? r.json() : []).then(users => {
-            const userMap = {};
-            users.forEach(u => { userMap[u.id] = u; });
-            
-            if (uniqueParticipants.size === 0) {
-                partContainer.innerHTML = '<span class="text-muted text-xs">No active participants.</span>';
+        fetchUsersForMentions().then(users => {
+            const matchedUsers = users.filter(u => {
+                if (!u.employee_id && !u.full_name) return false;
+                return (u.employee_id && allParticipantsText.includes(u.employee_id)) || (u.full_name && allParticipantsText.includes(u.full_name));
+            });
+
+            if (matchedUsers.length === 0) {
+                partContainer.innerHTML = '<span class="text-muted text-xs">No active tagged participants.</span>';
             } else {
-                uniqueParticipants.forEach(id => {
-                    const u = userMap[id] || { full_name: "Anonymous" };
+                matchedUsers.forEach(u => {
+                    const initials = (u.full_name || 'U').split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
                     partContainer.innerHTML += `
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="avatar-sm bg-light text-primary border" style="width: 24px; height: 24px; font-size: 10px;">${u.full_name.substring(0,2).toUpperCase()}</div>
-                            <span class="text-dark fw-medium text-xs">${u.full_name}</span>
+                        <div class="d-flex align-items-center gap-2 p-1.5 rounded bg-light border mb-1">
+                            <div class="avatar-sm bg-primary text-white flex-shrink-0" style="width: 24px; height: 24px; font-size: 10px;">${initials}</div>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="text-dark fw-bold text-xs d-flex align-items-center justify-content-between">
+                                    <span>${u.full_name}</span>
+                                    ${u.employee_id ? `<span class="employee-id-badge">${u.employee_id}</span>` : ''}
+                                </div>
+                            </div>
                         </div>
                     `;
                 });
@@ -807,9 +1451,15 @@ function renderMeetingNotesList() {
 }
 
 function openNewMeetingNoteModal() {
-    document.getElementById('newMeetingTitle').value = '';
-    document.getElementById('newMeetingNotes').value = '';
-    document.getElementById('newMeetingDate').value = '';
+    if (document.getElementById('newMeetingTitle')) document.getElementById('newMeetingTitle').value = '';
+    if (document.getElementById('newMeetingNotes')) document.getElementById('newMeetingNotes').value = '';
+    if (document.getElementById('newMeetingDate')) document.getElementById('newMeetingDate').value = '';
+    if (document.getElementById('newMeetingParticipants')) document.getElementById('newMeetingParticipants').value = '';
+    if (document.getElementById('newMeetingLink')) document.getElementById('newMeetingLink').value = '';
+
+    setupGenericMentionAutocomplete('newMeetingParticipants', 'mentionDropdownParticipants');
+    setupGenericMentionAutocomplete('newMeetingNotes', 'mentionDropdownNotes');
+
     const modalEl = document.getElementById('newMeetingNoteModal');
     const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
     modal.show();
@@ -819,6 +1469,8 @@ async function submitNewMeetingNote() {
     const title = document.getElementById('newMeetingTitle').value.trim();
     const notes = document.getElementById('newMeetingNotes').value.trim();
     const dateInput = document.getElementById('newMeetingDate').value;
+    const participants = document.getElementById('newMeetingParticipants') ? document.getElementById('newMeetingParticipants').value.trim() : '';
+    const meetingLink = document.getElementById('newMeetingLink') ? document.getElementById('newMeetingLink').value.trim() : '';
 
     if (!title || !notes) {
         showToast("Warning", "Title and Notes are required");
@@ -842,6 +1494,8 @@ async function submitNewMeetingNote() {
                 title: title,
                 notes: notes,
                 meeting_date: dateIso,
+                participants: participants,
+                meeting_link: meetingLink,
                 created_by: USER_ID
             })
         });
@@ -856,22 +1510,219 @@ async function submitNewMeetingNote() {
             const instance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
             instance.hide();
         }
-        showToast("Success", "Meeting notes recorded");
+        showToast("Success", "Meeting scheduled and tagged teammates notified");
         loadMeetingNotes();
     } catch (err) {
         showToast("Danger", err.message);
     }
 }
 
-function viewMeetingNoteDetail(noteId) {
+async function viewMeetingNoteDetail(noteId) {
+    activeMeetingNoteId = noteId;
     const note = meetingNotesCache.find(n => n.id === noteId);
     if (!note) return;
 
+    const statusInfo = getMeetingStatusInfo(note);
+    const users = await fetchUsersForMentions();
+
     document.getElementById('detailNoteTitle').innerText = note.title;
     document.getElementById('detailNoteDate').innerText = note.meeting_date ? new Date(note.meeting_date).toLocaleString() : 'N/A';
-    document.getElementById('detailNoteContent').innerText = note.notes;
-    
-    new bootstrap.Modal(document.getElementById('meetingNoteDetailModal')).show();
+    document.getElementById('detailNoteContent').innerHTML = formatMentionsInContent(note.notes, users);
+    if (document.getElementById('detailNoteAuthor')) document.getElementById('detailNoteAuthor').innerText = note.author_name || 'User';
+
+    const statusEl = document.getElementById('detailNoteStatus');
+    if (statusEl) {
+        statusEl.className = `badge ${statusInfo.badgeClass} rounded-pill text-xs ms-2`;
+        statusEl.innerText = statusInfo.label;
+    }
+
+    // Join Google Meet Button
+    const meetContainer = document.getElementById('detailJoinMeetBtnContainer');
+    if (meetContainer) {
+        if (note.meeting_link && note.meeting_link.trim().startsWith('http')) {
+            meetContainer.innerHTML = `
+                <a href="${note.meeting_link.trim()}" target="_blank" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold text-xs shadow-2xs d-inline-flex align-items-center gap-1.5">
+                    <i class="bi bi-camera-video-fill"></i> Join Google Meet
+                </a>
+            `;
+        } else {
+            meetContainer.innerHTML = '';
+        }
+    }
+
+    // Tagged Participants list
+    const partEl = document.getElementById('detailNoteParticipants');
+    if (partEl) {
+        if (note.participants) {
+            partEl.innerHTML = formatMentionsInContent(note.participants, users);
+        } else {
+            partEl.innerHTML = '<span class="text-muted text-xs">No specific participants tagged.</span>';
+        }
+    }
+
+    // Fetch and render Live Meeting Chat
+    fetchMeetingNoteComments(noteId);
+    setupGenericMentionAutocomplete('meetingChatInputText', 'mentionDropdownMeetingChat');
+
+    const modalEl = document.getElementById('meetingNoteDetailModal');
+    const bsModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    bsModal.show();
+}
+
+async function fetchMeetingNoteComments(noteId) {
+    const feed = document.getElementById('meetingChatFeedContainer');
+    if (!feed) return;
+
+    try {
+        const res = await fetch(`${API_URL}/decisions/meeting_notes/${noteId}/comments`);
+        if (!res.ok) return;
+        const comments = await res.json();
+
+        feed.innerHTML = '';
+        const users = await fetchUsersForMentions();
+
+        if (comments.length === 0) {
+            feed.innerHTML = `
+                <div class="text-center text-muted py-5 my-auto">
+                    <i class="bi bi-chat-text text-secondary fs-3 d-block mb-1"></i>
+                    <span class="small">No chat messages yet. Send Google Meet links or updates below!</span>
+                </div>
+            `;
+            return;
+        }
+
+        comments.forEach(c => {
+            const isOwn = c.user_id === USER_ID;
+            const author = users.find(u => u.id === c.user_id) || { full_name: c.author_name || "Teammate", employee_id: "" };
+            const initials = (author.full_name || "TM").split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+            const timeStr = c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+            const isDeleted = c.is_deleted || c.content === "This message was deleted.";
+            let formattedBody = isDeleted ? '<span class="fst-italic text-muted opacity-75">This message was deleted.</span>' : formatMentionsInContent(c.content, users);
+
+            if (!isDeleted) {
+                if (c.is_edited) {
+                    formattedBody += ' <small class="text-muted opacity-75" style="font-size: 10px;">(edited)</small>';
+                }
+                // Detect URLs & Google Meet links
+                formattedBody = formattedBody.replace(/(https?:\/\/[^\s<]+)/gi, (url) => {
+                    if (url.includes('meet.google.com') || url.includes('zoom.us') || url.includes('teams.microsoft.com')) {
+                        return `<a href="${url}" target="_blank" class="btn btn-sm btn-light border text-primary fw-bold rounded-pill my-1 px-3 d-inline-flex align-items-center gap-1.5 shadow-2xs text-xs"><i class="bi bi-camera-video-fill text-primary"></i> Join Meeting Link</a>`;
+                    }
+                    return `<a href="${url}" target="_blank" class="text-decoration-underline fw-bold">${url}</a>`;
+                });
+            }
+
+            const safeContent = (c.content || '').replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\${/g, '\\${');
+            const editDeleteButtons = (isOwn && !isDeleted) ? `
+                <div class="d-inline-flex gap-2 ms-2 opacity-75">
+                    <button type="button" class="btn btn-link p-0 text-primary text-xs text-decoration-none" onclick="editChatMessage(${c.id}, \`${safeContent}\`, true)" title="Edit Message">
+                        <i class="bi bi-pencil-fill" style="font-size: 11px;"></i> Edit
+                    </button>
+                    <button type="button" class="btn btn-link p-0 text-danger text-xs text-decoration-none" onclick="deleteChatMessage(${c.id}, true)" title="Delete Message">
+                        <i class="bi bi-trash-fill" style="font-size: 11px;"></i> Delete
+                    </button>
+                </div>
+            ` : '';
+
+            feed.innerHTML += `
+                <div class="chat-msg-row ${isOwn ? 'own-msg' : 'other-msg'}">
+                    <div class="chat-avatar ${isOwn ? 'bg-primary text-white' : 'bg-white text-primary border'}">
+                        ${initials}
+                    </div>
+                    <div class="chat-bubble-wrap">
+                        <div class="chat-msg-header d-flex align-items-center">
+                            <span class="chat-msg-author">${isOwn ? 'You' : author.full_name}</span>
+                            ${(!isOwn && author.employee_id) ? `<span class="chat-msg-empid">${author.employee_id}</span>` : ''}
+                            <span class="chat-msg-time me-auto">${timeStr}</span>
+                            ${editDeleteButtons}
+                        </div>
+                        <div class="chat-bubble">
+                            ${formattedBody}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        setTimeout(() => { feed.scrollTop = feed.scrollHeight; }, 50);
+    } catch (e) {
+        console.error("Error loading meeting note comments:", e);
+    }
+}
+
+async function submitMeetingNoteComment() {
+    if (!activeMeetingNoteId) return;
+    const input = document.getElementById('meetingChatInputText');
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) return;
+
+    try {
+        const res = await fetch(`${API_URL}/decisions/meeting_notes/${activeMeetingNoteId}/comments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                content: content,
+                user_id: USER_ID
+            })
+        });
+
+        if (!res.ok) throw new Error("Failed to send chat message");
+        input.value = '';
+        fetchMeetingNoteComments(activeMeetingNoteId);
+    } catch (err) {
+        showToast("Danger", err.message);
+    }
+}
+
+async function editChatMessage(commentId, currentContent, isMeetingNote = false) {
+    const newContent = prompt("Edit your message:", currentContent);
+    if (newContent === null || newContent.trim() === "" || newContent.trim() === currentContent) return;
+
+    try {
+        const res = await fetch(`${API_URL}/decisions/comments/${commentId}?content=${encodeURIComponent(newContent.trim())}&user_id=${USER_ID}`, {
+            method: "PUT"
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to edit message");
+        }
+
+        showToast("Success", "Message updated");
+        if (isMeetingNote && activeMeetingNoteId) {
+            fetchMeetingNoteComments(activeMeetingNoteId);
+        } else if (activeThreadId) {
+            loadThreads().then(() => selectThread(activeThreadId));
+        }
+    } catch (err) {
+        showToast("Danger", err.message);
+    }
+}
+
+async function deleteChatMessage(commentId, isMeetingNote = false) {
+    if (!confirm("Are you sure you want to delete this message?")) return;
+
+    try {
+        const res = await fetch(`${API_URL}/decisions/comments/${commentId}?user_id=${USER_ID}`, {
+            method: "DELETE"
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to delete message");
+        }
+
+        showToast("Danger", "Message deleted");
+        if (isMeetingNote && activeMeetingNoteId) {
+            fetchMeetingNoteComments(activeMeetingNoteId);
+        } else if (activeThreadId) {
+            loadThreads().then(() => selectThread(activeThreadId));
+        }
+    } catch (err) {
+        showToast("Danger", err.message);
+    }
 }
 
 // ==========================================
@@ -1053,6 +1904,7 @@ function switchTab(tabName) {
     if (tabName === 'history') {
         loadHistory();
     } else if (tabName === 'discussions') {
+        loadThreads();
         if (typeof loadDiscussions === 'function') loadDiscussions();
     } else if (tabName === 'meeting_notes') {
         if (typeof loadMeetingNotes === 'function') loadMeetingNotes();

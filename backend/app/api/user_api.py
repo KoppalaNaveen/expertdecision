@@ -86,7 +86,50 @@ def reject_user(action: AdminApprovalAction, db: Session = Depends(get_db)):
     status_code=200
 )
 def get_all_users(db: Session = Depends(get_db)):
-    return UserService.get_all_users(db)
+    import hashlib
+    users = UserService.get_all_users(db)
+    result = []
+    for u in users:
+        # Resolve human-readable email
+        orig_email = (u.email_original or "").strip().lower()
+        if not orig_email and u.email and "@" in u.email:
+            orig_email = u.email.strip().lower()
+
+        hash_val = u.email_hash or (u.email if u.email and len(u.email) == 64 else "")
+        if not hash_val and orig_email:
+            hash_val = hashlib.sha256(orig_email.encode('utf-8')).hexdigest()
+
+        if orig_email and u.email_original != orig_email:
+            u.email_original = orig_email
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+
+        result.append(UserResponse(
+            id=u.id,
+            full_name=u.full_name,
+            email=orig_email or "—",
+            email_hash=hash_val,
+            display_email=orig_email or "—",
+            email_original=orig_email or "—",
+            employee_id=u.employee_id,
+            role_id=u.role_id,
+            role_name=u.role.role_name if u.role else "User",
+            team_id=u.team_id,
+            designation=u.designation,
+            phone=u.phone,
+            is_active=u.is_active,
+            email_verified=u.email_verified,
+            approved=u.approved,
+            status=u.status,
+            approved_by=u.approved_by,
+            approved_at=u.approved_at,
+            rejected_by=u.rejected_by,
+            rejected_at=u.rejected_at,
+            created_at=u.created_at,
+        ))
+    return result
 
 @router.post(
     "/register",
@@ -186,4 +229,4 @@ def delete_user(
     user_id: int,
     db: Session = Depends(get_db)
 ):
-    return UserService.delete_user(db, user_id)
+    return UserService.delete_user(db, user_id)

@@ -56,6 +56,7 @@ class DecisionFullCreate(BaseModel):
     department: Optional[str] = None
     decision_date: Optional[datetime] = None
     tags: Optional[str] = None
+    status: Optional[str] = "Pending"
     alternatives: List[AlternativeCreateForDecision] = []
     reviewers: List[ReviewerCreateForDecision] = []
     temp_file_ids: List[int] = []
@@ -95,12 +96,22 @@ class AttachmentResponse(BaseModel):
 class CommentCreate(BaseModel):
     content: str
     user_id: int
+    reply_to_id: Optional[int] = None
 
 class CommentResponse(BaseModel):
     id: int
     content: str
     user_id: int
+    reply_to_id: Optional[int] = None
+    is_edited: Optional[bool] = False
+    is_deleted: Optional[bool] = False
+    is_pinned: Optional[bool] = False
+    reactions: Optional[str] = None
+    read_receipts: Optional[str] = None
+    edit_history: Optional[str] = None
     created_at: datetime
+    author_name: Optional[str] = None
+    author_role: Optional[str] = None
 
     model_config = {
         "from_attributes": True
@@ -114,6 +125,7 @@ class DiscussionThreadResponse(BaseModel):
     id: int
     topic: str
     status: str
+    is_pinned: Optional[bool] = False
     created_by: int
     created_at: datetime
     comments: List[CommentResponse] = []
@@ -126,6 +138,11 @@ class MeetingNoteCreate(BaseModel):
     title: str
     notes: str
     meeting_date: Optional[datetime] = None
+    participants: Optional[str] = None
+    agenda: Optional[str] = None
+    action_items: Optional[str] = None
+    next_meeting_date: Optional[datetime] = None
+    meeting_link: Optional[str] = None
     created_by: int
 
 class MeetingNoteResponse(BaseModel):
@@ -133,12 +150,42 @@ class MeetingNoteResponse(BaseModel):
     title: str
     notes: str
     meeting_date: Optional[datetime] = None
+    participants: Optional[str] = None
+    agenda: Optional[str] = None
+    action_items: Optional[str] = None
+    next_meeting_date: Optional[datetime] = None
+    meeting_link: Optional[str] = None
     created_by: int
     created_at: datetime
+    updated_by: Optional[int] = None
+    updated_at: Optional[datetime] = None
+    author_name: Optional[str] = None
+    status: Optional[str] = None
 
     model_config = {
         "from_attributes": True
     }
+
+class DecisionRationaleResponse(BaseModel):
+    decision_id: int
+    why_required: Optional[str] = None
+    business_justification: Optional[str] = None
+    expected_benefits: Optional[str] = None
+    risks: Optional[str] = None
+    assumptions: Optional[str] = None
+    created_by: int
+    created_at: Optional[datetime] = None
+    updated_by: Optional[int] = None
+    updated_at: Optional[datetime] = None
+    updater_name: Optional[str] = None
+
+class DecisionRationaleUpdate(BaseModel):
+    why_required: Optional[str] = None
+    business_justification: Optional[str] = None
+    expected_benefits: Optional[str] = None
+    risks: Optional[str] = None
+    assumptions: Optional[str] = None
+    user_id: int
 
 from app.schemas.review import ReviewResponse
 

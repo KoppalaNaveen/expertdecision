@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SMTP_EMAIL = os.getenv("SMTP_EMAIL")
-SMTP_APP_PASSWORD = os.getenv("SMTP_APP_PASSWORD")
+_raw_password = os.getenv("SMTP_APP_PASSWORD", "")
+SMTP_APP_PASSWORD = _raw_password.replace(" ", "") if _raw_password else ""
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
@@ -28,13 +29,13 @@ def send_otp_email(to_email: str, otp: str):
         <p>Hello,</p>
         <p>Thank you for registering on the Expert Decision Replay Platform.</p>
         <p>Your verification code is: <strong>{otp}</strong></p>
-        <p>This code will expire in 10 minutes.</p>
+        <p>This code will expire in 2 minutes.</p>
         <br>
         <p>Best regards,<br>The EDRP Team</p>
     </body>
     </html>
     """
-    body_text = f"Hello,\n\nThank you for registering on the Expert Decision Replay Platform.\n\nYour verification code is: {otp}\n\nThis code will expire in 10 minutes.\n\nBest regards,\nThe EDRP Team"
+    body_text = f"Hello,\n\nThank you for registering on the Expert Decision Replay Platform.\n\nYour verification code is: {otp}\n\nThis code will expire in 2 minutes.\n\nBest regards,\nThe EDRP Team"
 
     import email.utils
     msg = MIMEMultipart("alternative")

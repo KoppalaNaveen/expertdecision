@@ -1,588 +1,1500 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 class="fw-bold text-dark mb-1">Discussion Dashboard</h2>
-        <p class="text-muted mb-0">Manage decision-linked conversations, comments, and meeting notes.</p>
-    </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-light border shadow-sm text-secondary d-flex align-items-center">
-            <i data-lucide="filter" style="width: 16px; height: 16px;" class="me-2"></i> Filter
-        </button>
-        <button class="btn btn-primary shadow-sm d-flex align-items-center text-decoration-none" onclick="openStartThreadModal()">
-            <i data-lucide="plus" style="width: 16px; height: 16px;" class="me-1"></i> New Thread
-        </button>
+<!-- CUSTOM MODERN STYLING FOR ENTERPRISE COLLABORATION SUITE -->
+<style>
+    :root {
+        --primary-blue: #2563eb;
+        --primary-hover: #1d4ed8;
+        --surface-bg: #f8fafc;
+        --card-bg: #ffffff;
+        --border-color: #e2e8f0;
+        --text-dark: #0f172a;
+        --text-muted: #64748b;
+    }
+
+    body {
+        background-color: #f1f5f9;
+    }
+
+    .discussion-header-card {
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+    }
+
+    .suite-card {
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+        transition: all 0.2s ease-in-out;
+    }
+
+    .nav-tab-btn {
+        border-radius: 12px !important;
+        font-weight: 500;
+        color: var(--text-muted);
+        transition: all 0.2s ease;
+        padding: 0.65rem 1rem;
+        margin-bottom: 4px;
+    }
+
+    .nav-tab-btn:hover {
+        background-color: #f1f5f9 !important;
+        color: var(--text-dark);
+    }
+
+    .nav-tab-btn.active {
+        background: #eff6ff !important;
+        color: var(--primary-blue) !important;
+        font-weight: 600;
+        box-shadow: none !important;
+    }
+
+    .thread-card-item {
+        border-radius: 12px;
+        border: 1px solid #f1f5f9;
+        transition: all 0.15s ease;
+        background-color: #ffffff;
+    }
+
+    .thread-card-item:hover {
+        background-color: #f8fafc;
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+    }
+
+    .thread-card-item.active-thread {
+        background-color: #eff6ff !important;
+        border-color: #93c5fd !important;
+    }
+
+    .chat-workspace-card {
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+        overflow: hidden;
+    }
+
+    .chat-feed-area {
+        background-color: #f8fafc;
+        background-image: radial-gradient(#e2e8f0 0.75px, transparent 0.75px);
+        background-size: 16px 16px;
+    }
+
+    .chat-bubble-received {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #0f172a;
+        border-radius: 16px;
+        border-top-left-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+
+    .chat-bubble-sent {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: #ffffff;
+        border-radius: 16px;
+        border-top-right-radius: 4px;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    }
+
+    .chat-input-container {
+        background: #ffffff;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .chat-textarea {
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        transition: all 0.2s ease;
+        padding: 0.6rem 0.9rem;
+    }
+
+    .chat-textarea:focus {
+        background: #ffffff;
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    .avatar-circle {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 13px;
+    }
+
+    .presence-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+</style>
+
+<!-- FLOATING RECONNECTION NOTIFICATION BANNER -->
+<div id="onlineReconnectionBanner" class="position-fixed top-0 start-50 translate-middle-x mt-3 d-none shadow-lg rounded-4 p-3 bg-success text-white border border-success-subtle" style="z-index: 1090; min-width: 320px; max-width: 450px; transition: all 0.3s ease;">
+    <div class="d-flex align-items-center gap-2.5">
+        <i class="bi bi-check-circle-fill fs-4"></i>
+        <div>
+            <h6 class="fw-bold mb-0 text-sm">✅ You are back online.</h6>
+            <small class="text-white-50 text-xs">Reloading latest data...</small>
+        </div>
     </div>
 </div>
 
-<div class="row g-4 mb-4">
-    <!-- Stats Row -->
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm p-4 h-100 rounded-4">
-            <div class="d-flex align-items-center mb-2">
-                <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                    <i data-lucide="message-square" style="width: 20px;"></i>
-                </div>
-                <div>
-                    <h3 class="fw-bold mb-0 text-dark" id="stat-threads">0</h3>
-                    <small class="text-muted fw-semibold">Active Threads</small>
-                </div>
+<!-- MAIN HEADER BAR -->
+<div class="discussion-header-card p-3 p-md-4 mb-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-primary-subtle text-primary p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; flex-shrink: 0;">
+                <i class="bi bi-chat-square-quote-fill fs-4"></i>
             </div>
-            <div class="text-success small fw-medium mt-2"><i data-lucide="trending-up" style="width: 14px;" class="me-1"></i>+3 this week</div>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <h4 class="fw-bold text-dark mb-0">Discussion & Collaboration</h4>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill text-xs px-2 py-0.5">Enterprise Live</span>
+                </div>
+                <p class="text-muted text-xs mb-0 mt-0.5">Real-time chat threads, governance timeline, decision rationale, meeting notes & documents.</p>
+            </div>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm p-4 h-100 rounded-4">
-            <div class="d-flex align-items-center mb-2">
-                <div class="rounded-circle bg-info-subtle text-info d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                    <i data-lucide="messages-square" style="width: 20px;"></i>
-                </div>
-                <div>
-                    <h3 class="fw-bold mb-0 text-dark" id="stat-comments">0</h3>
-                    <small class="text-muted fw-semibold">Total Comments</small>
-                </div>
-            </div>
-            <div class="text-success small fw-medium mt-2"><i data-lucide="trending-up" style="width: 14px;" class="me-1"></i>+12 today</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm p-4 h-100 rounded-4">
-            <div class="d-flex align-items-center mb-2">
-                <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                    <i data-lucide="file-text" style="width: 20px;"></i>
-                </div>
-                <div>
-                    <h3 class="fw-bold mb-0 text-dark" id="stat-notes">0</h3>
-                    <small class="text-muted fw-semibold">Meeting Notes</small>
-                </div>
-            </div>
-            <div class="text-muted small fw-medium mt-2">2 this month</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm p-4 h-100 rounded-4">
-            <div class="d-flex align-items-center mb-2">
-                <div class="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                    <i data-lucide="users" style="width: 20px;"></i>
-                </div>
-                <div>
-                    <h3 class="fw-bold mb-0 text-dark" id="stat-participants">0</h3>
-                    <small class="text-muted fw-semibold">Participants</small>
-                </div>
-            </div>
-            <div class="text-muted small fw-medium mt-2">across all threads</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap flex-sm-nowrap">
+            <select id="globalDecisionSelect" class="form-select form-select-sm border-light-subtle shadow-sm rounded-3 py-1.5" style="min-width: 230px;" onchange="switchDecision(this.value)">
+                <option value="">Loading decisions...</option>
+            </select>
+            <button class="btn btn-primary btn-sm shadow-sm rounded-3 px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5" onclick="openStartThreadModal()">
+                <i class="bi bi-plus-circle-fill"></i> <span>New Thread</span>
+            </button>
         </div>
     </div>
 </div>
 
 <div class="row g-4">
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm rounded-4 h-100">
-            <div class="card-header bg-white border-0 p-4 pb-0 d-flex justify-content-between align-items-center">
-                <h5 class="fw-bold text-dark mb-0">Active Discussion Threads</h5>
-                <a href="#" class="text-primary fw-semibold text-decoration-none small">View all <i data-lucide="arrow-right" style="width: 14px;"></i></a>
-            </div>
-            <div class="card-body p-4" id="activeThreadsList">
-                <div class="text-center py-5 text-muted">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <div class="mt-2">Loading threads...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-4">
-        <div class="card border-0 shadow-sm rounded-4 mb-4">
-            <div class="card-header bg-white border-0 p-4 pb-0 d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold text-dark mb-0">Recent Comments</h6>
-                <a href="#" class="text-primary fw-semibold text-decoration-none small">View all</a>
-            </div>
-            <div class="card-body p-4" id="recentCommentsList">
-                <div class="text-center py-3 text-muted small">Loading...</div>
-            </div>
-        </div>
-        
-        <div class="card border-0 shadow-sm rounded-4 mb-4">
-            <div class="card-header bg-white border-0 p-4 pb-0 d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold text-dark mb-0">Recent Meeting Notes</h6>
-                <a href="#" class="text-primary fw-semibold text-decoration-none small">View all</a>
-            </div>
-            <div class="card-body p-4" id="recentNotesList">
-                <div class="text-center py-3 text-muted small">Loading...</div>
+    <!-- LEFT SIDEBAR -->
+    <div class="col-lg-3 col-md-4">
+        <!-- Unified Search Bar -->
+        <div class="suite-card p-2 mb-3">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-white border-0 text-muted ps-2.5"><i class="bi bi-search"></i></span>
+                <input type="text" id="unifiedSearchInput" class="form-control border-0 bg-white ps-1 text-sm" placeholder="Search threads, notes, files..." onkeyup="if(event.key==='Enter') executeUnifiedSearch()">
+                <button class="btn btn-primary rounded-3 text-xs px-2.5" onclick="executeUnifiedSearch()"><i class="bi bi-arrow-right"></i></button>
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-header bg-white border-0 p-4 pb-0">
-                <h6 class="fw-bold text-dark mb-0">Quick Actions</h6>
+        <!-- Navigation Tabs Sidebar -->
+        <div class="suite-card p-2 mb-3">
+            <div class="nav flex-column" id="moduleNavTabs">
+                <button class="nav-tab-btn list-group-item border-0 active d-flex align-items-center justify-content-between text-xs" onclick="switchNavTab('chat')">
+                    <span class="d-flex align-items-center"><i class="bi bi-chat-dots-fill me-2.5 text-primary"></i> Chat Threads</span>
+                    <span class="badge bg-primary rounded-pill px-2" id="unreadBadgeCount">0</span>
+                </button>
+                <button class="nav-tab-btn list-group-item border-0 d-flex align-items-center justify-content-between text-xs" onclick="switchNavTab('timeline')">
+                    <span class="d-flex align-items-center"><i class="bi bi-clock-history me-2.5 text-info"></i> Decision Timeline</span>
+                    <span class="badge bg-info-subtle text-info rounded-pill px-2">Log</span>
+                </button>
+                <button class="nav-tab-btn list-group-item border-0 d-flex align-items-center justify-content-between text-xs" onclick="switchNavTab('rationale')">
+                    <span class="d-flex align-items-center"><i class="bi bi-journal-text me-2.5 text-warning"></i> Decision Rationale</span>
+                    <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill px-2">Doc</span>
+                </button>
+                <button class="nav-tab-btn list-group-item border-0 d-flex align-items-center justify-content-between text-xs" onclick="switchNavTab('notes')">
+                    <span class="d-flex align-items-center"><i class="bi bi-calendar-event-fill me-2.5 text-success"></i> Meeting Notes</span>
+                    <span class="badge bg-success-subtle text-success rounded-pill px-2" id="meetingNotesBadgeCount">0</span>
+                </button>
+                <button class="nav-tab-btn list-group-item border-0 d-flex align-items-center justify-content-between text-xs" onclick="switchNavTab('files')">
+                    <span class="d-flex align-items-center"><i class="bi bi-paperclip me-2.5 text-secondary"></i> Supporting Files</span>
+                    <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2" id="filesBadgeCount">0</span>
+                </button>
+                <button class="nav-tab-btn list-group-item border-0 d-flex align-items-center justify-content-between text-xs" onclick="switchNavTab('notifications')">
+                    <span class="d-flex align-items-center"><i class="bi bi-bell-fill me-2.5 text-danger"></i> Notification Center</span>
+                    <span class="badge bg-danger rounded-pill px-2" id="notificationsBadgeCount">0</span>
+                </button>
             </div>
-            <div class="card-body p-4 d-flex flex-column gap-2">
-                <button class="btn btn-outline-primary w-100 text-start d-flex align-items-center justify-content-between border-light-subtle py-2 px-3 hover-primary" onclick="openAddCommentModal()">
-                    <span><i class="bi bi-chat-dots me-2"></i> Add Comment</span>
-                    <i class="bi bi-chevron-right text-muted" style="font-size: 11px;"></i>
-                </button>
-                <button class="btn btn-outline-primary w-100 text-start d-flex align-items-center justify-content-between border-light-subtle py-2 px-3 hover-primary" onclick="openStartThreadModal()">
-                    <span><i class="bi bi-chat-square-text me-2"></i> Start Discussion</span>
-                    <i class="bi bi-chevron-right text-muted" style="font-size: 11px;"></i>
-                </button>
-                <button class="btn btn-outline-primary w-100 text-start d-flex align-items-center justify-content-between border-light-subtle py-2 px-3 hover-primary" onclick="openAddMeetingNoteModal()">
-                    <span><i class="bi bi-calendar-event me-2"></i> Add Meeting Notes</span>
-                    <i class="bi bi-chevron-right text-muted" style="font-size: 11px;"></i>
-                </button>
-                <button class="btn btn-outline-primary w-100 text-start d-flex align-items-center justify-content-between border-light-subtle py-2 px-3 hover-primary" onclick="openUploadFileModal()">
-                    <span><i class="bi bi-cloud-arrow-up me-2"></i> Upload Supporting File</span>
-                    <i class="bi bi-chevron-right text-muted" style="font-size: 11px;"></i>
-                </button>
+        </div>
+
+        <!-- Discussion Threads List -->
+        <div class="suite-card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center pb-2 mb-2 border-bottom">
+                <h6 class="fw-bold mb-0 text-dark text-xs text-uppercase tracking-wider">Discussion Topics</h6>
+                <button class="btn btn-link btn-sm p-0 text-primary text-decoration-none fw-semibold text-xs" onclick="openStartThreadModal()"><i class="bi bi-plus-lg me-0.5"></i> Add</button>
+            </div>
+            <div id="threadsListContainer" class="custom-scrollbar" style="max-height: 240px; overflow-y: auto;">
+                <div class="text-center py-3 text-muted small">Loading topics...</div>
+            </div>
+        </div>
+
+        <!-- Presence & Team Status -->
+        <div class="suite-card p-3">
+            <div class="pb-2 mb-2 border-bottom">
+                <h6 class="fw-bold mb-0 text-dark text-xs text-uppercase tracking-wider">Team Participants</h6>
+            </div>
+            <div id="teamPresenceContainer" class="custom-scrollbar" style="max-height: 180px; overflow-y: auto;">
+                <div class="text-center py-2 text-muted small">Loading team presence...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN WORKSPACE CONTAINER -->
+    <div class="col-lg-9 col-md-8">
+        <!-- 1. CHAT THREADS WINDOW -->
+        <div id="tab-chat" class="module-tab-content">
+            <div class="chat-workspace-card d-flex flex-column" style="height: 700px;">
+                <!-- Chat Workspace Header -->
+                <div class="bg-white border-bottom p-3 d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="avatar-circle bg-primary text-white shadow-sm flex-shrink-0" id="chatThreadAvatar">
+                            TH
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h6 class="fw-bold mb-0 text-dark fs-6" id="activeThreadTitle">Select a discussion topic</h6>
+                            </div>
+                            <small class="text-muted text-xs d-block" id="activeThreadSubtitle">Choose a topic from the left sidebar to view messages.</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle rounded-3 py-1 px-2.5 text-xs fw-semibold" type="button" id="threadStatusBtn" data-bs-toggle="dropdown">
+                                Status: Open
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3">
+                                <li><a class="dropdown-item text-xs py-1.5" href="#" onclick="changeThreadStatus('Open')">🟢 Open</a></li>
+                                <li><a class="dropdown-item text-xs py-1.5" href="#" onclick="changeThreadStatus('In Progress')">🟡 In Progress</a></li>
+                                <li><a class="dropdown-item text-xs py-1.5" href="#" onclick="changeThreadStatus('Resolved')">🔵 Resolved</a></li>
+                                <li><a class="dropdown-item text-xs py-1.5" href="#" onclick="changeThreadStatus('Closed')">🔴 Closed</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pinned Messages Banner -->
+                <div class="bg-primary-subtle border-bottom px-3 py-2 d-none" id="pinnedMessagesBanner">
+                    <div class="d-flex align-items-center justify-content-between text-xs">
+                        <span class="text-primary fw-semibold"><i class="bi bi-pin-angle-fill me-1"></i> Pinned Announcement:</span>
+                        <span class="text-dark text-truncate" id="pinnedMessageContent" style="max-width: 550px;">--</span>
+                    </div>
+                </div>
+
+                <!-- Chat Feed (Messages Container) -->
+                <div class="chat-feed-area p-3 p-md-4 flex-grow-1 custom-scrollbar overflow-y-auto" id="chatFeedContainer">
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-chat-square-dots fs-1 text-primary opacity-40 d-block mb-2"></i>
+                        <p class="mb-0 text-sm">Select a thread topic on the left sidebar to start real-time discussion.</p>
+                    </div>
+                </div>
+
+                <!-- Reply Preview Banner -->
+                <div class="bg-warning-subtle border-top px-3 py-2 d-none align-items-center justify-content-between" id="replyPreviewBanner">
+                    <span class="text-xs text-dark"><i class="bi bi-reply-fill me-1 text-warning"></i> Replying to: <strong id="replyToSnippet">--</strong></span>
+                    <button class="btn btn-link btn-sm text-dark p-0 text-decoration-none" onclick="cancelReply()"><i class="bi bi-x-circle-fill"></i></button>
+                </div>
+
+                <!-- Chat Input Footer -->
+                <div class="chat-input-container p-3 position-relative" id="chatInputFooter">
+                    <!-- Mention Autocomplete Popup Dropdown -->
+                    <div id="mentionDropdownDiscussion" class="dropdown-menu shadow-lg border p-1 position-absolute" style="display: none; max-height: 220px; overflow-y: auto; z-index: 1050; bottom: 100%; left: 50px; width: 320px; border-radius: 12px; background: #FFFFFF; border-color: #E2E8F0 !important;">
+                        <!-- Mention items populated via JS -->
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-light border text-muted rounded-3 p-2 d-flex align-items-center justify-content-center" type="button" onclick="document.getElementById('chatFileInput').click()" title="Attach File (PDF, XLSX, DOCX, ZIP up to 200MB)">
+                            <i class="bi bi-paperclip fs-5"></i>
+                        </button>
+                        <input type="file" id="chatFileInput" class="d-none" onchange="handleInlineFileUpload(event)">
+                        
+                        <textarea id="chatInputText" class="form-control chat-textarea text-sm" rows="1" placeholder="Write a message... (Press Enter to send, Shift+Enter for newline)" style="resize: none;" onkeydown="handleChatKeyDown(event)"></textarea>
+                        
+                        <button class="btn btn-light border text-muted rounded-3 p-2 d-flex align-items-center justify-content-center" type="button" onclick="insertEmoji('👍')" title="Quick Emoji">
+                            <i class="bi bi-emoji-smile fs-5"></i>
+                        </button>
+                        <button class="btn btn-primary rounded-3 px-3.5 py-2 fw-semibold text-sm d-flex align-items-center gap-1.5 flex-shrink-0" type="button" onclick="sendChatMessage()">
+                            <span>Send</span> <i class="bi bi-send-fill text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. DECISION TIMELINE TAB -->
+        <div id="tab-timeline" class="module-tab-content d-none">
+            <div class="suite-card p-4">
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom pb-3 mb-4 gap-2">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2 fs-6"><i class="bi bi-clock-history text-info"></i> Decision Activity Timeline</h6>
+                        <small class="text-muted text-xs">Zero-duplication activity log tracking complete decision lifecycle</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <select id="timelineFilterCategory" class="form-select form-select-sm rounded-3" onchange="loadDecisionTimeline()">
+                            <option value="All">All Activities</option>
+                            <option value="Decision">Decision Updates</option>
+                            <option value="Review">Review Activities</option>
+                            <option value="Discussion">Discussion Comments</option>
+                            <option value="MeetingNote">Meeting Notes</option>
+                            <option value="FileUpload">File Uploads</option>
+                        </select>
+                        <input type="text" id="timelineSearchInput" class="form-control form-control-sm rounded-3" placeholder="Search timeline..." onkeyup="loadDecisionTimeline()">
+                    </div>
+                </div>
+                <div id="timelineListContainer" class="custom-scrollbar" style="max-height: 600px; overflow-y: auto;">
+                    <div class="text-center py-5 text-muted">Loading activity timeline...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. DECISION RATIONALE TAB -->
+        <div id="tab-rationale" class="module-tab-content d-none">
+            <div class="suite-card p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2 fs-6"><i class="bi bi-journal-text text-warning"></i> Decision Rationale & Governance</h6>
+                        <small class="text-muted text-xs" id="rationaleMetadataText">Document rationale details and business alignment</small>
+                    </div>
+                    <button class="btn btn-warning btn-sm fw-semibold px-3.5 text-dark rounded-3 d-flex align-items-center gap-1.5 shadow-sm" onclick="saveDecisionRationale()">
+                        <i class="bi bi-check-lg"></i> Save Rationale
+                    </button>
+                </div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold text-secondary text-xs">Why Required (Core Need)</label>
+                        <textarea id="ratWhy" class="form-control text-sm rounded-3" rows="3" placeholder="Explain why this decision is required..."></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary text-xs">Business Justification</label>
+                        <textarea id="ratJustification" class="form-control text-sm rounded-3" rows="3" placeholder="Strategic justification, ROI, budget impact..."></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary text-xs">Expected Benefits</label>
+                        <textarea id="ratBenefits" class="form-control text-sm rounded-3" rows="3" placeholder="Expected outcomes, efficiency gains..."></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary text-xs">Identified Risks</label>
+                        <textarea id="ratRisks" class="form-control text-sm rounded-3" rows="3" placeholder="Potential risks and mitigation strategies..."></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary text-xs">Core Assumptions</label>
+                        <textarea id="ratAssumptions" class="form-control text-sm rounded-3" rows="3" placeholder="Dependencies, timeline assumptions..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. MEETING NOTES TAB -->
+        <div id="tab-notes" class="module-tab-content d-none">
+            <div class="suite-card p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2 fs-6"><i class="bi bi-calendar-event text-success"></i> Structured Meeting Notes</h6>
+                        <small class="text-muted text-xs">Record meeting dates, agendas, action items & minutes</small>
+                    </div>
+                    <button class="btn btn-success btn-sm fw-semibold px-3.5 rounded-3 d-flex align-items-center gap-1.5 shadow-sm" onclick="openAddMeetingNoteModal()">
+                        <i class="bi bi-plus-circle-fill"></i> Record Note
+                    </button>
+                </div>
+                <div id="meetingNotesListContainer" class="custom-scrollbar" style="max-height: 600px; overflow-y: auto;">
+                    <div class="text-center py-5 text-muted">Loading meeting notes...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. SUPPORTING FILES TAB -->
+        <div id="tab-files" class="module-tab-content d-none">
+            <div class="suite-card p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2 fs-6"><i class="bi bi-paperclip text-secondary"></i> Supporting Files & Documents Hub</h6>
+                        <small class="text-muted text-xs">Upload and download attachments (PDF, XLSX, DOCX, ZIP up to 200MB)</small>
+                    </div>
+                    <button class="btn btn-secondary btn-sm fw-semibold px-3.5 rounded-3 d-flex align-items-center gap-1.5 shadow-sm" onclick="openUploadFileModal()">
+                        <i class="bi bi-cloud-upload-fill"></i> Upload File
+                    </button>
+                </div>
+                <div id="supportingFilesListContainer" class="custom-scrollbar" style="max-height: 600px; overflow-y: auto;">
+                    <div class="text-center py-5 text-muted">Loading files...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. NOTIFICATION CENTER TAB -->
+        <div id="tab-notifications" class="module-tab-content d-none">
+            <div class="suite-card p-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                    <div>
+                        <h6 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2 fs-6"><i class="bi bi-bell text-danger"></i> Discussion Notification Center</h6>
+                        <small class="text-muted text-xs">Track comments, replies, @mentions & status updates</small>
+                    </div>
+                    <button class="btn btn-outline-danger btn-sm text-xs px-3 rounded-3 fw-semibold" onclick="markAllNotificationsRead()">Mark All as Read</button>
+                </div>
+                <div id="notificationsListContainer" class="custom-scrollbar" style="max-height: 600px; overflow-y: auto;">
+                    <div class="text-center py-5 text-muted">Loading notifications...</div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- UNIFIED SEARCH RESULTS MODAL -->
+<div class="modal fade" id="unifiedSearchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2 fs-6"><i class="bi bi-search text-primary"></i> Categorized Search Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 custom-scrollbar" id="searchResultsContainer" style="max-height: 500px; overflow-y: auto;">
+                <div class="text-center py-4 text-muted">Enter a search query above...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- START THREAD MODAL -->
+<div class="modal fade" id="startThreadModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark fs-6"><i class="bi bi-chat-left-plus text-primary me-2"></i>Start Discussion Thread</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary text-xs">Thread Topic</label>
+                    <input type="text" id="startThreadTopicInput" class="form-control rounded-3" placeholder="E.g., Infrastructure Budget & Risk Analysis...">
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                <button type="button" class="btn btn-light rounded-3 px-4 text-xs fw-semibold text-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary rounded-3 px-4 text-xs fw-semibold" onclick="submitGlobalThread()">Create Thread</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ADD / EDIT MEETING NOTE MODAL -->
+<div class="modal fade" id="addMeetingNoteModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark fs-6" id="meetingNoteModalTitle"><i class="bi bi-journal-plus text-success me-2"></i>Record Meeting Note</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="editNoteId" value="">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary text-xs">Meeting Title</label>
+                    <input type="text" id="noteTitleInput" class="form-control rounded-3" placeholder="E.g., Architecture Governance Sync">
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary text-xs">Meeting Date & Time</label>
+                        <input type="datetime-local" id="noteDateInput" class="form-control rounded-3">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary text-xs">Participants</label>
+                        <input type="text" id="noteParticipantsInput" class="form-control rounded-3" placeholder="E.g., Naveen, John, Sarah">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary text-xs">Agenda</label>
+                    <textarea id="noteAgendaInput" class="form-control rounded-3" rows="2" placeholder="Key topics to discuss..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary text-xs">Discussion Summary / Minutes</label>
+                    <textarea id="noteNotesInput" class="form-control rounded-3" rows="3" placeholder="Meeting decisions and discussion points..."></textarea>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary text-xs">Action Items</label>
+                        <textarea id="noteActionItemsInput" class="form-control rounded-3" rows="2" placeholder="Assigned action items..."></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary text-xs">Next Meeting Date</label>
+                        <input type="datetime-local" id="noteNextMeetingInput" class="form-control rounded-3">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                <button type="button" class="btn btn-light rounded-3 px-4 text-xs fw-semibold text-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success rounded-3 px-4 text-xs fw-semibold" onclick="saveMeetingNote()">Save Note</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- UPLOAD FILE MODAL -->
+<div class="modal fade" id="uploadFileModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark fs-6"><i class="bi bi-cloud-arrow-up text-secondary me-2"></i>Upload Supporting Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary text-xs">Choose File</label>
+                    <input type="file" id="modalFileInput" class="form-control rounded-3" accept=".pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg,.zip">
+                    <div class="form-text text-xs mt-1">Supports PDF, XLSX, DOCX, CSV, PNG, JPG, and ZIP files up to 200 MB</div>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                <button type="button" class="btn btn-light rounded-3 px-4 text-xs fw-semibold text-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary rounded-3 px-4 text-xs fw-semibold" onclick="submitModalFileUpload()">Upload</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JAVASCRIPT BUSINESS & INTERACTION LOGIC (100% PRESERVED + CONNECTIVITY HANDLING) -->
 <script>
     const API_URL = "http://127.0.0.1:8000";
+    const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
+    
+    let currentDecisionId = null;
+    let currentThreadId = null;
+    let replyToCommentId = null;
+    let ws = null;
+    let pollingInterval = null;
 
-    document.addEventListener("DOMContentLoaded", () => {
-        fetchDiscussionData();
+    // Connectivity State Variables
+    let isCurrentlyOnline = navigator.onLine;
+    let verificationRetryTimer = null;
+    let reconnectionBannerTimer = null;
+    let currentActiveTab = 'chat';
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        if (!navigator.onLine) {
+            handleOfflineStatus();
+        } else {
+            await loadDecisionsList();
+            loadUserNotifications();
+            loadTeamPresence();
+            
+            // Auto fallback polling every 3 seconds
+            pollingInterval = setInterval(() => {
+                if (isCurrentlyOnline && currentThreadId && document.getElementById('tab-chat').classList.contains('d-none') === false) {
+                    fetchThreadComments(currentThreadId, true);
+                }
+            }, 3000);
+        }
     });
 
-    async function fetchDiscussionData() {
+    // Helper for Centered Red Offline UI Card
+    function getOfflineCardHtml(messageSub = 'Please check your internet connection and try again.') {
+        return `
+            <div class="d-flex flex-column align-items-center justify-content-center py-5 px-3 text-center my-auto w-100">
+                <div class="suite-card p-4 p-md-5 border-danger-subtle bg-danger-subtle bg-opacity-25 rounded-4 shadow-sm" style="max-width: 480px; border: 1.5px solid #fca5a5;">
+                    <div class="avatar-circle bg-danger-subtle text-danger mx-auto mb-3" style="width: 56px; height: 56px;">
+                        <i class="bi bi-wifi-off fs-3"></i>
+                    </div>
+                    <h5 class="fw-bold text-danger mb-1 fs-6">❌ No Internet Connection</h5>
+                    <p class="text-secondary text-xs mb-0">${escapeHtml(messageSub)}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    // Verify Server Connectivity via lightweight API call
+    async function verifyServerConnectivity() {
         try {
-            // Load users and decisions mapping first
-            const [usersRes, decisionsRes, threadsRes, notesRes, commentsRes] = await Promise.all([
-                fetch(`${API_URL}/users/`).then(r => r.ok ? r.json() : []),
-                fetch(`${API_URL}/decisions/`).then(r => r.ok ? r.json() : []),
-                fetch(`${API_URL}/decisions/threads/all`).then(r => r.ok ? r.json() : []),
-                fetch(`${API_URL}/decisions/meeting_notes/all`).then(r => r.ok ? r.json() : []),
-                fetch(`${API_URL}/decisions/comments/all`).then(r => r.ok ? r.json() : [])
-            ]);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2500);
+            const res = await fetch(`${API_URL}/decisions/`, { method: "GET", signal: controller.signal });
+            clearTimeout(timeoutId);
+            return res.ok || res.status < 500;
+        } catch (e) {
+            return false;
+        }
+    }
 
-            const userMap = {};
-            usersRes.forEach(u => { userMap[u.id] = u; });
+    function handleOfflineStatus() {
+        if (!isCurrentlyOnline) return; // Prevent duplicate event triggers
+        isCurrentlyOnline = false;
 
-            const decisionMap = {};
-            decisionsRes.forEach(d => { decisionMap[d.id] = d; });
+        // Stop polling and close active WebSocket
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+        if (verificationRetryTimer) {
+            clearInterval(verificationRetryTimer);
+            verificationRetryTimer = null;
+        }
 
-            // RENDER STATS
-            document.getElementById("stat-threads").innerText = threadsRes.length;
-            document.getElementById("stat-comments").innerText = commentsRes.length;
-            document.getElementById("stat-notes").innerText = notesRes.length;
+        // Render offline card in feed container if offline
+        const feedContainer = document.getElementById('chatFeedContainer');
+        if (feedContainer && currentActiveTab === 'chat' && feedContainer.children.length === 1 && feedContainer.innerText.includes('Loading')) {
+            feedContainer.innerHTML = getOfflineCardHtml();
+        }
+    }
 
-            // Unique participants calculation
-            const participants = new Set();
-            threadsRes.forEach(t => participants.add(t.created_by));
-            commentsRes.forEach(c => participants.add(c.user_id));
-            notesRes.forEach(n => participants.add(n.created_by));
-            document.getElementById("stat-participants").innerText = participants.size;
+    async function handleOnlineStatus() {
+        if (isCurrentlyOnline) return; // Prevent duplicate event triggers
 
-            // RENDER THREADS
-            const threadsList = document.getElementById("activeThreadsList");
-            if (threadsRes.length === 0) {
-                threadsList.innerHTML = `<div class="text-center py-5 text-muted">No active discussion threads found.</div>`;
-            } else {
-                threadsList.innerHTML = "";
-                // Sort threads by newest first
-                threadsRes.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-                threadsRes.slice(0, 10).forEach(t => {
-                    const dec = decisionMap[t.decision_id] || {};
-                    const catName = dec.category_name || "General";
-                    const formattedTime = new Date(t.created_at).toLocaleDateString();
-                    const badgeClass = t.status === 'Open' ? 'bg-primary-subtle text-primary border-primary-subtle' : 'bg-success-subtle text-success border-success-subtle';
-                    
-                    // count replies
-                    const repliesCount = commentsRes.filter(c => c.thread_id === t.id).length;
-                    // count thread participants
-                    const threadParts = new Set([t.created_by, ...commentsRes.filter(c => c.thread_id === t.id).map(c => c.user_id)]);
-
-                    threadsList.innerHTML += `
-                        <div class="d-flex flex-column border rounded-3 p-3 mb-3 hover-shadow transition" onclick="window.location.href='/decision/${t.decision_id}?tab=discussions&thread=${t.id}'">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h6 class="fw-bold mb-0 text-dark">${t.topic}</h6>
-                                <span class="badge ${badgeClass} border px-2 py-1 rounded-pill">${t.status}</span>
-                            </div>
-                            <div class="d-flex gap-3 text-muted small fw-medium mt-2">
-                                <span class="d-flex align-items-center"><i data-lucide="message-square" style="width:14px;" class="me-1"></i> ${repliesCount} Replies</span>
-                                <span class="d-flex align-items-center"><i data-lucide="users" style="width:14px;" class="me-1"></i> ${threadParts.size} Participants</span>
-                                <span class="d-flex align-items-center"><i data-lucide="tag" style="width:14px;" class="me-1"></i> ${catName}</span>
-                                <span class="d-flex align-items-center ms-auto"><i data-lucide="clock" style="width:14px;" class="me-1"></i> ${formattedTime}</span>
-                            </div>
-                        </div>
-                    `;
-                });
+        // Perform server connectivity verification
+        const isServerReachable = await verifyServerConnectivity();
+        if (!isServerReachable) {
+            if (!verificationRetryTimer) {
+                verificationRetryTimer = setInterval(async () => {
+                    if (await verifyServerConnectivity()) {
+                        clearInterval(verificationRetryTimer);
+                        verificationRetryTimer = null;
+                        executeOnlineReconnection();
+                    }
+                }, 3000);
             }
+            return;
+        }
 
-            // RENDER COMMENTS
-            const commentsList = document.getElementById("recentCommentsList");
-            if (commentsRes.length === 0) {
-                commentsList.innerHTML = `<div class="text-center py-3 text-muted small">No comments posted yet.</div>`;
-            } else {
-                commentsList.innerHTML = "";
-                commentsRes.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-                commentsRes.slice(0, 5).forEach(c => {
-                    const u = userMap[c.user_id] || { full_name: "Anonymous User" };
-                    const initials = u.full_name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
-                    const formattedTime = new Date(c.created_at).toLocaleDateString();
-                    // Find thread for topic
-                    const thread = threadsRes.find(t => t.id === c.thread_id) || {};
-                    const topic = thread.topic || "Discussion";
+        executeOnlineReconnection();
+    }
 
-                    commentsList.innerHTML += `
-                        <div class="d-flex align-items-start border-bottom pb-3 mb-3 last-border-0">
-                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0 fw-bold shadow-sm" style="width: 32px; height: 32px; font-size: 11px;">
-                                ${initials}
-                            </div>
-                            <div class="ms-3 flex-grow-1">
-                                <div class="d-flex justify-content-between align-items-baseline mb-1">
-                                    <span class="fw-bold text-dark small">${u.full_name}</span>
-                                    <span class="text-muted" style="font-size: 10px;">${formattedTime}</span>
-                                </div>
-                                <p class="text-muted small mb-1" style="line-height: 1.4;">${c.content}</p>
-                                <span class="text-primary fw-semibold" style="font-size: 10px;">in ${topic.substring(0, 30)}${topic.length > 30 ? '...' : ''}</span>
-                            </div>
-                        </div>
-                    `;
-                });
+    function executeOnlineReconnection() {
+        isCurrentlyOnline = true;
+
+        // Show green banner
+        const banner = document.getElementById('onlineReconnectionBanner');
+        if (banner) {
+            banner.classList.remove('d-none');
+        }
+
+        if (reconnectionBannerTimer) clearTimeout(reconnectionBannerTimer);
+
+        reconnectionBannerTimer = setTimeout(() => {
+            // Save active focused element & selection for unsaved data protection
+            const activeElemId = document.activeElement ? document.activeElement.id : null;
+            const activeElemSelectionStart = document.activeElement && typeof document.activeElement.selectionStart === 'number' ? document.activeElement.selectionStart : null;
+
+            // Smart Modular Refresh based on active tab
+            smartDataRefresh();
+
+            // Hide banner after 2s
+            if (banner) banner.classList.add('d-none');
+
+            // Restore focus
+            if (activeElemId) {
+                const elem = document.getElementById(activeElemId);
+                if (elem) {
+                    elem.focus();
+                    if (activeElemSelectionStart !== null && typeof elem.setSelectionRange === 'function') {
+                        elem.setSelectionRange(activeElemSelectionStart, activeElemSelectionStart);
+                    }
+                }
             }
+        }, 2000);
+    }
 
-            // RENDER NOTES
-            const notesList = document.getElementById("recentNotesList");
-            if (notesRes.length === 0) {
-                notesList.innerHTML = `<div class="text-center py-3 text-muted small">No meeting notes recorded yet.</div>`;
-            } else {
-                notesList.innerHTML = "";
-                notesRes.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-                notesRes.slice(0, 5).forEach(n => {
-                    const formattedDate = n.meeting_date ? new Date(n.meeting_date).toLocaleDateString() : "No date";
-                    const formattedTime = n.meeting_date ? new Date(n.meeting_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
-                    
-                    notesList.innerHTML += `
-                        <div class="d-flex align-items-start border-bottom pb-3 mb-3 last-border-0" style="cursor: pointer;" onclick="window.location.href='/decision/${n.decision_id}?tab=meeting_notes'">
-                            <div class="rounded-3 bg-primary-subtle text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;">
-                                <i data-lucide="calendar" style="width:18px;"></i>
-                            </div>
-                            <div class="ms-3">
-                                <div class="fw-bold text-dark small mb-1">${n.title}</div>
-                                <div class="text-muted" style="font-size: 11px;">${formattedDate} ${formattedTime ? '· ' + formattedTime : ''}</div>
-                            </div>
-                        </div>
-                    `;
-                });
+    function smartDataRefresh() {
+        if (!currentDecisionId) {
+            loadDecisionsList();
+            return;
+        }
+
+        // Context-Aware Reconnection & Smart Data Load
+        if (currentActiveTab === 'chat') {
+            loadThreadsForDecision(currentDecisionId);
+            if (currentThreadId) fetchThreadComments(currentThreadId, true);
+            initWebSocket(currentDecisionId);
+            if (!pollingInterval) {
+                pollingInterval = setInterval(() => {
+                    if (isCurrentlyOnline && currentThreadId && document.getElementById('tab-chat').classList.contains('d-none') === false) {
+                        fetchThreadComments(currentThreadId, true);
+                    }
+                }, 3000);
             }
+        } else if (currentActiveTab === 'timeline') {
+            loadDecisionTimeline();
+        } else if (currentActiveTab === 'rationale') {
+            loadDecisionRationale(currentDecisionId);
+        } else if (currentActiveTab === 'notes') {
+            loadMeetingNotes(currentDecisionId);
+        } else if (currentActiveTab === 'files') {
+            loadSupportingFiles(currentDecisionId);
+        } else if (currentActiveTab === 'notifications') {
+            loadUserNotifications();
+        }
 
-            if (window.lucide) window.lucide.createIcons();
+        loadTeamPresence();
+    }
 
+    window.addEventListener("online", handleOnlineStatus);
+    window.addEventListener("offline", handleOfflineStatus);
+
+    function insertEmoji(emoji) {
+        const input = document.getElementById('chatInputText');
+        if (input) {
+            input.value += emoji;
+            input.focus();
+        }
+    }
+
+    async function loadDecisionsList() {
+        if (!isCurrentlyOnline) {
+            document.getElementById('threadsListContainer').innerHTML = getOfflineCardHtml();
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/decisions/`);
+            if (!res.ok) return;
+            const decisions = await res.json();
+            const select = document.getElementById('globalDecisionSelect');
+            select.innerHTML = '';
+            if (decisions.length === 0) {
+                select.innerHTML = '<option value="">No decisions found</option>';
+                return;
+            }
+            decisions.forEach((d, idx) => {
+                select.innerHTML += `<option value="${d.id}">DEC-${d.id} · ${escapeHtml(d.title)}</option>`;
+            });
+            if (!currentDecisionId) currentDecisionId = decisions[0].id;
+            switchDecision(currentDecisionId);
         } catch (e) {
             console.error(e);
         }
     }
 
-    // ==========================================
-    // QUICK ACTIONS LOGIC (Workflow 3b)
-    // ==========================================
-    const USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
-
-    async function populateDecisionsDropdown(selectId) {
-        const select = document.getElementById(selectId);
-        if (!select) return;
-        select.innerHTML = '<option value="">Select a Decision...</option>';
-        try {
-            const res = await fetch(`${API_URL}/decisions/`);
-            if (!res.ok) throw new Error("Failed to load decisions");
-            const decisions = await res.json();
-            decisions.forEach(d => {
-                select.innerHTML += `<option value="${d.id}">DEC-${d.id} · ${d.title}</option>`;
-            });
-        } catch (err) {
-            console.error(err);
+    async function switchDecision(decisionId) {
+        if (!decisionId) return;
+        currentDecisionId = parseInt(decisionId, 10);
+        await loadThreadsForDecision(currentDecisionId);
+        loadDecisionRationale(currentDecisionId);
+        loadMeetingNotes(currentDecisionId);
+        loadSupportingFiles(currentDecisionId);
+        loadDecisionTimeline();
+        if (currentActiveTab === 'chat') {
+            initWebSocket(currentDecisionId);
         }
     }
 
-    async function populateThreadsDropdown(selectId) {
-        const select = document.getElementById(selectId);
-        if (!select) return;
-        select.innerHTML = '<option value="">Select a Thread...</option>';
+    function initWebSocket(decisionId) {
+        if (!isCurrentlyOnline) return;
+        if (ws) {
+            ws.close();
+        }
         try {
-            const res = await fetch(`${API_URL}/decisions/threads/all`);
-            if (!res.ok) throw new Error("Failed to load threads");
+            ws = new WebSocket(`ws://127.0.0.1:8000/decisions/ws/${decisionId}`);
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'NEW_COMMENT' && data.thread_id === currentThreadId) {
+                    fetchThreadComments(currentThreadId, true);
+                }
+            };
+        } catch (e) {
+            console.log("WebSocket connect error, using polling fallback");
+        }
+    }
+
+    function switchNavTab(tabName) {
+        currentActiveTab = tabName;
+        document.querySelectorAll('#moduleNavTabs button').forEach(b => b.classList.remove('active'));
+        if (event && event.currentTarget) {
+            event.currentTarget.classList.add('active');
+        }
+
+        document.querySelectorAll('.module-tab-content').forEach(d => d.classList.add('d-none'));
+        document.getElementById(`tab-${tabName}`).classList.remove('d-none');
+
+        if (!isCurrentlyOnline) {
+            return;
+        }
+
+        if (tabName === 'timeline') loadDecisionTimeline();
+        if (tabName === 'rationale') loadDecisionRationale(currentDecisionId);
+        if (tabName === 'notes') loadMeetingNotes(currentDecisionId);
+        if (tabName === 'files') loadSupportingFiles(currentDecisionId);
+        if (tabName === 'notifications') loadUserNotifications();
+    }
+
+    // --- 1. THREADS & CHAT ---
+    async function loadThreadsForDecision(decisionId) {
+        const container = document.getElementById('threadsListContainer');
+        if (!isCurrentlyOnline) {
+            container.innerHTML = getOfflineCardHtml();
+            return;
+        }
+        container.innerHTML = '<div class="text-center py-2 text-muted small">Loading topics...</div>';
+        try {
+            const res = await fetch(`${API_URL}/decisions/${decisionId}/threads`);
+            if (!res.ok) return;
             const threads = await res.json();
-            threads.forEach(t => {
-                select.innerHTML += `<option value="${t.id}">${t.topic}</option>`;
+            if (threads.length === 0) {
+                container.innerHTML = '<div class="text-center py-3 text-muted small">No discussion topics.</div>';
+                document.getElementById('activeThreadTitle').innerText = "No topics found";
+                document.getElementById('chatFeedContainer').innerHTML = '<div class="text-center py-5 text-muted"><p>Click "+ New Thread" above to create the first topic.</p></div>';
+                return;
+            }
+            container.innerHTML = '';
+            threads.forEach((t, idx) => {
+                const isAct = t.id === currentThreadId || (idx === 0 && !currentThreadId);
+                if (isAct && !currentThreadId) currentThreadId = t.id;
+                
+                const badgeColor = t.status === 'Resolved' ? 'bg-success-subtle text-success border-success-subtle' : 'bg-primary-subtle text-primary border-primary-subtle';
+                container.innerHTML += `
+                    <div class="thread-card-item p-2.5 mb-1.5 cursor-pointer transition ${isAct ? 'active-thread' : ''}" onclick="selectThread(${t.id}, '${escapeHtml(t.topic)}', '${t.status}')">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-semibold text-dark text-xs truncate" style="max-width: 140px;">${escapeHtml(t.topic)}</span>
+                            <span class="badge ${badgeColor} border text-xs px-1.5 py-0.5">${t.status}</span>
+                        </div>
+                        <small class="text-muted text-xs d-block">${new Date(t.created_at).toLocaleDateString()}</small>
+                    </div>
+                `;
             });
-        } catch (err) {
-            console.error(err);
+            if (threads.length > 0 && !currentThreadId) {
+                selectThread(threads[0].id, threads[0].topic, threads[0].status);
+            }
+        } catch (e) {
+            console.error(e);
         }
     }
 
-    function openStartThreadModal() {
-        populateDecisionsDropdown('startThreadDecisionSelect');
-        document.getElementById('startThreadTopicInput').value = '';
-        new bootstrap.Modal(document.getElementById('startThreadModal')).show();
+    function selectThread(threadId, topic, status) {
+        currentThreadId = threadId;
+        document.getElementById('activeThreadTitle').innerText = topic;
+        document.getElementById('activeThreadSubtitle').innerText = `Decision ID: DEC-${currentDecisionId} • Status: ${status}`;
+        document.getElementById('chatThreadAvatar').innerText = topic.substring(0, 2).toUpperCase();
+        document.getElementById('threadStatusBtn').innerText = `Status: ${status}`;
+        fetchThreadComments(threadId);
     }
 
-    async function submitGlobalThread() {
-        const decisionId = document.getElementById('startThreadDecisionSelect').value;
-        const topic = document.getElementById('startThreadTopicInput').value.trim();
+    async function fetchThreadComments(threadId, silent = false) {
+        const container = document.getElementById('chatFeedContainer');
+        if (!isCurrentlyOnline) {
+            if (!silent) container.innerHTML = getOfflineCardHtml();
+            return;
+        }
+        if (!silent) container.innerHTML = '<div class="text-center py-4 text-muted small"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading messages...</div>';
         
-        if (!decisionId || !topic) {
-            alert("All fields are required");
-            return;
-        }
-
         try {
-            const res = await fetch(`${API_URL}/decisions/${decisionId}/threads`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    topic: topic,
-                    created_by: USER_ID
-                })
-            });
-
-            if (!res.ok) throw new Error("Failed to start discussion thread");
+            const res = await fetch(`${API_URL}/decisions/threads/${threadId}/comments`);
+            if (!res.ok) return;
+            const comments = await res.json();
             
-            bootstrap.Modal.getInstance(document.getElementById('startThreadModal')).hide();
-            fetchDiscussionData();
-        } catch (err) {
-            alert(err.message);
+            if (comments.length === 0) {
+                container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-chat-text fs-2 text-primary opacity-40 d-block mb-1"></i>No comments in this thread yet. Type below to send a message.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            comments.forEach(c => {
+                const isOwn = c.user_id === CURRENT_USER_ID;
+                const formattedTime = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const parentText = c.parent_snippet ? `<div class="p-1.5 px-2 mb-1.5 bg-light-subtle border-start border-3 border-primary text-muted text-xs rounded-2">${escapeHtml(c.parent_snippet)}</div>` : '';
+                
+                let reactionsHtml = '';
+                if (c.reactions) {
+                    try {
+                        const rMap = JSON.parse(c.reactions);
+                        Object.keys(rMap).forEach(emoji => {
+                            reactionsHtml += `<span class="badge bg-white border text-dark me-1 cursor-pointer text-xs shadow-2xs rounded-pill" onclick="toggleReaction(${c.id}, '${emoji}')">${emoji} ${rMap[emoji].length}</span>`;
+                        });
+                    } catch(e){}
+                }
+
+                container.innerHTML += `
+                    <div class="d-flex align-items-start gap-2.5 mb-3 ${isOwn ? 'flex-row-reverse' : ''}">
+                        <div class="avatar-circle ${isOwn ? 'bg-primary text-white' : 'bg-slate-200 text-dark'} flex-shrink-0" style="width: 34px; height: 34px; font-size: 11px;">
+                            ${c.author_initials || 'U'}
+                        </div>
+                        <div class="d-flex flex-column ${isOwn ? 'align-items-end' : 'align-items-start'}" style="max-width: 82%;">
+                            <div class="d-flex align-items-center gap-1.5 mb-1">
+                                <span class="fw-bold text-dark text-xs">${escapeHtml(c.author_name)}</span>
+                                <span class="badge bg-secondary-subtle text-secondary px-1.5 py-0.5 text-xs rounded-pill">${c.author_role}</span>
+                                <span class="text-muted text-xs ms-1">${formattedTime} ${c.is_edited ? '<small class="text-warning">(Edited)</small>' : ''}</span>
+                            </div>
+                            <div class="p-3 ${isOwn ? 'chat-bubble-sent' : 'chat-bubble-received'} text-sm" style="word-break: break-word;">
+                                ${parentText}
+                                ${typeof formatMentionsInContent === 'function' ? formatMentionsInContent(c.content) : escapeHtml(c.content)}
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mt-1 px-1">
+                                ${reactionsHtml}
+                                <button class="btn btn-link p-0 text-muted text-xs text-decoration-none fw-semibold" onclick="replyToComment(${c.id}, '${escapeHtml(c.author_name)}: ${escapeHtml(c.content.substring(0,25))}')">Reply</button>
+                                ${isOwn && !c.is_deleted ? `
+                                    <button class="btn btn-link p-0 text-primary text-xs text-decoration-none fw-semibold me-1" onclick="editCommentPrompt(${c.id}, \`${escapeHtml(c.content).replace(/`/g, '\\`')}\`)"><i class="bi bi-pencil-fill me-0.5"></i>Edit</button>
+                                    <button class="btn btn-link p-0 text-danger text-xs text-decoration-none fw-semibold" onclick="softDeleteComment(${c.id})"><i class="bi bi-trash-fill me-0.5"></i>Delete</button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            if (!silent) {
+                container.scrollTop = container.scrollHeight;
+            }
+        } catch(e) {
+            console.error(e);
         }
     }
 
-    function openAddCommentModal() {
-        populateThreadsDropdown('addCommentThreadSelect');
-        document.getElementById('addCommentContentInput').value = '';
-        new bootstrap.Modal(document.getElementById('addCommentModal')).show();
+    function handleChatKeyDown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendChatMessage();
+        }
     }
 
-    async function submitGlobalComment() {
-        const threadId = document.getElementById('addCommentThreadSelect').value;
-        const content = document.getElementById('addCommentContentInput').value.trim();
+    async function sendChatMessage() {
+        const input = document.getElementById('chatInputText');
+        const content = input.value.trim();
+        if (!content || !currentThreadId) return;
 
-        if (!threadId || !content) {
-            alert("All fields are required");
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before sending messages.");
             return;
         }
 
         try {
-            const res = await fetch(`${API_URL}/decisions/threads/${threadId}/comments`, {
+            const res = await fetch(`${API_URL}/decisions/threads/${currentThreadId}/comments`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: content,
-                    user_id: USER_ID
+                    user_id: CURRENT_USER_ID,
+                    reply_to_id: replyToCommentId
                 })
             });
 
-            if (!res.ok) throw new Error("Failed to post comment");
-
-            bootstrap.Modal.getInstance(document.getElementById('addCommentModal')).hide();
-            fetchDiscussionData();
-        } catch (err) {
-            alert(err.message);
+            if (res.ok) {
+                input.value = '';
+                cancelReply();
+                fetchThreadComments(currentThreadId);
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'NEW_COMMENT', thread_id: currentThreadId }));
+                }
+            }
+        } catch (e) {
+            console.error(e);
         }
     }
 
+    function replyToComment(commentId, snippet) {
+        replyToCommentId = commentId;
+        document.getElementById('replyToSnippet').innerText = snippet;
+        const banner = document.getElementById('replyPreviewBanner');
+        banner.classList.remove('d-none');
+        banner.classList.add('d-flex');
+    }
+
+    function cancelReply() {
+        replyToCommentId = null;
+        const banner = document.getElementById('replyPreviewBanner');
+        banner.classList.remove('d-flex');
+        banner.classList.add('d-none');
+    }
+
+    async function toggleReaction(commentId, emoji) {
+        if (!isCurrentlyOnline) return;
+        try {
+            await fetch(`${API_URL}/decisions/comments/${commentId}/react?emoji=${encodeURIComponent(emoji)}&user_id=${CURRENT_USER_ID}`, { method: "POST" });
+            fetchThreadComments(currentThreadId, true);
+        } catch(e){}
+    }
+
+    async function editCommentPrompt(commentId, currentContent) {
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before editing messages.");
+            return;
+        }
+        const newContent = prompt("Edit your message:", currentContent);
+        if (newContent === null || newContent.trim() === "" || newContent.trim() === currentContent) return;
+
+        try {
+            const res = await fetch(`${API_URL}/decisions/comments/${commentId}?content=${encodeURIComponent(newContent.trim())}&user_id=${CURRENT_USER_ID}`, {
+                method: "PUT"
+            });
+            if (res.ok) {
+                fetchThreadComments(currentThreadId, true);
+            } else {
+                const err = await res.json().catch(()=>({}));
+                alert(err.detail || "Failed to edit comment");
+            }
+        } catch(e){
+            console.error(e);
+        }
+    }
+
+    async function softDeleteComment(commentId) {
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before deleting messages.");
+            return;
+        }
+        if (!confirm("Are you sure you want to delete this comment?")) return;
+        try {
+            await fetch(`${API_URL}/decisions/comments/${commentId}?user_id=${CURRENT_USER_ID}`, { method: "DELETE" });
+            fetchThreadComments(currentThreadId, true);
+        } catch(e){}
+    }
+
+    async function changeThreadStatus(status) {
+        if (!currentThreadId || !isCurrentlyOnline) return;
+        try {
+            await fetch(`${API_URL}/decisions/threads/${currentThreadId}/status?status=${encodeURIComponent(status)}&user_id=${CURRENT_USER_ID}`, { method: "PATCH" });
+            document.getElementById('threadStatusBtn').innerText = `Status: ${status}`;
+            loadThreadsForDecision(currentDecisionId);
+        } catch(e){}
+    }
+
+    // --- 2. DECISION TIMELINE ---
+    async function loadDecisionTimeline() {
+        const container = document.getElementById('timelineListContainer');
+        if (!isCurrentlyOnline) {
+            container.innerHTML = getOfflineCardHtml();
+            return;
+        }
+        container.innerHTML = '<div class="text-center py-4 text-muted small"><div class="spinner-border spinner-border-sm text-info me-2"></div>Loading timeline...</div>';
+        
+        const cat = document.getElementById('timelineFilterCategory').value;
+        const q = document.getElementById('timelineSearchInput').value.trim();
+
+        try {
+            const res = await fetch(`${API_URL}/decisions/${currentDecisionId}/timeline?category=${encodeURIComponent(cat)}&q=${encodeURIComponent(q)}`);
+            if (!res.ok) return;
+            const items = await res.json();
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-muted small">No activity timeline logs found for this decision.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            items.forEach(item => {
+                const formattedTime = new Date(item.timestamp).toLocaleString();
+                container.innerHTML += `
+                    <div class="d-flex align-items-start gap-3 border-bottom pb-3 mb-3">
+                        <div class="avatar-circle bg-info-subtle text-info flex-shrink-0" style="width: 38px; height: 38px;">
+                            <i class="bi bi-clock-history fs-6"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-baseline mb-1">
+                                <h6 class="fw-bold text-dark text-sm mb-0">${escapeHtml(item.action)}</h6>
+                                <span class="text-muted text-xs">${formattedTime}</span>
+                            </div>
+                            <p class="text-muted text-xs mb-1.5">${escapeHtml(item.details || '')}</p>
+                            <span class="badge bg-light border text-dark text-xs rounded-pill px-2 py-0.5">${escapeHtml(item.user_name)} (${item.user_role})</span>
+                        </div>
+                    </div>
+                `;
+            });
+        } catch(e){
+            console.error(e);
+        }
+    }
+
+    // --- 3. DECISION RATIONALE ---
+    async function loadDecisionRationale(decisionId) {
+        if (!isCurrentlyOnline) return;
+        try {
+            const res = await fetch(`${API_URL}/decisions/${decisionId}/rationale`);
+            if (!res.ok) return;
+            const rat = await res.json();
+
+            // Unsaved Data Protection: Only set value if input is not focused or unedited
+            if (document.activeElement !== document.getElementById('ratWhy') && !document.getElementById('ratWhy').value.trim()) {
+                document.getElementById('ratWhy').value = rat.why_required || '';
+            }
+            if (document.activeElement !== document.getElementById('ratJustification') && !document.getElementById('ratJustification').value.trim()) {
+                document.getElementById('ratJustification').value = rat.business_justification || '';
+            }
+            if (document.activeElement !== document.getElementById('ratBenefits') && !document.getElementById('ratBenefits').value.trim()) {
+                document.getElementById('ratBenefits').value = rat.expected_benefits || '';
+            }
+            if (document.activeElement !== document.getElementById('ratRisks') && !document.getElementById('ratRisks').value.trim()) {
+                document.getElementById('ratRisks').value = rat.risks || '';
+            }
+            if (document.activeElement !== document.getElementById('ratAssumptions') && !document.getElementById('ratAssumptions').value.trim()) {
+                document.getElementById('ratAssumptions').value = rat.assumptions || '';
+            }
+
+            if (rat.updated_at && rat.updater_name) {
+                document.getElementById('rationaleMetadataText').innerText = `Last updated by ${rat.updater_name} on ${new Date(rat.updated_at).toLocaleString()}`;
+            }
+        } catch(e){}
+    }
+
+    async function saveDecisionRationale() {
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before saving rationale.");
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/decisions/${currentDecisionId}/rationale`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    why_required: document.getElementById('ratWhy').value.trim(),
+                    business_justification: document.getElementById('ratJustification').value.trim(),
+                    expected_benefits: document.getElementById('ratBenefits').value.trim(),
+                    risks: document.getElementById('ratRisks').value.trim(),
+                    assumptions: document.getElementById('ratAssumptions').value.trim(),
+                    user_id: CURRENT_USER_ID
+                })
+            });
+
+            if (res.ok) {
+                alert("Decision Rationale saved successfully!");
+                loadDecisionRationale(currentDecisionId);
+            }
+        } catch(e){}
+    }
+
+    // --- 4. MEETING NOTES ---
+    async function loadMeetingNotes(decisionId) {
+        const container = document.getElementById('meetingNotesListContainer');
+        if (!isCurrentlyOnline) {
+            container.innerHTML = getOfflineCardHtml();
+            return;
+        }
+        container.innerHTML = '<div class="text-center py-4 text-muted small">Loading notes...</div>';
+        try {
+            const res = await fetch(`${API_URL}/decisions/${decisionId}/meeting_notes`);
+            if (!res.ok) return;
+            const notes = await res.json();
+            document.getElementById('meetingNotesBadgeCount').innerText = notes.length;
+
+            if (notes.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-muted small">No meeting notes recorded yet.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            notes.forEach(n => {
+                const formattedDate = n.meeting_date ? new Date(n.meeting_date).toLocaleString() : 'No date';
+                const statusInfo = typeof getMeetingStatusInfo === 'function' ? getMeetingStatusInfo(n) : {
+                    label: n.status || (n.meeting_date ? (new Date(n.meeting_date) > new Date() ? 'Scheduled' : 'Completed') : 'Not Scheduled'),
+                    badgeClass: 'bg-primary-subtle text-primary border border-primary-subtle'
+                };
+                container.innerHTML += `
+                    <div class="border rounded-4 p-3 mb-3 bg-white shadow-2xs">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="fw-bold text-dark mb-0">${escapeHtml(n.title)}</h6>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge ${statusInfo.badgeClass} rounded-pill text-xs">${statusInfo.label}</span>
+                                <span class="badge bg-light text-secondary border px-2 py-1 text-xs rounded-pill"><i class="bi bi-calendar me-1"></i>${formattedDate}</span>
+                            </div>
+                        </div>
+                        <p class="text-secondary text-xs mb-2">${escapeHtml(n.notes)}</p>
+                        <div class="row g-2 text-xs text-muted border-top pt-2 mt-2">
+                            <div class="col-md-6"><strong>Participants:</strong> ${escapeHtml(n.participants || 'N/A')}</div>
+                            <div class="col-md-6"><strong>Agenda:</strong> ${escapeHtml(n.agenda || 'N/A')}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        } catch(e){}
+    }
+
     function openAddMeetingNoteModal() {
-        populateDecisionsDropdown('addNoteDecisionSelect');
-        document.getElementById('addNoteTitleInput').value = '';
-        document.getElementById('addNoteContentInput').value = '';
-        document.getElementById('addNoteDateInput').value = '';
+        document.getElementById('editNoteId').value = '';
+        document.getElementById('noteTitleInput').value = '';
+        document.getElementById('noteNotesInput').value = '';
         new bootstrap.Modal(document.getElementById('addMeetingNoteModal')).show();
     }
 
-    async function submitGlobalMeetingNote() {
-        const decisionId = document.getElementById('addNoteDecisionSelect').value;
-        const title = document.getElementById('addNoteTitleInput').value.trim();
-        const notes = document.getElementById('addNoteContentInput').value.trim();
-        const date = document.getElementById('addNoteDateInput').value;
+    async function saveMeetingNote() {
+        const title = document.getElementById('noteTitleInput').value.trim();
+        const notes = document.getElementById('noteNotesInput').value.trim();
+        const dateVal = document.getElementById('noteDateInput').value;
 
-        if (!decisionId || !title || !notes) {
-            alert("Decision, Title, and Notes are required");
+        if (!title || !notes) {
+            alert("Title and Notes content are required.");
+            return;
+        }
+
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before saving meeting notes.");
             return;
         }
 
         try {
-            const res = await fetch(`${API_URL}/decisions/${decisionId}/meeting_notes`, {
+            const res = await fetch(`${API_URL}/decisions/${currentDecisionId}/meeting_notes`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: title,
                     notes: notes,
-                    meeting_date: date ? new Date(date).toISOString() : null,
-                    created_by: USER_ID
+                    meeting_date: dateVal ? new Date(dateVal).toISOString() : null,
+                    participants: document.getElementById('noteParticipantsInput').value,
+                    agenda: document.getElementById('noteAgendaInput').value,
+                    action_items: document.getElementById('noteActionItemsInput').value,
+                    created_by: CURRENT_USER_ID
                 })
             });
 
-            if (!res.ok) throw new Error("Failed to save meeting notes");
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('addMeetingNoteModal')).hide();
+                loadMeetingNotes(currentDecisionId);
+            }
+        } catch(e){}
+    }
 
-            bootstrap.Modal.getInstance(document.getElementById('addMeetingNoteModal')).hide();
-            fetchDiscussionData();
-        } catch (err) {
-            alert(err.message);
+    // --- 5. SUPPORTING FILES ---
+    async function loadSupportingFiles(decisionId) {
+        const container = document.getElementById('supportingFilesListContainer');
+        if (!isCurrentlyOnline) {
+            container.innerHTML = getOfflineCardHtml();
+            return;
         }
+        container.innerHTML = '<div class="text-center py-4 text-muted small">Loading files...</div>';
+        try {
+            const res = await fetch(`${API_URL}/decisions/${decisionId}/files`);
+            if (!res.ok) return;
+            const files = await res.json();
+            document.getElementById('filesBadgeCount').innerText = files.length;
+
+            if (files.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-muted small">No supporting documents attached.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            files.forEach(f => {
+                const sizeMB = (f.file_size / (1024 * 1024)).toFixed(2);
+                container.innerHTML += `
+                    <div class="d-flex align-items-center justify-content-between border rounded-4 p-3 mb-2 bg-white shadow-2xs">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="avatar-circle bg-primary-subtle text-primary flex-shrink-0" style="width: 40px; height: 40px;">
+                                <i class="bi bi-file-earmark-text-fill fs-5"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0 text-sm">${escapeHtml(f.filename)}</h6>
+                                <small class="text-muted text-xs">${sizeMB} MB • Uploaded ${new Date(f.uploaded_at).toLocaleDateString()}</small>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary text-xs rounded-3 px-2.5" onclick="window.open('${API_URL}${f.file_path}', '_blank')"><i class="bi bi-download me-1"></i>Download</button>
+                            <button class="btn btn-sm btn-outline-danger text-xs rounded-3 px-2" onclick="deleteSupportingFile(${f.id})"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+        } catch(e){}
     }
 
     function openUploadFileModal() {
-        populateDecisionsDropdown('uploadFileDecisionSelect');
-        document.getElementById('uploadFileInput').value = '';
         new bootstrap.Modal(document.getElementById('uploadFileModal')).show();
     }
 
-    async function submitGlobalFile() {
-        const decisionId = document.getElementById('uploadFileDecisionSelect').value;
-        const files = document.getElementById('uploadFileInput').files;
+    async function submitModalFileUpload() {
+        const files = document.getElementById('modalFileInput').files;
+        if (!files || files.length === 0) return;
+        await uploadFileBlob(files[0]);
+        bootstrap.Modal.getInstance(document.getElementById('uploadFileModal')).hide();
+    }
 
-        if (!decisionId || files.length === 0) {
-            alert("Decision and File are required");
+    async function handleInlineFileUpload(event) {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+        await uploadFileBlob(files[0]);
+    }
+
+    async function uploadFileBlob(file) {
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before uploading files.");
             return;
         }
-
-        const file = files[0];
-        if (file.size > 200 * 1024 * 1024) {
-            alert(`File "${file.name}" exceeds the maximum allowed upload limit of 200 MB.`);
-            return;
-        }
-
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('user_id', USER_ID);
-        formData.append('decision_id', decisionId);
+        formData.append('user_id', CURRENT_USER_ID);
 
         try {
-            const res = await fetch(`${API_URL}/upload/`, {
+            const res = await fetch(`${API_URL}/decisions/${currentDecisionId}/files`, {
                 method: "POST",
                 body: formData
             });
 
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.detail || "Failed to upload document");
+            if (res.ok) {
+                alert("File uploaded successfully!");
+                loadSupportingFiles(currentDecisionId);
+            }
+        } catch(e){}
+    }
+
+    async function deleteSupportingFile(fileId) {
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before deleting files.");
+            return;
+        }
+        if (!confirm("Are you sure you want to delete this file?")) return;
+        try {
+            await fetch(`${API_URL}/decisions/files/${fileId}?user_id=${CURRENT_USER_ID}`, { method: "DELETE" });
+            loadSupportingFiles(currentDecisionId);
+        } catch(e){}
+    }
+
+    // --- 6. NOTIFICATIONS ---
+    async function loadUserNotifications() {
+        const container = document.getElementById('notificationsListContainer');
+        if (!isCurrentlyOnline) {
+            container.innerHTML = getOfflineCardHtml();
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/decisions/notifications/user/${CURRENT_USER_ID}`);
+            if (!res.ok) return;
+            const notifs = await res.json();
+            const unreadCount = notifs.filter(n => !n.is_read).length;
+            document.getElementById('notificationsBadgeCount').innerText = unreadCount;
+            document.getElementById('unreadBadgeCount').innerText = unreadCount;
+
+            if (notifs.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-muted small">No notifications.</div>';
+                return;
             }
 
-            bootstrap.Modal.getInstance(document.getElementById('uploadFileModal')).hide();
-            alert("Supporting document uploaded successfully");
-            fetchDiscussionData();
-        } catch (err) {
-            alert(err.message);
+            container.innerHTML = '';
+            notifs.forEach(n => {
+                container.innerHTML += `
+                    <div class="d-flex align-items-start justify-content-between p-3 mb-2 border rounded-4 ${n.is_read ? 'bg-white' : 'bg-primary-subtle border-primary-subtle'}">
+                        <div>
+                            <div class="fw-bold text-dark text-xs mb-1">${escapeHtml(n.message)}</div>
+                            <small class="text-muted text-xs">${new Date(n.created_at).toLocaleString()}</small>
+                        </div>
+                        ${!n.is_read ? `<button class="btn btn-link btn-sm text-xs p-0 text-primary text-decoration-none fw-semibold" onclick="markNotificationRead(${n.id})">Mark Read</button>` : ''}
+                    </div>
+                `;
+            });
+        } catch(e){}
+    }
+
+    async function markNotificationRead(notifId) {
+        if (!isCurrentlyOnline) return;
+        try {
+            await fetch(`${API_URL}/decisions/notifications/read?notification_id=${notifId}`, { method: "POST" });
+            loadUserNotifications();
+        } catch(e){}
+    }
+
+    async function markAllNotificationsRead() {
+        if (!isCurrentlyOnline) return;
+        try {
+            await fetch(`${API_URL}/decisions/notifications/read-all?user_id=${CURRENT_USER_ID}`, { method: "POST" });
+            loadUserNotifications();
+        } catch(e){}
+    }
+
+    // --- 7. TEAM PRESENCE ---
+    async function loadTeamPresence() {
+        const container = document.getElementById('teamPresenceContainer');
+        if (!isCurrentlyOnline) return;
+        try {
+            const res = await fetch(`${API_URL}/users/`);
+            if (!res.ok) return;
+            const users = await res.json();
+            container.innerHTML = '';
+            users.forEach((u, idx) => {
+                const isOnline = idx % 2 === 0;
+                container.innerHTML += `
+                    <div class="d-flex align-items-center justify-content-between p-1.5 mb-1 text-xs rounded-2 hover-bg">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="presence-dot ${isOnline ? 'bg-success' : 'bg-secondary'}"></span>
+                            <span class="fw-medium text-dark">${escapeHtml(u.full_name)}</span>
+                        </div>
+                        <small class="text-muted text-xs">${isOnline ? 'Online' : 'Offline'}</small>
+                    </div>
+                `;
+            });
+        } catch(e){}
+    }
+
+    // --- 8. UNIFIED SEARCH ---
+    async function executeUnifiedSearch() {
+        const query = document.getElementById('unifiedSearchInput').value.trim();
+        if (!query) return;
+
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please check your network and try again.");
+            return;
         }
+
+        const container = document.getElementById('searchResultsContainer');
+        container.innerHTML = '<div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Searching...</div>';
+        
+        const modal = new bootstrap.Modal(document.getElementById('unifiedSearchModal'));
+        modal.show();
+
+        try {
+            const res = await fetch(`${API_URL}/decisions/search?q=${encodeURIComponent(query)}&user_id=${CURRENT_USER_ID}`);
+            if (!res.ok) return;
+            const data = await res.json();
+
+            container.innerHTML = `
+                <div class="mb-3">
+                    <h6 class="fw-bold text-primary border-bottom pb-1.5 text-xs text-uppercase tracking-wider"><i class="bi bi-chat-dots me-1"></i> Thread Topics (${data.threads.length})</h6>
+                    ${data.threads.map(t => `<div class="p-2 border-bottom text-xs"><strong>${escapeHtml(t.topic)}</strong> (Decision DEC-${t.decision_id})</div>`).join('') || '<div class="text-muted text-xs py-1">No matching topics</div>'}
+                </div>
+                <div class="mb-3">
+                    <h6 class="fw-bold text-info border-bottom pb-1.5 text-xs text-uppercase tracking-wider"><i class="bi bi-chat-text me-1"></i> Messages (${data.messages.length})</h6>
+                    ${data.messages.map(m => `<div class="p-2 border-bottom text-xs">${escapeHtml(m.content)}</div>`).join('') || '<div class="text-muted text-xs py-1">No matching messages</div>'}
+                </div>
+                <div class="mb-3">
+                    <h6 class="fw-bold text-success border-bottom pb-1.5 text-xs text-uppercase tracking-wider"><i class="bi bi-calendar-event me-1"></i> Meeting Notes (${data.meeting_notes.length})</h6>
+                    ${data.meeting_notes.map(n => `<div class="p-2 border-bottom text-xs"><strong>${escapeHtml(n.title)}</strong></div>`).join('') || '<div class="text-muted text-xs py-1">No matching meeting notes</div>'}
+                </div>
+                <div class="mb-3">
+                    <h6 class="fw-bold text-secondary border-bottom pb-1.5 text-xs text-uppercase tracking-wider"><i class="bi bi-paperclip me-1"></i> Files (${data.files.length})</h6>
+                    ${data.files.map(f => `<div class="p-2 border-bottom text-xs"><strong>${escapeHtml(f.filename)}</strong></div>`).join('') || '<div class="text-muted text-xs py-1">No matching files</div>'}
+                </div>
+            `;
+        } catch(e){}
+    }
+
+    function openStartThreadModal() {
+        document.getElementById('startThreadTopicInput').value = '';
+        new bootstrap.Modal(document.getElementById('startThreadModal')).show();
+    }
+
+    async function submitGlobalThread() {
+        const topic = document.getElementById('startThreadTopicInput').value.trim();
+        if (!topic || !currentDecisionId) return;
+
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before creating threads.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/decisions/${currentDecisionId}/threads`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ topic: topic, created_by: CURRENT_USER_ID })
+            });
+
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('startThreadModal')).hide();
+                loadThreadsForDecision(currentDecisionId);
+            }
+        } catch(e){}
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 </script>
-
-<!-- Start Thread Modal -->
-<div class="modal fade" id="startThreadModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold">Start Discussion Thread</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Linked Decision</label>
-                    <select id="startThreadDecisionSelect" class="form-select"></select>
-                </div>
-                <div class="mb-0">
-                    <label class="form-label fw-semibold text-secondary">Thread Topic</label>
-                    <input type="text" id="startThreadTopicInput" class="form-control" placeholder="E.g., Infrastructure scalability concerns...">
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" onclick="submitGlobalThread()">Start Thread</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Comment Modal -->
-<div class="modal fade" id="addCommentModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold">Add Comment</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Select Thread</label>
-                    <select id="addCommentThreadSelect" class="form-select"></select>
-                </div>
-                <div class="mb-0">
-                    <label class="form-label fw-semibold text-secondary">Comment Content</label>
-                    <textarea id="addCommentContentInput" class="form-control" rows="3" placeholder="Write your comments..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" onclick="submitGlobalComment()">Post Comment</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Meeting Note Modal -->
-<div class="modal fade" id="addMeetingNoteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold">Record Meeting Notes</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Linked Decision</label>
-                    <select id="addNoteDecisionSelect" class="form-select"></select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Meeting Title</label>
-                    <input type="text" id="addNoteTitleInput" class="form-control" placeholder="E.g., Q4 Technology Budget Sync">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Notes/Minutes</label>
-                    <textarea id="addNoteContentInput" class="form-control" rows="4" placeholder="Agenda items, summaries, action tasks..."></textarea>
-                </div>
-                <div class="mb-0">
-                    <label class="form-label fw-semibold text-secondary">Meeting Date</label>
-                    <input type="datetime-local" id="addNoteDateInput" class="form-control">
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" onclick="submitGlobalMeetingNote()">Save Notes</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Upload File Modal -->
-<div class="modal fade" id="uploadFileModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold">Upload Supporting Document</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Linked Decision</label>
-                    <select id="uploadFileDecisionSelect" class="form-select"></select>
-                </div>
-                <div class="mb-0">
-                    <label class="form-label fw-semibold text-secondary">Choose File</label>
-                    <input type="file" id="uploadFileInput" class="form-control" accept=".pdf,.docx,.xlsx,.pptx,.csv">
-                    <div class="form-text text-xs">Supports PDF, DOCX, XLSX, PPTX, and CSV files up to 200 MB</div>
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" onclick="submitGlobalFile()">Upload File</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-    .hover-shadow:hover { box-shadow: 0 .125rem .25rem rgba(0,0,0,.075)!important; cursor: pointer; }
-    .transition { transition: all .2s ease-in-out; }
-    .last-border-0:last-child { border-bottom: 0 !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }
-</style>
 {% endblock %}

@@ -198,10 +198,16 @@
             } else if (n.notification_type === 'Discussion') {
                 iconName = 'message-square';
                 bgClass = 'bg-discussion';
+            } else if (n.notification_type === 'Support Request') {
+                iconName = 'headphones';
+                bgClass = 'bg-review';
             }
 
             const decId = extractDecisionId(n.message);
-            const viewBtn = decId ? `<a href="/decision/${decId}" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">View Decision</a>` : '';
+            let viewBtn = decId ? `<a href="/decision/${decId}" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">View Decision</a>` : '';
+            if (n.notification_type === 'Support Request' || n.message.includes('SUP-') || n.message.toLowerCase().includes('support request')) {
+                viewBtn = `<a href="/support" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">View Support Center</a>`;
+            }
 
             html += `
                 <div class="notif-card ${!n.is_read ? 'unread' : ''}">

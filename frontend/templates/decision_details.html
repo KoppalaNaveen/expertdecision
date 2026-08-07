@@ -58,14 +58,145 @@
         border-radius: 4px;
     }
     .avatar-sm {
-        width: 24px;
-        height: 24px;
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+    }
+
+    /* Modern Discussion Chat Styling */
+    .chat-msg-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 12px;
+        width: 100%;
+    }
+    .chat-msg-row.own-msg {
+        flex-direction: row-reverse;
+    }
+
+    .chat-avatar {
+        width: 34px;
+        height: 34px;
         border-radius: 50%;
-        display: inline-flex;
+        display: flex;
         align-items: center;
         justify-content: center;
+        font-weight: 700;
+        font-size: 11.5px;
+        flex-shrink: 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    }
+
+    .chat-bubble-wrap {
+        max-width: 78%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chat-msg-row.own-msg .chat-bubble-wrap {
+        align-items: flex-end;
+    }
+
+    .chat-msg-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+        font-size: 11px;
+    }
+
+    .chat-msg-author {
+        font-weight: 700;
+        color: #1E293B;
+    }
+
+    .chat-msg-empid {
+        background: #E2E8F0;
+        color: #0F172A;
+        padding: 1px 6px;
+        border-radius: 4px;
         font-size: 10px;
-        font-weight: bold;
+        font-weight: 700;
+        font-family: monospace;
+        border: 1px solid #CBD5E1;
+    }
+
+    .chat-msg-time {
+        color: #94A3B8;
+        font-size: 10px;
+    }
+
+    .chat-bubble {
+        padding: 11px 15px;
+        border-radius: 16px;
+        font-size: 13.5px;
+        line-height: 1.5;
+        word-break: break-word;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    .chat-msg-row.own-msg .chat-bubble {
+        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+        color: #FFFFFF;
+        border-bottom-right-radius: 4px;
+    }
+
+    .chat-msg-row.other-msg .chat-bubble {
+        background: #FFFFFF;
+        color: #0F172A;
+        border: 1px solid #E2E8F0;
+        border-bottom-left-radius: 4px;
+    }
+
+    /* Rendered Mention Pill */
+    .mention-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #E0F2FE;
+        color: #0284C7;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        border: 1px solid #BAE6FD;
+        margin: 0 2px;
+    }
+
+    .chat-msg-row.own-msg .mention-pill {
+        background: rgba(255, 255, 255, 0.25);
+        color: #FFFFFF;
+        border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .mention-empid {
+        background: rgba(2, 132, 199, 0.15);
+        color: #0369A1;
+        font-size: 10px;
+        padding: 0 4px;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+
+    .chat-msg-row.own-msg .mention-empid {
+        background: rgba(255, 255, 255, 0.3);
+        color: #FFFFFF;
+    }
+
+    /* Mention Dropdown Menu Items */
+    .mention-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .mention-dropdown-item:hover, .mention-dropdown-item.active {
+        background: #F1F5F9;
     }
 </style>
 
@@ -88,7 +219,7 @@
         <button id="btnSubmitDraft" class="btn btn-success shadow-sm fw-semibold d-flex align-items-center d-none" onclick="submitDraftForReview()">
             <i class="bi bi-send-check-fill me-2"></i> Submit for Review
         </button>
-        <button id="btnEditDecision" class="btn btn-white border shadow-sm fw-semibold text-secondary d-flex align-items-center" onclick="window.location.href='/create_decision?edit=' + DECISION_ID">
+        <button id="btnEditDecision" class="btn btn-white border shadow-sm fw-semibold text-secondary d-flex align-items-center" onclick="window.location.href='/create_decision?edit={{ decision_id }}'">
             <i class="bi bi-pencil me-2"></i> Edit
         </button>
         <button id="btnArchiveDecision" class="btn btn-white border shadow-sm fw-semibold text-secondary d-flex align-items-center" onclick="archiveCurrentDecision()">
@@ -240,8 +371,10 @@
                     <div class="text-center py-4 text-muted small">Loading approval chain...</div>
                 </div>
                 
-                <!-- Admin override for demo purposes -->
-                <div class="mt-4 pt-3 border-top">
+                <!-- Admin override section (Only for Administrators) -->
+                {% set role_name = session.get('role_name', 'User') %}
+                {% if role_name in ['Administrator', 'Admin'] %}
+                <div class="mt-4 pt-3 border-top" id="updateStatusContainer">
                     <label class="form-label fw-semibold text-sm">Update Decision Status</label>
                     <div class="input-group input-group-sm">
                         <select id="statusSelect" class="form-select border-end-0">
@@ -254,6 +387,7 @@
                         <button class="btn btn-outline-secondary" onclick="updateStatus()">Update</button>
                     </div>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -379,29 +513,55 @@
             </div>
         </div>
 
-        <!-- Comments Feed Panel -->
+        <!-- Comments Feed Panel (Modern Chat Page Experience) -->
         <div class="col-md-7 col-lg-8">
-            <div class="premium-card p-4 d-flex flex-column h-100" style="min-height: 500px;">
-                <div class="border-bottom pb-2 mb-3 d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="fw-bold text-dark mb-0" id="currentThreadTopic">Select a Thread</h5>
-                        <span class="badge bg-primary-subtle text-primary border rounded-pill text-xs mt-1" id="currentThreadStatus" style="display: none;">Open</span>
+            <div class="premium-card p-0 d-flex flex-column h-100 overflow-hidden border" style="min-height: 540px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.06);">
+                <!-- Chat Header -->
+                <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width: 38px; height: 38px; font-size: 15px;">
+                            💬
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h6 class="fw-bold text-dark mb-0 fs-6" id="currentThreadTopic">Select a Thread</h6>
+                                <span class="badge bg-primary-subtle text-primary border rounded-pill text-xs" id="currentThreadStatus" style="display: none;">Open</span>
+                            </div>
+                            <small class="text-muted" style="font-size: 11px;" id="currentThreadSubtext">Join the team discussion</small>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-danger btn-sm text-xs rounded-3 d-none align-items-center gap-1 fw-semibold shadow-2xs" id="btnDeleteActiveThread" onclick="deleteActiveThread()">
+                        <i class="bi bi-trash"></i> Delete Thread
+                    </button>
+                </div>
+
+                <!-- Chat Body (Scrollable Messages Container) -->
+                <div id="commentsFeedContainer" class="flex-grow-1 p-4 d-flex flex-column gap-2" style="max-height: 430px; min-height: 380px; overflow-y: auto; background: #F8FAFC;">
+                    <div class="text-center text-muted py-5 my-auto">
+                        <div class="rounded-circle bg-white border d-inline-flex align-items-center justify-content-center p-3 mb-3 shadow-sm">
+                            <i class="bi bi-chat-dots text-primary fs-2"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark">No Thread Selected</h6>
+                        <p class="small text-muted mb-0">Select a thread from the panel on the left to view conversation messages.</p>
                     </div>
                 </div>
 
-                <!-- Scrollable comments list -->
-                <div id="commentsFeedContainer" class="flex-grow-1 mb-3" style="max-height: 400px; overflow-y: auto; padding-right: 8px;">
-                    <div class="text-center text-muted py-5">
-                        <i class="bi bi-chat-dots text-secondary fs-2 d-block mb-2"></i>
-                        Select a thread from the panel to view conversation comments.
+                <!-- Chat Input Box with Mention Support -->
+                <div class="p-3 border-top bg-white position-relative" id="addCommentFormBox" style="display: none;">
+                    <!-- Mention Autocomplete Popup Dropdown -->
+                    <div id="mentionDropdown" class="dropdown-menu shadow-lg border p-1 position-absolute" style="display: none; max-height: 220px; overflow-y: auto; z-index: 1050; bottom: 100%; left: 16px; width: 320px; border-radius: 12px; background: #FFFFFF; border-color: #E2E8F0 !important;">
+                        <!-- Mention items populated via JS -->
                     </div>
-                </div>
 
-                <!-- Add Comment box -->
-                <div class="mt-auto border-top pt-3" id="addCommentFormBox" style="display: none;">
-                    <div class="input-group">
-                        <textarea class="form-control border-light-subtle" id="newCommentContent" rows="2" placeholder="Write your comment... Use @ to mention teammates" style="resize: none;"></textarea>
-                        <button class="btn btn-primary px-4" type="button" onclick="submitComment()">Post</button>
+                    <div class="d-flex align-items-end gap-2">
+                        <div class="flex-grow-1 position-relative">
+                            <textarea class="form-control border-light-subtle rounded-3 p-2.5" id="newCommentContent" rows="2" placeholder="Write a message... Type @ to mention team members by Name or Employee ID" style="resize: none; font-size: 13.5px; line-height: 1.45;"></textarea>
+                            <small class="text-muted position-absolute bottom-0 end-0 pe-2 pb-1" style="font-size: 10px; pointer-events: none; opacity: 0.7;">Press Enter to send (Shift+Enter for new line)</small>
+                        </div>
+                        <button class="btn btn-primary px-3 py-2.5 fw-bold d-flex align-items-center gap-1.5 rounded-3 shadow-sm" type="button" onclick="submitComment()">
+                            <i class="bi bi-send-fill"></i>
+                            <span>Send</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -414,13 +574,29 @@
     <div class="row g-4">
         <div class="col-lg-8">
             <div class="premium-card p-4">
-                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-3 mb-3 gap-2">
                     <div>
                         <h5 class="fw-bold text-dark mb-1">Meeting Notes Log</h5>
                         <p class="text-muted text-sm mb-0">Review documented session records and action items.</p>
                     </div>
-                    <button class="btn btn-outline-primary btn-sm fw-semibold" onclick="openNewMeetingNoteModal()">
+                    <button class="btn btn-outline-primary btn-sm fw-semibold rounded-pill px-3 shadow-2xs" onclick="openNewMeetingNoteModal()">
                         <i class="bi bi-calendar-plus me-1"></i> Add Notes
+                    </button>
+                </div>
+
+                <!-- Status Filter Pills Bar -->
+                <div class="d-flex align-items-center gap-2 mb-4 p-1.5 rounded-3 bg-light border">
+                    <button type="button" class="btn btn-sm filter-pill-btn btn-primary text-white fw-bold px-3 py-1.5 rounded-2 shadow-2xs" id="filter-btn-all" onclick="filterMeetingNotes('all')">
+                        All <span class="badge bg-white text-primary rounded-pill ms-1" id="count-all">0</span>
+                    </button>
+                    <button type="button" class="btn btn-sm filter-pill-btn text-secondary fw-semibold px-3 py-1.5 rounded-2" id="filter-btn-scheduled" onclick="filterMeetingNotes('scheduled')">
+                        Scheduled <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill ms-1" id="count-scheduled">0</span>
+                    </button>
+                    <button type="button" class="btn btn-sm filter-pill-btn text-secondary fw-semibold px-3 py-1.5 rounded-2" id="filter-btn-in_progress" onclick="filterMeetingNotes('in_progress')">
+                        In Progress <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill ms-1" id="count-in_progress">0</span>
+                    </button>
+                    <button type="button" class="btn btn-sm filter-pill-btn text-secondary fw-semibold px-3 py-1.5 rounded-2" id="filter-btn-completed" onclick="filterMeetingNotes('completed')">
+                        Completed <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-1" id="count-completed">0</span>
                     </button>
                 </div>
 
@@ -431,23 +607,10 @@
         </div>
 
         <div class="col-lg-4">
-            <div class="premium-card p-4 mb-4">
-                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Participants</h6>
-                <div id="meetingParticipantsContainer" class="d-flex flex-column gap-2">
-                    <!-- Populated dynamically via JS -->
-                </div>
-            </div>
-
             <div class="premium-card p-4">
                 <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Next Scheduled Session</h6>
-                <div class="d-flex align-items-center gap-3">
-                    <div class="rounded-3 bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; flex-shrink: 0;">
-                        <i class="bi bi-calendar-event fs-4"></i>
-                    </div>
-                    <div>
-                        <h6 class="fw-bold mb-1 text-sm">Implementation Sync</h6>
-                        <span class="text-muted text-xs">Tomorrow · 2:00 PM · Zoom</span>
-                    </div>
+                <div id="nextScheduledSessionContainer">
+                    <div class="text-muted text-xs py-3 text-center">No upcoming meeting scheduled.</div>
                 </div>
             </div>
         </div>
@@ -530,58 +693,7 @@
     </div>
 </div>
 
-<!-- New Meeting Note Modal -->
-<div class="modal fade" id="newMeetingNoteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold">Record Meeting Notes</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Meeting Title</label>
-                    <input type="text" id="newMeetingTitle" class="form-control" placeholder="E.g., Q4 Architecture Review">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Notes/Minutes</label>
-                    <textarea id="newMeetingNotes" class="form-control" rows="5" placeholder="Meeting summaries, agenda details, actions items..."></textarea>
-                </div>
-                <div class="mb-0">
-                    <label class="form-label fw-semibold text-secondary">Meeting Date</label>
-                    <input type="datetime-local" id="newMeetingDate" class="form-control">
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" onclick="submitNewMeetingNote()">Save Notes</button>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Meeting Notes Detail Modal -->
-<div class="modal fade" id="meetingNoteDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold" id="detailNoteTitle">Meeting Note Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3 text-muted text-xs">
-                    <i class="bi bi-calendar me-1"></i> <span id="detailNoteDate">...</span>
-                </div>
-                <div class="p-3 bg-light rounded" id="detailNoteContent" style="white-space: pre-line; font-size: 14px; line-height: 1.6;">
-                    ...
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 
 <!-- Alternative Add/Edit Modal (Multi-Step Wizard) -->
@@ -768,60 +880,7 @@
     </div>
 </div>
 
-<!-- New Meeting Note Modal -->
-<div class="modal fade" id="newMeetingNoteModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold">Record Meeting Notes</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Meeting Title</label>
-                    <input type="text" id="newMeetingTitle" class="form-control" placeholder="E.g., Q4 Technology Budget Sync">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold text-secondary">Notes/Minutes</label>
-                    <textarea id="newMeetingNotes" class="form-control" rows="4" placeholder="Agenda items, summaries, action tasks..."></textarea>
-                </div>
-                <div class="mb-0">
-                    <label class="form-label fw-semibold text-secondary">Meeting Date</label>
-                    <input type="datetime-local" id="newMeetingDate" class="form-control">
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" onclick="submitNewMeetingNote()">Save Notes</button>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Meeting Note Detail Modal -->
-<div class="modal fade" id="meetingNoteDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold" id="detailNoteTitle">Meeting Note Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3">
-                    <small class="text-muted d-block mb-1">Meeting Date/Time</small>
-                    <span class="fw-semibold text-dark text-sm" id="detailNoteDate">Not set</span>
-                </div>
-                <div>
-                    <small class="text-muted d-block mb-2">Minutes &amp; Action Items</small>
-                    <div class="p-3 bg-light rounded-3 text-muted text-sm" id="detailNoteContent" style="white-space: pre-line; min-height: 120px;"></div>
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <script>
     let currentAltStep = 1;
@@ -959,9 +1018,19 @@
                 }
                 
                 currentAlternatives.forEach((alt, index) => {
-                    // Generate a random alignment score for visual demonstration if we don't have one
-                    const score = (alt.feasibility_score * 10) || Math.floor(Math.random() * 40 + 60);
-                    const isRecommended = index === 0; // Just for demo, mark first as recommended
+                    let score = 50;
+                    if (alt.feasibility_score !== null && alt.feasibility_score !== undefined && !isNaN(alt.feasibility_score)) {
+                        let val = parseFloat(alt.feasibility_score);
+                        if (val > 0 && val <= 1.0) {
+                            score = val * 100;
+                        } else if (val > 1.0 && val <= 10.0) {
+                            score = val * 10;
+                        } else {
+                            score = val;
+                        }
+                        score = Math.min(100, Math.max(0, Math.round(score)));
+                    }
+                    const isRecommended = index === 0; // Mark first as recommended
                     
                     let riskColor = alt.risk_level === 'High' ? 'danger' : (alt.risk_level === 'Medium' ? 'warning' : 'success');
                     
@@ -1037,53 +1106,124 @@
 <!-- New Meeting Note Modal -->
 <div class="modal fade" id="newMeetingNoteModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-light border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark fs-6"><i class="bi bi-journal-plus text-success me-2"></i>Record Meeting Note</h5>
+        <div class="modal-content border-0 shadow" style="border-radius: 16px;">
+            <div class="modal-header bg-light border-bottom py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark fs-6"><i class="bi bi-calendar-plus text-primary me-2"></i>Schedule Session & Record Notes</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
-                <div class="row">
-                    <div class="col-md-8 mb-3">
+                <div class="row g-3">
+                    <div class="col-md-7">
                         <label for="newMeetingTitle" class="form-label fw-semibold text-dark small">Meeting Title / Topic <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="newMeetingTitle" placeholder="e.g. Executive Architecture Alignment Sync">
+                        <input type="text" class="form-control rounded-3" id="newMeetingTitle" placeholder="e.g. Architecture Alignment Sync">
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="newMeetingDate" class="form-label fw-semibold text-dark small">Meeting Date & Time</label>
-                        <input type="datetime-local" class="form-control" id="newMeetingDate">
+                    <div class="col-md-5">
+                        <label for="newMeetingDate" class="form-label fw-semibold text-dark small">Meeting Date & Time <span class="text-danger">*</span></label>
+                        <input type="datetime-local" class="form-control rounded-3" id="newMeetingDate">
                     </div>
-                    <div class="col-12 mb-3">
-                        <label for="newMeetingNotes" class="form-label fw-semibold text-dark small">Key Meeting Notes & Decisions <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="newMeetingNotes" rows="5" placeholder="Document key discussions, participant alignment, and action items..."></textarea>
+                    
+                    <div class="col-md-7 position-relative">
+                        <label for="newMeetingParticipants" class="form-label fw-semibold text-dark small">Participants / Tag Teammates (@ Mention)</label>
+                        <input type="text" class="form-control rounded-3" id="newMeetingParticipants" placeholder="Type @ to tag participants by Name or Employee ID">
+                        <div id="mentionDropdownParticipants" class="dropdown-menu shadow-lg border p-1 position-absolute" style="display: none; max-height: 200px; overflow-y: auto; z-index: 1060; width: 100%; border-radius: 12px; background: #FFFFFF;"></div>
+                    </div>
+                    
+                    <div class="col-md-5">
+                        <label for="newMeetingLink" class="form-label fw-semibold text-dark small">Google Meet / Location Link</label>
+                        <input type="url" class="form-control rounded-3" id="newMeetingLink" placeholder="https://meet.google.com/abc-defg-hij">
+                    </div>
+
+                    <div class="col-12 position-relative">
+                        <label for="newMeetingNotes" class="form-label fw-semibold text-dark small">Key Meeting Notes, Agenda & Decisions <span class="text-danger">*</span></label>
+                        <textarea class="form-control rounded-3" id="newMeetingNotes" rows="4" placeholder="Document agenda items, key discussions, and @mention attendees..."></textarea>
+                        <div id="mentionDropdownNotes" class="dropdown-menu shadow-lg border p-1 position-absolute" style="display: none; max-height: 200px; overflow-y: auto; z-index: 1060; bottom: 100%; left: 0; width: 100%; border-radius: 12px; background: #FFFFFF;"></div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer bg-light border-top py-2">
-                <button type="button" class="btn btn-light border fw-semibold text-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success fw-semibold" onclick="submitNewMeetingNote()">Save Meeting Note</button>
+            <div class="modal-footer bg-light border-top py-2.5 px-4">
+                <button type="button" class="btn btn-light border fw-semibold text-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary fw-semibold px-4 rounded-3" onclick="submitNewMeetingNote()">Save & Schedule Session</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Meeting Note Detail Modal -->
+<!-- Meeting Note Detail & Live Chat Modal -->
 <div class="modal fade" id="meetingNoteDetailModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-light border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark fs-6" id="detailNoteTitle">Meeting Detail</h5>
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header bg-light border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2.5">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold shadow-2xs" style="width: 38px; height: 38px; font-size: 16px;">
+                        📅
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark fs-6 mb-0" id="detailNoteTitle">Meeting Detail</h5>
+                        <div class="text-muted text-xs" id="detailNoteDate">N/A</div>
+                    </div>
+                    <span id="detailNoteStatus" class="badge rounded-pill text-xs ms-2">Scheduled</span>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="text-muted small mb-3"><i class="bi bi-clock me-1"></i> <span id="detailNoteDate">N/A</span></div>
-                <div class="p-3 bg-light rounded border text-dark" id="detailNoteContent" style="white-space: pre-wrap;"></div>
-            </div>
-            <div class="modal-footer bg-light border-top py-2">
-                <button type="button" class="btn btn-secondary fw-semibold" data-bs-dismiss="modal">Close</button>
+            <div class="modal-body p-0">
+                <div class="row g-0">
+                    <!-- Left Column: Session Info & Notes -->
+                    <div class="col-lg-6 p-4 border-end bg-white custom-scrollbar" style="max-height: 520px; overflow-y: auto;">
+                        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                            <span class="text-muted text-xs fw-semibold">SESSION DETAILS</span>
+                            <div id="detailJoinMeetBtnContainer"></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-dark text-xs mb-1">Participants</label>
+                            <div id="detailNoteParticipants" class="d-flex flex-wrap gap-1.5 text-xs"></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-dark text-xs mb-1">Key Notes & Decisions</label>
+                            <div class="p-3 bg-light rounded-3 border text-dark text-sm" id="detailNoteContent" style="white-space: pre-wrap; line-height: 1.6;"></div>
+                        </div>
+
+                        <div class="text-muted text-xs mt-3 pt-2 border-top d-flex justify-content-between">
+                            <span>Recorded by: <strong id="detailNoteAuthor">User</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Live Meeting Chat & Links -->
+                    <div class="col-lg-6 p-0 d-flex flex-column bg-light" style="min-height: 500px; max-height: 520px;">
+                        <div class="p-3 border-bottom bg-white d-flex align-items-center gap-2">
+                            <i class="bi bi-chat-dots-fill text-primary"></i>
+                            <h6 class="fw-bold text-dark mb-0 text-sm">Session Live Chat & Links</h6>
+                        </div>
+
+                        <!-- Chat Feed -->
+                        <div id="meetingChatFeedContainer" class="flex-grow-1 p-3 d-flex flex-column gap-2.5 custom-scrollbar" style="overflow-y: auto; background: #F8FAFC;">
+                            <div class="text-center text-muted py-5 my-auto">
+                                <i class="bi bi-chat-text text-secondary fs-3 d-block mb-1"></i>
+                                <span class="small">No messages in meeting chat yet.</span>
+                            </div>
+                        </div>
+
+                        <!-- Chat Input Bar -->
+                        <div class="p-3 border-top bg-white position-relative" id="meetingChatInputBox">
+                            <div id="mentionDropdownMeetingChat" class="dropdown-menu shadow-lg border p-1 position-absolute" style="display: none; max-height: 200px; overflow-y: auto; z-index: 1060; bottom: 100%; left: 16px; width: 300px; border-radius: 12px; background: #FFFFFF;"></div>
+                            <div class="d-flex align-items-end gap-2">
+                                <textarea class="form-control border-light-subtle rounded-3 p-2 text-sm" id="meetingChatInputText" rows="2" placeholder="Send Google Meet links, updates... Type @ to tag teammates" style="resize: none;"></textarea>
+                                <button class="btn btn-primary px-3 py-2 fw-bold d-flex align-items-center gap-1 rounded-3 shadow-sm flex-shrink-0" onclick="submitMeetingNoteComment()">
+                                    <i class="bi bi-send-fill text-xs"></i>
+                                    <span>Send</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<script>
+    const DECISION_ID = parseInt("{{ decision_id }}", 10);
+</script>
 <script src="{{ url_for('static', filename='js/decision_details.js') }}?v=20260724"></script>
 {% endblock %}

@@ -407,7 +407,7 @@ class DashboardRepository:
                     "reviewer_name": reviewer_name,
                     "category_name": d.category.name if d.category else (d.department or "General"),
                     "created_at_str": d.created_at.strftime("%b %d, %Y") if d.created_at else "—",
-                    "updated_at_str": d.updated_at.strftime("%b %d, %Y") if d.updated_at else (d.created_at.strftime("%b %d, %Y") if d.created_at else "—"),
+                    "updated_at_str": getattr(d, 'updated_at', None).strftime("%b %d, %Y") if getattr(d, 'updated_at', None) else (d.created_at.strftime("%b %d, %Y") if d.created_at else "—"),
                     "time_ago": _time_ago(d.created_at)
                 })
 

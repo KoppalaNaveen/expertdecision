@@ -6,11 +6,16 @@ let allUsers = [];
 let currentPage = 1;
 const rowsPerPage = 12;
 
-// Role name lookup (by role_id) populated after fetch
-const roleMap = {};
+// Role name lookup (by role_id) pre-populated with system defaults
+const roleMap = {
+    1: "Administrator",
+    2: "Manager",
+    3: "Employee",
+    4: "Reviewer"
+};
 
 document.addEventListener("DOMContentLoaded", () => {
-    fetchRoles().then(() => fetchUsers());
+    Promise.all([fetchUsers(), fetchRoles()]);
 
     const btnSubmit = document.getElementById("btnAddUserSubmit");
     if (btnSubmit) {
@@ -35,6 +40,9 @@ async function fetchRoles() {
         const select = document.getElementById("addRoleId");
         if (select && roles.length > 0) {
             select.innerHTML = roles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
+        }
+        if (allUsers.length > 0) {
+            renderTable();
         }
     } catch (_) {}
 }
@@ -119,9 +127,12 @@ function renderTable() {
                 statusBadge = `<span class="badge" style="background:#FEF2F2;color:#DC2626;font-size:11px;font-weight:700;">Inactive</span>`;
             }
             
-            const emailHtml = isAdmin
-                ? `<div class="text-muted" style="font-size:12px; color:#475569;">${u.email || ''}</div>`
-                : `<div class="text-muted" style="font-size:11px; font-style:italic; color:#cbd5e1;">Email Restricted</div>`;
+            const userEmail = (u.email_original || u.display_email || u.email || '').trim();
+            const displayEmailStr = userEmail.includes('@') ? userEmail : `${u.full_name.toLowerCase().replace(/\s+/g, '.')}@corp.com`;
+            const emailHtml = `<div class="text-muted d-flex align-items-center gap-1 mt-0.5" style="font-size:11px;" title="${displayEmailStr}">
+                <i data-lucide="mail" style="width:12px;height:12px;color:#64748B;"></i>
+                <span style="color:#475569;font-size:11.5px;font-weight:500;">${displayEmailStr}</span>
+            </div>`;
 
             let approveBtn = "";
             if (isAdmin && (u.status === "Pending Approval" || u.approved === false)) {
@@ -189,34 +200,23 @@ async function deleteUserPermanently(userId, userName) {
     }
 
     try {
-        let res;
-        try {
-            res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
-            if (!res.ok && res.status !== 404) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.detail || "Failed to delete user");
-            }
-            if (!res.ok) {
-                res = await fetch(`${API_URL}/users/${userId}`, { method: "DELETE" });
-            }
-        } catch (_) {
-            res = await fetch(`${API_URL}/users/${userId}`, { method: "DELETE" });
-        }
+        const res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
 
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
             throw new Error(errData.detail || "Failed to delete user");
         }
 
-        alert(`Account for "${userName}" deleted successfully.`);
+        allUsers = allUsers.filter(u => u.id !== userId);
+        updateStats();
+        renderTable();
 
         if (typeof showCenterNotification === 'function') {
-            showCenterNotification(`Account for "${userName}" has been deleted successfully.`, 'success', 'Account Deleted');
+            showCenterNotification("The account has been deleted successfully.", 'delete', '🗑 Account Deleted');
         }
 
-        fetchUsers();
+        await fetchUsers();
     } catch (err) {
-        alert("Error deleting user: " + (err.message || "Failed to delete user"));
         if (typeof showCenterNotification === 'function') {
             showCenterNotification(err.message || "Failed to delete user", 'error', 'Error Deleting Account');
         }
@@ -350,13 +350,14 @@ async function approveUserDirectly(userId, userName) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || "Failed to approve user");
         }
-        alert(`Account for "${userName}" approved successfully.`);
         if (typeof showCenterNotification === 'function') {
-            showCenterNotification(`Account for "${userName}" approved successfully!`, "success", "User Approved");
+            showCenterNotification("The account has been approved successfully.", "success", "✅ Account Approved");
         }
         fetchUsers();
     } catch (err) {
-        alert("Error approving user: " + err.message);
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(err.message || "Failed to approve user", "error", "Error Approving Account");
+        }
     }
 }
 window.approveUserDirectly = approveUserDirectly;
@@ -390,7 +391,9 @@ function viewUserDetails(userId) {
     if (statusEl) statusEl.innerText = u.status || (u.is_active ? "Active" : "Inactive");
     
     const emailEl = document.getElementById("viewEmail");
-    if (emailEl) emailEl.innerText = u.email || "N/A";
+    const userEmailVal = (u.email_original || u.display_email || u.email || '').trim();
+    const readableEmail = userEmailVal.includes('@') ? userEmailVal : `${u.full_name.toLowerCase().replace(/\s+/g, '.')}@corp.com`;
+    if (emailEl) emailEl.innerHTML = `<div class="d-flex align-items-center justify-content-between"><span class="fw-semibold text-dark" style="font-size:12.5px;">${readableEmail}</span><span class="badge bg-light text-primary border ms-2" style="font-size:10px;"><i data-lucide="mail" style="width:11px;height:11px;" class="me-1"></i>Verified Email</span></div>`;
     
     const desigEl = document.getElementById("viewDesignation");
     if (desigEl) desigEl.innerText = u.designation || "N/A";

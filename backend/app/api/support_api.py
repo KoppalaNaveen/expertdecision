@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import random
 import threading
+import re
 
 from app.database.connection import get_db
 from app.models.support_ticket import SupportTicket
@@ -18,6 +19,17 @@ router = APIRouter(
 
 def _generate_ticket_number() -> str:
     return f"SUP-{random.randint(1000, 9999)}"
+
+def _extract_contact_sender(message: str, fallback_name: str, fallback_email: str):
+    if not message:
+        return fallback_name, fallback_email
+    match = re.search(r"From:\s*([^<\n]+)\s*<([^>\n]+)>", message, re.IGNORECASE)
+    if match:
+        name = match.group(1).strip()
+        email = match.group(2).strip()
+        if name and email:
+            return name, email
+    return fallback_name, fallback_email
 
 @router.post("/create", response_model=SupportTicketResponse)
 def create_support_ticket(req: SupportTicketCreate, db: Session = Depends(get_db)):
@@ -70,9 +82,40 @@ def create_support_ticket(req: SupportTicketCreate, db: Session = Depends(get_db
                 
         threading.Thread(target=_async_confirm, daemon=True).start()
 
+    # Deliver in-app Notification to Administrators using NotificationService
+    try:
+        from app.services.notification_service import NotificationService
+        from app.models.role import Role
+        
+        admin_roles = db.query(Role).filter(Role.role_name.in_(["Admin", "Administrator"])).all()
+        admin_role_ids = [r.id for r in admin_roles]
+        
+        admins = []
+        if admin_role_ids:
+            admins = db.query(User).filter(User.role_id.in_(admin_role_ids)).all()
+        
+        if not admins:
+            admin_user = db.query(User).filter(User.id == 1).first()
+            if admin_user:
+                admins = [admin_user]
+
+        user_display_name = user.full_name if user else "Visitor"
+        notif_msg = f"New Support Request Received [{ticket_num}] from {user_display_name}: {new_ticket.subject}"
+
+        for admin in admins:
+            NotificationService.create_notification(
+                db,
+                user_id=admin.id,
+                message=notif_msg,
+                notification_type="Support Request"
+            )
+    except Exception as notif_err:
+        print(f"Support ticket admin notification error: {notif_err}")
+
     res = SupportTicketResponse.from_orm(new_ticket)
-    res.user_name = user.full_name if user else "User"
-    res.user_email = user.email if user else "user@company.com"
+    name, email = _extract_contact_sender(new_ticket.message, user.full_name if user else "User", user.email if user else "user@company.com")
+    res.user_name = name
+    res.user_email = email
     return res
 
 @router.get("/my-tickets/{user_id}", response_model=List[SupportTicketResponse])
@@ -83,8 +126,9 @@ def get_user_tickets(user_id: int, db: Session = Depends(get_db)):
     result = []
     for t in tickets:
         r = SupportTicketResponse.from_orm(t)
-        r.user_name = user.full_name if user else "User"
-        r.user_email = user.email if user else "user@company.com"
+        name, email = _extract_contact_sender(t.message, user.full_name if user else "User", user.email if user else "user@company.com")
+        r.user_name = name
+        r.user_email = email
         result.append(r)
     return result
 
@@ -96,8 +140,9 @@ def get_all_tickets(db: Session = Depends(get_db)):
     for t in tickets:
         u = db.query(User).filter(User.id == t.user_id).first()
         r = SupportTicketResponse.from_orm(t)
-        r.user_name = u.full_name if u else "User"
-        r.user_email = u.email if u else "user@company.com"
+        name, email = _extract_contact_sender(t.message, u.full_name if u else "User", u.email if u else "user@company.com")
+        r.user_name = name
+        r.user_email = email
         result.append(r)
     return result
 
@@ -135,3 +180,51 @@ def reply_support_ticket(req: SupportTicketReply, db: Session = Depends(get_db))
     res.user_name = user.full_name if user else "User"
     res.user_email = user.email if user else "user@company.com"
     return res
+
+@router.delete("/delete/{ticket_id}")
+@router.delete("/{ticket_id}")
+def delete_support_ticket(ticket_id: str, db: Session = Depends(get_db)):
+    clean_id = str(ticket_id).strip()
+    ticket = None
+
+    if clean_id.isdigit():
+        ticket = db.query(SupportTicket).filter(SupportTicket.id == int(clean_id)).first()
+
+    if not ticket:
+        ticket = db.query(SupportTicket).filter(SupportTicket.ticket_number == clean_id).first()
+
+    if not ticket and not clean_id.startswith("SUP-"):
+        ticket = db.query(SupportTicket).filter(SupportTicket.ticket_number == f"SUP-{clean_id}").first()
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail=f"Support ticket '{ticket_id}' not found")
+
+    real_id = ticket.id
+    ticket_num = ticket.ticket_number
+    user_id = ticket.user_id
+    subj_excerpt = (ticket.subject or "")[:40]
+
+    try:
+        db.delete(ticket)
+        db.commit()
+    except Exception as err:
+        db.rollback()
+        print(f"Error deleting support ticket #{clean_id}: {err}")
+        raise HTTPException(status_code=500, detail=f"Database error deleting ticket: {str(err)}")
+
+    # Post-deletion Activity log in separate isolated transaction
+    try:
+        valid_user = db.query(User).filter(User.id == user_id).first() if user_id else None
+        log_user_id = valid_user.id if valid_user else 1
+        log = ActivityLog(
+            user_id=log_user_id,
+            action=f"Deleted support ticket {ticket_num}",
+            details=f"Subject: {subj_excerpt}"
+        )
+        db.add(log)
+        db.commit()
+    except Exception as log_err:
+        print(f"Support ticket delete audit log note: {log_err}")
+        db.rollback()
+
+    return {"message": f"Support ticket {ticket_num} deleted successfully", "id": real_id}

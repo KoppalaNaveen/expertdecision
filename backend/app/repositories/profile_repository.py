@@ -12,8 +12,8 @@ class ProfileRepository:
 
         return (
             db.query(User, Role, Team)
-            .join(Role, User.role_id == Role.id)
-            .join(Team, User.team_id == Team.id)
+            .outerjoin(Role, User.role_id == Role.id)
+            .outerjoin(Team, User.team_id == Team.id)
             .filter(User.id == user_id)
             .first()
         )

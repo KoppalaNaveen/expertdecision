@@ -82,7 +82,7 @@ class NotificationService:
                 )
         
         # 3. Managers Notification (Users with Manager role who are not reviewers)
-        manager_role = db.query(Role).filter(Role.name == "Manager").first()
+        manager_role = db.query(Role).filter(Role.role_name == "Manager").first()
         if manager_role:
             managers = db.query(User).filter(User.role_id == manager_role.id, User.id != created_by_id).all()
             for mgr in managers:
@@ -95,7 +95,7 @@ class NotificationService:
                     )
 
         # 4. Administrators Notification (Users with Admin / Administrator role)
-        admin_roles = db.query(Role).filter(Role.name.in_(["Admin", "Administrator"])).all()
+        admin_roles = db.query(Role).filter(Role.role_name.in_(["Admin", "Administrator"])).all()
         admin_role_ids = [r.id for r in admin_roles]
         if admin_role_ids:
             admins = db.query(User).filter(User.role_id.in_(admin_role_ids), User.id != created_by_id).all()
@@ -129,7 +129,7 @@ class NotificationService:
             )
             
         # 2. Managers & Admins Notification
-        manager_admin_roles = db.query(Role).filter(Role.name.in_(["Manager", "Admin", "Administrator"])).all()
+        manager_admin_roles = db.query(Role).filter(Role.role_name.in_(["Manager", "Admin", "Administrator"])).all()
         role_ids = [r.id for r in manager_admin_roles]
         if role_ids:
             supervisors = db.query(User).filter(User.role_id.in_(role_ids), User.id != reviewer_id, User.id != decision.created_by).all()

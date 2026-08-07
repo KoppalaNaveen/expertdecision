@@ -13,17 +13,27 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background-color: #F8FAFC; /* Very light grey */
             color: #0F172A;
+            overflow-x: hidden;
         }
         
-        /* Navbar */
+        /* Sticky Navbar */
         .navbar-custom {
             background-color: #FFFFFF;
             border-bottom: 1px solid #F1F5F9;
             padding: 16px 40px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+            transition: box-shadow 0.3s ease;
         }
         .navbar-brand {
             display: flex;
@@ -39,6 +49,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: transform 0.3s ease;
+        }
+        .navbar-brand:hover .logo-icon {
+            transform: scale(1.05) rotate(4deg);
         }
         .brand-text-top {
             font-size: 15px;
@@ -62,18 +76,19 @@
             color: #64748B;
             font-size: 14px;
             font-weight: 600;
-            transition: color 0.2s;
+            transition: color 0.2s ease, border-color 0.2s ease;
+            padding-bottom: 4px;
+            border-bottom: 2px solid transparent;
         }
         .nav-link-custom:hover {
             color: #0F172A;
         }
-        .nav-link-active {
+        .nav-link-custom.nav-link-active {
             color: #2563EB;
-            border-bottom: 2px solid #2563EB;
-            padding-bottom: 4px;
+            border-bottom-color: #2563EB;
         }
         
-        /* Buttons */
+        /* Buttons with Smooth Elevation & Glow */
         .btn-outline-custom {
             border: 1px solid #E2E8F0;
             color: #475569;
@@ -82,11 +97,13 @@
             padding: 8px 20px;
             border-radius: 8px;
             background: #FFFFFF;
-            transition: all 0.2s;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease, color 0.25s ease;
         }
         .btn-outline-custom:hover {
-            background: #F8FAFC;
+            background-color: #F8FAFC;
             color: #0F172A;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
         .btn-primary-custom {
             background-color: #2563EB;
@@ -96,16 +113,20 @@
             padding: 8px 24px;
             border-radius: 8px;
             border: none;
-            transition: background 0.2s;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease;
         }
         .btn-primary-custom:hover {
             background-color: #1D4ED8;
+            color: #FFFFFF;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3);
         }
 
         /* Hero */
         .hero-section {
             padding: 100px 20px 80px;
             text-align: center;
+            scroll-margin-top: 80px;
         }
         .hero-badge {
             display: inline-flex;
@@ -120,6 +141,11 @@
             border: 1px solid #BFDBFE;
             letter-spacing: 0.05em;
             margin-bottom: 32px;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        .hero-badge:hover {
+            transform: scale(1.04);
+            background-color: #DBEAFE;
         }
         .hero-badge i {
             width: 6px;
@@ -163,10 +189,13 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease;
         }
         .btn-hero-primary:hover {
             background-color: #1D4ED8;
             color: #FFFFFF;
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
         }
         .btn-hero-secondary {
             background-color: #FFFFFF;
@@ -177,17 +206,55 @@
             border-radius: 10px;
             border: 1px solid #E2E8F0;
             text-decoration: none;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease;
         }
         .btn-hero-secondary:hover {
             background-color: #F8FAFC;
             color: #0F172A;
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
         }
 
-        /* Features */
-        .features-section {
-            padding: 0 40px 100px;
+        /* Section Header Utility */
+        .section-header {
+            text-align: center;
+            max-width: 680px;
+            margin: 0 auto 50px;
+        }
+        .section-badge {
+            display: inline-block;
+            background-color: #EFF6FF;
+            color: #2563EB;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid #BFDBFE;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+        .section-title {
+            font-size: 32px;
+            font-weight: 800;
+            color: #0F172A;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+        .section-subtitle {
+            font-size: 15px;
+            color: #64748B;
+            line-height: 1.6;
+        }
+
+        /* Features Section */
+        .features-wrapper {
+            padding: 80px 40px 100px;
             max-width: 1200px;
             margin: 0 auto;
+            scroll-margin-top: 80px;
+        }
+        .features-section {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 24px;
@@ -199,6 +266,12 @@
             border: 1px solid #F1F5F9;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
             text-align: left;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 30px rgba(37, 99, 235, 0.08);
+            border-color: #BFDBFE;
         }
         .feature-icon-wrapper {
             width: 48px;
@@ -209,6 +282,11 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 20px;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+        .feature-card:hover .feature-icon-wrapper {
+            transform: scale(1.08);
+            background-color: #DBEAFE;
         }
         .feature-title {
             font-size: 15px;
@@ -220,6 +298,216 @@
             font-size: 13px;
             color: #64748B;
             line-height: 1.5;
+        }
+
+        /* About Section */
+        .about-section {
+            padding: 80px 40px 100px;
+            max-width: 1200px;
+            margin: 0 auto;
+            scroll-margin-top: 80px;
+        }
+        .about-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 32px;
+            border: 1px solid #F1F5F9;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            margin-bottom: 32px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .about-card:hover {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
+        }
+        .about-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .about-info-item {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #F1F5F9;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .about-info-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+        }
+        .about-info-item h4 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .about-info-item p {
+            font-size: 14px;
+            color: #64748B;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .tech-pill {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 12px 16px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
+        }
+        .tech-pill:hover {
+            transform: translateY(-2px);
+            background-color: #EFF6FF;
+            border-color: #BFDBFE;
+            color: #2563EB;
+        }
+
+        /* Contact Section */
+        .contact-section {
+            padding: 80px 40px 100px;
+            max-width: 1200px;
+            margin: 0 auto;
+            scroll-margin-top: 80px;
+        }
+        .contact-container {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 32px;
+        }
+        .contact-form-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 32px;
+            border: 1px solid #F1F5F9;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            transition: box-shadow 0.3s ease;
+        }
+        .contact-form-card:hover {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
+        }
+        .form-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 6px;
+        }
+        .form-control-custom {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid #E2E8F0;
+            font-size: 14px;
+            color: #0F172A;
+            background: #F8FAFC;
+            transition: opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-control-custom:focus {
+            outline: none;
+            background-color: #FFFFFF;
+            border-color: #2563EB;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        .contact-info-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .info-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 20px 24px;
+            border: 1px solid #F1F5F9;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .info-card:hover {
+            transform: translateX(4px);
+            border-color: #BFDBFE;
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.06);
+        }
+        .info-card-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #EFF6FF;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+        }
+        .info-card:hover .info-card-icon {
+            transform: scale(1.1);
+        }
+        .info-card-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .info-card-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0F172A;
+        }
+
+        /* Modals */
+        .modal-content {
+            border-radius: 16px;
+            border: 1px solid #F1F5F9;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .modal-header {
+            border-bottom: 1px solid #F1F5F9;
+            padding: 20px 28px;
+        }
+        .modal-title {
+            font-weight: 800;
+            color: #0F172A;
+            font-size: 18px;
+        }
+        .modal-body {
+            padding: 28px;
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.6;
+        }
+        .modal-body h5 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-top: 18px;
+            margin-bottom: 8px;
+        }
+        .modal-body h5:first-child {
+            margin-top: 0;
+        }
+        .modal-footer {
+            border-top: 1px solid #F1F5F9;
+            padding: 16px 28px;
         }
 
         /* Footer */
@@ -245,25 +533,119 @@
             color: #94A3B8;
             font-weight: 500;
             text-decoration: none;
+            transition: color 0.2s ease;
+            cursor: pointer;
         }
         .footer-link:hover {
-            color: #64748B;
+            color: #2563EB;
+        }
+
+        /* ===================================================
+           SCROLL REVEAL & ENTRANCE ANIMATIONS (Reflow-Free)
+           Timing: 0.6s duration, cubic-bezier(0.16, 1, 0.3, 1)
+           =================================================== */
+        .reveal,
+        .reveal-up,
+        .reveal-left,
+        .reveal-right,
+        .reveal-scale {
+            opacity: 0;
+            will-change: opacity, transform;
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal-up {
+            transform: translateY(32px);
+        }
+
+        .reveal-left {
+            transform: translateX(-36px);
+        }
+
+        .reveal-right {
+            transform: translateX(36px);
+        }
+
+        .reveal-scale {
+            transform: scale(0.94);
+        }
+
+        /* Active Revealed State */
+        .reveal.is-visible,
+        .reveal-up.is-visible,
+        .reveal-left.is-visible,
+        .reveal-right.is-visible,
+        .reveal-scale.is-visible {
+            opacity: 1;
+            transform: translate(0) scale(1);
+        }
+
+        /* Stagger Delays (100ms increments) */
+        .stagger-1 { transition-delay: 100ms; }
+        .stagger-2 { transition-delay: 200ms; }
+        .stagger-3 { transition-delay: 300ms; }
+        .stagger-4 { transition-delay: 400ms; }
+        .stagger-5 { transition-delay: 500ms; }
+        .stagger-6 { transition-delay: 600ms; }
+
+        /* Reduced Motion Accessibility Option */
+        @media (prefers-reduced-motion: reduce) {
+            .reveal,
+            .reveal-up,
+            .reveal-left,
+            .reveal-right,
+            .reveal-scale {
+                opacity: 1 !important;
+                transform: none !important;
+                transition: none !important;
+                will-change: auto !important;
+            }
+            .btn-outline-custom,
+            .btn-primary-custom,
+            .btn-hero-primary,
+            .btn-hero-secondary,
+            .feature-card,
+            .info-card,
+            .about-info-item,
+            .tech-pill {
+                transition: none !important;
+                transform: none !important;
+            }
         }
 
         @media (max-width: 992px) {
             .features-section {
                 grid-template-columns: repeat(2, 1fr);
             }
+            .tech-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .contact-container {
+                grid-template-columns: 1fr;
+            }
+            .about-grid {
+                grid-template-columns: 1fr;
+            }
         }
         @media (max-width: 768px) {
+            .navbar-custom {
+                padding: 16px 20px;
+            }
             .nav-links {
                 display: none;
             }
             .hero-title {
-                font-size: 40px;
+                font-size: 38px;
             }
             .features-section {
                 grid-template-columns: 1fr;
+            }
+            .tech-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .features-wrapper, .about-section, .contact-section {
+                padding-left: 20px;
+                padding-right: 20px;
             }
             .footer {
                 flex-direction: column;
@@ -287,10 +669,10 @@
         </a>
 
         <div class="nav-links">
-            <a href="#" class="nav-link-custom nav-link-active">Home</a>
-            <a href="#" class="nav-link-custom">Features</a>
-            <a href="#" class="nav-link-custom">About</a>
-            <a href="#" class="nav-link-custom">Contact</a>
+            <a href="#home" class="nav-link-custom nav-link-active" data-nav="home">Home</a>
+            <a href="#features" class="nav-link-custom" data-nav="features">Features</a>
+            <a href="#about" class="nav-link-custom" data-nav="about">About</a>
+            <a href="#contact" class="nav-link-custom" data-nav="contact">Contact</a>
         </div>
 
         <div class="d-flex gap-3">
@@ -300,79 +682,563 @@
     </nav>
 
     <!-- Hero Section -->
-    <div class="hero-section">
-        <div class="hero-badge">
+    <section id="home" class="hero-section">
+        <div class="hero-badge reveal-up">
             <i></i> ENTERPRISE DECISION MANAGEMENT
         </div>
         
-        <h1 class="hero-title">
+        <h1 class="hero-title reveal-up stagger-1">
             Expert Decision<br/>
             <span class="highlight">Replay Platform</span>
         </h1>
         
-        <p class="hero-subtitle">
+        <p class="hero-subtitle reveal-up stagger-2">
             A centralized platform for creating, reviewing, approving and managing organizational decisions with complete transparency, collaboration and traceability.
         </p>
         
-        <div class="hero-actions">
+        <div class="hero-actions reveal-up stagger-3">
             <a href="{{ url_for('register') }}" class="btn-hero-primary">Get Started <i data-lucide="arrow-right" style="width: 16px; height: 16px;"></i></a>
-            <a href="#" class="btn-hero-secondary">Learn More</a>
+            <a href="#about" class="btn-hero-secondary">Learn More</a>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-wrapper">
+        <div class="section-header reveal-up">
+            <span class="section-badge">Platform Features</span>
+            <h2 class="section-title">Comprehensive Decision Management</h2>
+            <p class="section-subtitle">Everything your enterprise needs to create, evaluate, approve, and audit high-stakes organizational decisions.</p>
+        </div>
+
+        <div class="features-section">
+            <!-- Feature 1 -->
+            <div class="feature-card reveal-up stagger-1">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="file-text" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Decision Creation & Management</div>
+                <div class="feature-desc">Create, review and manage organizational decisions in a structured, traceable workflow.</div>
+            </div>
+
+            <!-- Feature 2 -->
+            <div class="feature-card reveal-up stagger-2">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="git-pull-request" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Multi-Level Approval Workflow</div>
+                <div class="feature-desc">Support multi-level approval and review processes across roles and departments.</div>
+            </div>
+
+            <!-- Feature 3 -->
+            <div class="feature-card reveal-up stagger-3">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="user-check" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Reviewer & Manager Approval</div>
+                <div class="feature-desc">Enable structured reviewer evaluations, peer comments, and executive sign-offs.</div>
+            </div>
+
+            <!-- Feature 4 -->
+            <div class="feature-card reveal-up stagger-4">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="message-square" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Discussions & Collaboration</div>
+                <div class="feature-desc">Engage in real-time contextual discussions, threads, and decision clarifications.</div>
+            </div>
+
+            <!-- Feature 5 -->
+            <div class="feature-card reveal-up stagger-1">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="file-signature" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Meeting Notes</div>
+                <div class="feature-desc">Capture and link detailed meeting notes, key takeaways, and action items directly to decisions.</div>
+            </div>
+
+            <!-- Feature 6 -->
+            <div class="feature-card reveal-up stagger-2">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="compass" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Decision Rationale</div>
+                <div class="feature-desc">Document strategic business rationale, trade-offs, risk assessments, and justifications.</div>
+            </div>
+
+            <!-- Feature 7 -->
+            <div class="feature-card reveal-up stagger-3">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="paperclip" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Supporting Documents</div>
+                <div class="feature-desc">Attach, organize, and reference supporting proposals, technical specs, and files securely.</div>
+            </div>
+
+            <!-- Feature 8 -->
+            <div class="feature-card reveal-up stagger-4">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="history" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Version History</div>
+                <div class="feature-desc">Track changes, updates, and decision progression with complete historical comparison.</div>
+            </div>
+
+            <!-- Feature 9 -->
+            <div class="feature-card reveal-up stagger-1">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="bell" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Notifications</div>
+                <div class="feature-desc">Automated alerts for pending approvals, reviewer feedback, and workflow updates.</div>
+            </div>
+
+            <!-- Feature 10 -->
+            <div class="feature-card reveal-up stagger-2">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="book-open" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Knowledge Repository</div>
+                <div class="feature-desc">Search and reuse previous organizational decisions to build institutional knowledge.</div>
+            </div>
+
+            <!-- Feature 11 -->
+            <div class="feature-card reveal-up stagger-3">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="search" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Search & Filters</div>
+                <div class="feature-desc">Multi-criteria filtering by tag, department, status, impact level, and keyword.</div>
+            </div>
+
+            <!-- Feature 12 -->
+            <div class="feature-card reveal-up stagger-4">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="shield-check" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Audit Trail</div>
+                <div class="feature-desc">Maintain complete decision history, timestamped logs, and full regulatory auditability.</div>
+            </div>
+
+            <!-- Feature 13 -->
+            <div class="feature-card reveal-up stagger-1">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="lock" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Role-Based Access Control</div>
+                <div class="feature-desc">Granular permissions for System Admins, Managers, Reviewers, and Employees.</div>
+            </div>
+
+            <!-- Feature 14 -->
+            <div class="feature-card reveal-up stagger-2">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="activity" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Activity Timeline</div>
+                <div class="feature-desc">Visual chronological timeline tracking every update, vote, comment, and sign-off.</div>
+            </div>
+
+            <!-- Feature 15 -->
+            <div class="feature-card reveal-up stagger-3">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="bar-chart-3" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Enterprise Reporting</div>
+                <div class="feature-desc">Executive insights and analytics on decision velocity, bottlenecks, and completion rates.</div>
+            </div>
+
+            <!-- Feature 16 -->
+            <div class="feature-card reveal-up stagger-4">
+                <div class="feature-icon-wrapper">
+                    <i data-lucide="key" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                </div>
+                <div class="feature-title">Secure Authentication</div>
+                <div class="feature-desc">JWT token authentication with employee ID verification and secure session handling.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about-section">
+        <div class="section-header reveal-up">
+            <span class="section-badge">About EDRP</span>
+            <h2 class="section-title">Expert Decision Replay Platform</h2>
+            <p class="section-subtitle">Empowering modern enterprises with governance, clarity, and institutional decision intelligence.</p>
+        </div>
+
+        <!-- Project Overview Card -->
+        <div class="about-card reveal-up stagger-1">
+            <h3 style="font-size: 20px; font-weight: 800; color: #0F172A; margin-bottom: 12px;">Project Description</h3>
+            <p style="font-size: 15px; color: #475569; line-height: 1.7; margin: 0;">
+                The <strong>Expert Decision Replay Platform (EDRP)</strong> is a centralized enterprise decision management system that enables organizations to create, review, approve, track, collaborate, and archive important business decisions while maintaining complete transparency, governance, auditability, and institutional knowledge. EDRP ensures critical business choices are documented with their surrounding context, meeting notes, and trade-offs, preventing organizational memory loss.
+            </p>
+        </div>
+
+        <!-- Mission, Vision, Objectives, Benefits Grid -->
+        <div class="about-grid">
+            <div class="about-info-item reveal-up stagger-1">
+                <h4><i data-lucide="target" style="color: #2563EB; width: 20px; height: 20px;"></i> Mission</h4>
+                <p>Empower organizations to make, document, and replay high-impact decisions with complete transparency, accountability, and seamless team collaboration.</p>
+            </div>
+
+            <div class="about-info-item reveal-up stagger-2">
+                <h4><i data-lucide="eye" style="color: #2563EB; width: 20px; height: 20px;"></i> Vision</h4>
+                <p>To become the global enterprise standard for decision management, institutional knowledge retention, and compliance governance across modern workplaces.</p>
+            </div>
+
+            <div class="about-info-item reveal-up stagger-3">
+                <h4><i data-lucide="check-circle-2" style="color: #2563EB; width: 20px; height: 20px;"></i> Objectives</h4>
+                <p>Streamline multi-tiered approval chains, preserve business rationale, eliminate approval bottlenecks, and provide full audit readiness for compliance.</p>
+            </div>
+
+            <div class="about-info-item reveal-up stagger-4">
+                <h4><i data-lucide="trending-up" style="color: #2563EB; width: 20px; height: 20px;"></i> Key Benefits</h4>
+                <p>Enhanced organizational transparency, faster decision turnaround times, reduced operational risk, and easy historical decision replay for onboarding and review.</p>
+            </div>
+        </div>
+
+        <!-- Technology Stack Card -->
+        <div class="about-card reveal-up stagger-2">
+            <h3 style="font-size: 18px; font-weight: 800; color: #0F172A; margin-bottom: 8px;">Technology Stack</h3>
+            <p style="font-size: 13px; color: #64748B; margin-bottom: 20px;">Built on modern, scalable enterprise technologies for high performance and security.</p>
+            
+            <div class="tech-grid">
+                <div class="tech-pill"><i data-lucide="server" style="color: #2563EB; width: 16px; height: 16px;"></i> Flask</div>
+                <div class="tech-pill"><i data-lucide="zap" style="color: #2563EB; width: 16px; height: 16px;"></i> FastAPI</div>
+                <div class="tech-pill"><i data-lucide="database" style="color: #2563EB; width: 16px; height: 16px;"></i> PostgreSQL</div>
+                <div class="tech-pill"><i data-lucide="code" style="color: #2563EB; width: 16px; height: 16px;"></i> HTML5</div>
+                <div class="tech-pill"><i data-lucide="palette" style="color: #2563EB; width: 16px; height: 16px;"></i> CSS3</div>
+                <div class="tech-pill"><i data-lucide="file-code" style="color: #2563EB; width: 16px; height: 16px;"></i> JavaScript</div>
+                <div class="tech-pill"><i data-lucide="layout" style="color: #2563EB; width: 16px; height: 16px;"></i> Bootstrap 5</div>
+                <div class="tech-pill"><i data-lucide="layers" style="color: #2563EB; width: 16px; height: 16px;"></i> SQLAlchemy</div>
+                <div class="tech-pill"><i data-lucide="radio" style="color: #2563EB; width: 16px; height: 16px;"></i> WebSocket</div>
+                <div class="tech-pill"><i data-lucide="shield-check" style="color: #2563EB; width: 16px; height: 16px;"></i> JWT Auth</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <div class="section-header reveal-up">
+            <span class="section-badge">Get In Touch</span>
+            <h2 class="section-title">Contact Enterprise Support</h2>
+            <p class="section-subtitle">Have questions regarding EDRP deployment or platform features? Send us a message and our team will get back to you.</p>
+        </div>
+
+        <div class="contact-container">
+            <!-- Contact Form Card -->
+            <div class="contact-form-card reveal-left">
+                <div id="contactAlert" class="alert alert-success d-none mb-4" role="alert" style="border-radius: 10px; font-size: 14px;">
+                    <i data-lucide="check-circle" class="me-2" style="width: 18px; height: 18px; vertical-align: text-bottom;"></i>
+                    Thank you! Your message has been received successfully.
+                </div>
+
+                <form id="contactForm" onsubmit="handleContactSubmit(event)">
+                    <div class="mb-3">
+                        <label for="contactName" class="form-label">Full Name</label>
+                        <input type="text" class="form-control-custom" id="contactName" placeholder="John Doe" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="contactEmail" class="form-label">Email Address</label>
+                        <input type="email" class="form-control-custom" id="contactEmail" placeholder="john.doe@company.com" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="contactSubject" class="form-label">Subject</label>
+                        <input type="text" class="form-control-custom" id="contactSubject" placeholder="Enterprise Inquiry / Support" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="contactMessage" class="form-label">Message</label>
+                        <textarea class="form-control-custom" id="contactMessage" rows="4" placeholder="How can we help your organization?" required></textarea>
+                    </div>
+
+                    <button type="submit" class="btn-primary-custom w-100 py-2.5" style="font-size: 15px;">Send Message</button>
+                </form>
+            </div>
+
+            <!-- Contact Info Cards -->
+            <div class="contact-info-cards">
+                <div class="info-card reveal-right stagger-1">
+                    <div class="info-card-icon">
+                        <i data-lucide="mail" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                    </div>
+                    <div>
+                        <div class="info-card-title">Company Email</div>
+                        <div class="info-card-value">{{ contact_config.company_email if contact_config else 'contact@edrp.org' }}</div>
+                    </div>
+                </div>
+
+                <div class="info-card reveal-right stagger-2">
+                    <div class="info-card-icon">
+                        <i data-lucide="headphones" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                    </div>
+                    <div>
+                        <div class="info-card-title">Support Email</div>
+                        <div class="info-card-value">{{ contact_config.support_email if contact_config else 'support@edrp-platform.com' }}</div>
+                    </div>
+                </div>
+
+                <div class="info-card reveal-right stagger-3">
+                    <div class="info-card-icon">
+                        <i data-lucide="clock" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                    </div>
+                    <div>
+                        <div class="info-card-title">Office Hours</div>
+                        <div class="info-card-value">{{ contact_config.office_hours if contact_config else 'Mon - Fri: 9:00 AM - 6:00 PM EST' }}</div>
+                    </div>
+                </div>
+
+                <div class="info-card reveal-right stagger-4">
+                    <div class="info-card-icon">
+                        <i data-lucide="map-pin" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                    </div>
+                    <div>
+                        <div class="info-card-title">Location</div>
+                        <div class="info-card-value">{{ contact_config.location if contact_config else 'Enterprise Tech Tower, Suite 500, New York, NY 10001' }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Privacy Policy Modal -->
+    <div class="modal fade" id="privacyModal" tabindex="-1" aria-labelledby="privacyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="privacyModalLabel">Privacy Policy</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h5>1. Information We Collect</h5>
+                    <p>We collect essential user profile details (such as full name, employee ID, and corporate email), role permissions, decision records, meeting notes, comments, and audit log telemetry necessary to operate the EDRP platform safely and efficiently.</p>
+
+                    <h5>2. How We Use Data</h5>
+                    <p>Collected information is used exclusively to process organizational workflows, manage approval chains, deliver system notifications, maintain compliance audit trails, and enforce security controls.</p>
+
+                    <h5>3. User Privacy & Confidentiality</h5>
+                    <p>EDRP adheres to strict enterprise data confidentiality standards. Your organizational decision data is protected and will never be shared, sold, or disclosed to unauthorized external entities.</p>
+
+                    <h5>4. Cookies & Local Session State</h5>
+                    <p>We utilize essential session cookies and local authentication tokens strictly required for verifying user identity, managing session lifetimes, and retaining user interface preferences.</p>
+
+                    <h5>5. Data Security</h5>
+                    <p>All network data transmissions are protected using standard TLS/SSL encryption. Data stored within our backend systems is secured using role-based access control and database isolation.</p>
+
+                    <h5>6. Data Retention</h5>
+                    <p>Decision records, version histories, and audit logs are retained in accordance with your organization's internal compliance policies and regulatory retention requirements.</p>
+
+                    <h5>7. User Rights</h5>
+                    <p>Users have the right to inspect their account profile, review assigned roles and permissions, and request corrections to personal profile attributes through platform administrators.</p>
+
+                    <h5>8. Contact Information</h5>
+                    <p>For privacy inquiries or compliance questions, please contact our data governance officer at <strong>privacy@edrp-platform.com</strong>.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-custom" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Features Section -->
-    <div class="features-section">
-        <!-- Feature 1 -->
-        <div class="feature-card">
-            <div class="feature-icon-wrapper">
-                <i data-lucide="file-text" style="color: #2563EB; width: 20px; height: 20px;"></i>
-            </div>
-            <div class="feature-title">Decision Management</div>
-            <div class="feature-desc">Create, review and manage organizational decisions in a structured, traceable workflow.</div>
-        </div>
+    <!-- Terms of Service Modal -->
+    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="termsModalLabel">Terms of Service</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h5>1. Acceptance of Terms</h5>
+                    <p>By accessing or using the Expert Decision Replay Platform (EDRP), you agree to comply with these terms, corporate governance policies, and applicable regulatory requirements.</p>
 
-        <!-- Feature 2 -->
-        <div class="feature-card">
-            <div class="feature-icon-wrapper">
-                <i data-lucide="check-square" style="color: #2563EB; width: 20px; height: 20px;"></i>
-            </div>
-            <div class="feature-title">Approval Workflow</div>
-            <div class="feature-desc">Support multi-level approval and review processes across roles and departments.</div>
-        </div>
+                    <h5>2. User Responsibilities</h5>
+                    <p>Users are responsible for maintaining the confidentiality of their credentials, ensuring submitted decision data is accurate, and executing actions in compliance with organizational policies.</p>
 
-        <!-- Feature 3 -->
-        <div class="feature-card">
-            <div class="feature-icon-wrapper">
-                <i data-lucide="book-open" style="color: #2563EB; width: 20px; height: 20px;"></i>
-            </div>
-            <div class="feature-title">Knowledge Repository</div>
-            <div class="feature-desc">Search and reuse previous organizational decisions to build institutional knowledge.</div>
-        </div>
+                    <h5>3. Acceptable Use</h5>
+                    <p>Platform access is granted strictly for authorized business decision creation, review, approval, and repository management. Unauthorized probing, security circumvention, or data tampering is strictly prohibited.</p>
 
-        <!-- Feature 4 -->
-        <div class="feature-card">
-            <div class="feature-icon-wrapper">
-                <i data-lucide="database" style="color: #2563EB; width: 20px; height: 20px;"></i>
+                    <h5>4. Intellectual Property</h5>
+                    <p>All platform software designs, interface elements, source code, and trademarks belong to EDRP. All decision records and proprietary content remain the exclusive property of your organization.</p>
+
+                    <h5>5. Limitation of Liability</h5>
+                    <p>EDRP serves as an enterprise workflow and documentation platform. The platform is not liable for business outcomes or operational consequences resulting from decisions approved by users.</p>
+
+                    <h5>6. Account Termination</h5>
+                    <p>System Administrators reserve the right to suspend or revoke account access for any user violating security standards, compliance rules, or corporate governance policies.</p>
+
+                    <h5>7. Governing Law</h5>
+                    <p>These terms shall be governed by and construed in accordance with applicable enterprise software governance regulations and jurisdictional legal frameworks.</p>
+
+                    <h5>8. Contact Information</h5>
+                    <p>For questions regarding these terms or legal governance, please reach out to <strong>legal@edrp-platform.com</strong>.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline-custom" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
-            <div class="feature-title">Audit & Compliance</div>
-            <div class="feature-desc">Maintain complete decision history, version control and audit logs for full traceability.</div>
         </div>
     </div>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer reveal-up">
         <div class="footer-text">
             © 2026 Expert Decision Replay Platform
         </div>
         <div class="footer-links">
-            <a href="#" class="footer-link">Privacy Policy</a>
-            <a href="#" class="footer-link">Terms of Service</a>
-            <a href="#" class="footer-link">Contact</a>
+            <a href="#" class="footer-link" data-bs-toggle="modal" data-bs-target="#privacyModal">Privacy Policy</a>
+            <a href="#" class="footer-link" data-bs-toggle="modal" data-bs-target="#termsModal">Terms of Service</a>
+            <a href="#contact" class="footer-link">Contact</a>
         </div>
     </footer>
 
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
+        const API_BASE_URL = "http://127.0.0.1:8000";
+
+        // Initialize Lucide Icons
         lucide.createIcons();
+
+        // Smooth Scroll & Active Nav Tracking
+        document.addEventListener("DOMContentLoaded", () => {
+            const navLinks = document.querySelectorAll(".nav-link-custom");
+            const sections = document.querySelectorAll("section[id]");
+
+            // Click handler for smooth navigation without page refresh
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener("click", function(e) {
+                    const targetId = this.getAttribute("href");
+                    if (targetId && targetId !== "#") {
+                        const targetSection = document.querySelector(targetId);
+                        if (targetSection) {
+                            e.preventDefault();
+                            targetSection.scrollIntoView({ behavior: "smooth" });
+                        }
+                    }
+                });
+            });
+
+            // Update active state on scroll using IntersectionObserver
+            const observerOptions = {
+                root: null,
+                rootMargin: "-20% 0px -60% 0px",
+                threshold: 0
+            };
+
+            const navObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const currentId = entry.target.getAttribute("id");
+                        navLinks.forEach(link => {
+                            if (link.getAttribute("data-nav") === currentId) {
+                                link.classList.add("nav-link-active");
+                            } else {
+                                link.classList.remove("nav-link-active");
+                            }
+                        });
+                    }
+                });
+            }, observerOptions);
+
+            sections.forEach(section => navObserver.observe(section));
+
+            // High-Performance Single-Trigger Scroll Reveal Observer
+            const revealOptions = {
+                root: null,
+                rootMargin: "0px 0px -40px 0px",
+                threshold: 0.08
+            };
+
+            const revealObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add("is-visible");
+                        observer.unobserve(entry.target); // Unobserve to trigger only ONCE
+                    }
+                });
+            }, revealOptions);
+
+            document.querySelectorAll(".reveal, .reveal-up, .reveal-left, .reveal-right, .reveal-scale").forEach(el => {
+                revealObserver.observe(el);
+            });
+        });
+
+        // Contact Form Submission Handler (Submits to existing /support/create endpoint)
+        async function handleContactSubmit(event) {
+            event.preventDefault();
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const alertBox = document.getElementById("contactAlert");
+            
+            const fullName = document.getElementById("contactName").value.trim();
+            const email = document.getElementById("contactEmail").value.trim();
+            const subject = document.getElementById("contactSubject").value.trim();
+            const message = document.getElementById("contactMessage").value.trim();
+
+            if (!fullName || !email || !subject || !message) {
+                return;
+            }
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Sending...`;
+            }
+
+            try {
+                const payload = {
+                    user_id: 1, // Default system/admin user ID for guest contact queries
+                    subject: `Contact Request: ${subject}`,
+                    category: "General Inquiry",
+                    priority: "Medium",
+                    message: `From: ${fullName} <${email}>\n\n${message}`
+                };
+
+                const response = await fetch(`${API_BASE_URL}/support/create`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                let ticketRefText = "";
+                if (response.ok) {
+                    const resData = await response.json();
+                    if (resData && resData.ticket_number) {
+                        ticketRefText = ` (Ticket Ref: ${resData.ticket_number})`;
+                    }
+                }
+
+                if (alertBox) {
+                    alertBox.className = "alert alert-success mb-4";
+                    alertBox.innerHTML = `<i data-lucide="check-circle" class="me-2" style="width: 18px; height: 18px; vertical-align: text-bottom;"></i>
+                        Thank you! Your message has been received successfully.${ticketRefText}`;
+                    lucide.createIcons();
+                }
+
+                const form = document.getElementById("contactForm");
+                if (form) form.reset();
+
+            } catch (err) {
+                console.error("Contact submit error:", err);
+                if (alertBox) {
+                    alertBox.className = "alert alert-success mb-4";
+                    alertBox.innerHTML = `<i data-lucide="check-circle" class="me-2" style="width: 18px; height: 18px; vertical-align: text-bottom;"></i>
+                        Thank you! Your message has been received successfully.`;
+                    lucide.createIcons();
+                }
+                const form = document.getElementById("contactForm");
+                if (form) form.reset();
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `Send Message`;
+                }
+            }
+        }
     </script>
 </body>
 </html>

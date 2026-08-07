@@ -97,6 +97,9 @@ class UserResponse(BaseModel):
     id: int
     full_name: str
     email: str
+    email_hash: Optional[str] = None
+    display_email: Optional[str] = None   # plain text email or fallback
+    email_original: Optional[str] = None
     employee_id: Optional[str] = None
     role_id: int
     team_id: Optional[int] = 1

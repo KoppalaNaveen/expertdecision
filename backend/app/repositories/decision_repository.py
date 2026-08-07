@@ -8,6 +8,8 @@ from app.models.activity_log import ActivityLog
 
 from app.core.security import generate_data_hash
 
+from fastapi import HTTPException
+
 class DecisionRepository:
 
     @staticmethod
@@ -18,27 +20,15 @@ class DecisionRepository:
             description=decision.description,
             created_by=decision.created_by,
             category_id=decision.category_id,
-            status="Pending",
+            priority_level=decision.priority_level,
+            department=decision.department,
+            decision_date=decision.decision_date,
+            tags=decision.tags,
             content_hash=content_hash
         )
         db.add(new_decision)
         db.commit()
         db.refresh(new_decision)
-        
-        # Create first version
-        new_version = DecisionVersion(
-            decision_id=new_decision.id,
-            version_number=1,
-            title=new_decision.title,
-            description=new_decision.description,
-            category_id=new_decision.category_id,
-            status=new_decision.status,
-            changed_by=new_decision.created_by,
-            change_reason="Initial Creation"
-        )
-        db.add(new_version)
-        db.commit()
-        
         return new_decision
 
     @staticmethod
@@ -55,7 +45,7 @@ class DecisionRepository:
             department=full_decision.department,
             decision_date=full_decision.decision_date,
             tags=full_decision.tags,
-            status="Pending",
+            status=full_decision.status or "Pending",
             content_hash=content_hash
         )
         db.add(new_decision)
@@ -75,38 +65,80 @@ class DecisionRepository:
             db.add(new_alt)
             
         # Process reviewers with strict rules:
-        # 1. No duplicate reviewer assignments
-        # 2. Decision owner (created_by) cannot be a reviewer
-        # 3. Auto-assign eligible reviewers if none provided
+        # 1. Manual selection validation: allowed roles are Reviewer and Manager. Reject Employee, Admin, Owner, Inactive, Duplicates.
+        # 2. Sequential queueing: Step 1 = Pending, Step 2+ = Queued.
+        # 3. Auto-assign ONLY when no reviewers are selected: assigns EXACTLY 1 Reviewer + 1 Manager.
+        from app.models.user import User
         assigned_reviewer_ids = set()
         valid_reviewers = []
+
         if full_decision.reviewers:
-            for rev in full_decision.reviewers:
-                if rev.reviewer_id != new_decision.created_by and rev.reviewer_id not in assigned_reviewer_ids:
-                    assigned_reviewer_ids.add(rev.reviewer_id)
-                    valid_reviewers.append(rev)
-        
-        if not valid_reviewers:
-            from app.models.user import User
-            eligible_users = db.query(User).filter(User.id != new_decision.created_by).all()
-            for u in eligible_users:
-                if u.id not in assigned_reviewer_ids:
-                    assigned_reviewer_ids.add(u.id)
-                    db.add(Review(
-                        decision_id=new_decision.id,
-                        reviewer_id=u.id,
-                        status="Pending",
-                        approval_type="Sequential"
-                    ))
-        else:
-            for rev in valid_reviewers:
+            for idx, rev in enumerate(full_decision.reviewers):
+                if rev.reviewer_id == new_decision.created_by:
+                    raise HTTPException(status_code=400, detail="Decision creator cannot be assigned as a reviewer or approver.")
+                if rev.reviewer_id in assigned_reviewer_ids:
+                    continue
+                
+                u = db.query(User).filter(User.id == rev.reviewer_id).first()
+                if not u:
+                    raise HTTPException(status_code=400, detail=f"Assigned reviewer ID {rev.reviewer_id} not found.")
+                
+                r_name = (u.role.role_name if u.role else "").lower()
+                emp_id = (u.employee_id or "").upper()
+                
+                is_reviewer = "reviewer" in r_name or emp_id.startswith("RW")
+                is_manager = "manager" in r_name or emp_id.startswith("MN")
+                
+                if not (is_reviewer or is_manager) or "employee" in r_name or "admin" in r_name:
+                    raise HTTPException(status_code=400, detail=f"User '{u.full_name}' ({u.role.role_name if u.role else 'Employee'}) is not eligible as a reviewer. Only Reviewer and Manager roles are allowed.")
+
+                assigned_reviewer_ids.add(rev.reviewer_id)
+                valid_reviewers.append((rev, idx == 0))
+
+            for rev, is_first in valid_reviewers:
                 db.add(Review(
                     decision_id=new_decision.id,
                     reviewer_id=rev.reviewer_id,
-                    status="Pending",
+                    status="Pending" if is_first else "Queued",
                     deadline=rev.deadline,
                     approval_type=rev.approval_type or "Sequential"
                 ))
+        else:
+            # Auto-assignment: assign EXACTLY 1 Reviewer + 1 Manager
+            eligible_users = db.query(User).filter(User.id != new_decision.created_by).all()
+            
+            auto_reviewer = None
+            auto_manager = None
+            
+            for u in eligible_users:
+                r_name = (u.role.role_name if u.role else "").lower()
+                emp_id = (u.employee_id or "").upper()
+                
+                if not auto_reviewer and ("reviewer" in r_name or emp_id.startswith("RW")) and "admin" not in r_name and "employee" not in r_name:
+                    auto_reviewer = u
+                elif not auto_manager and ("manager" in r_name or emp_id.startswith("MN")) and "admin" not in r_name and "employee" not in r_name:
+                    auto_manager = u
+                    
+            if not auto_reviewer or not auto_manager:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unable to automatically assign reviewers: An active Reviewer and an active Manager are both required for automatic workflow assignment."
+                )
+
+            # Step 1: Reviewer (Pending)
+            db.add(Review(
+                decision_id=new_decision.id,
+                reviewer_id=auto_reviewer.id,
+                status="Pending",
+                approval_type="Sequential"
+            ))
+            # Step 2: Manager (Queued)
+            db.add(Review(
+                decision_id=new_decision.id,
+                reviewer_id=auto_manager.id,
+                status="Queued",
+                approval_type="Sequential"
+            ))
             
         if full_decision.temp_file_ids:
             from app.models.attachment import Attachment
@@ -165,8 +197,9 @@ class DecisionRepository:
         db_decision.decision_date = full_decision.decision_date
         db_decision.tags = full_decision.tags
         
+        was_rejected = (db_decision.status == "Rejected")
         # If decision was rejected, move it back to Pending (resubmit)
-        if db_decision.status == "Rejected":
+        if was_rejected:
             db_decision.status = "Pending"
             
         # Update content hash
@@ -189,8 +222,7 @@ class DecisionRepository:
             )
             db.add(new_alt)
             
-        # 3. Clear and rebuild reviews with strict rules
-        db.query(Review).filter(Review.decision_id == decision_id).delete()
+        # 3. Update or rebuild reviews with strict rules (preserve existing comments history)
         assigned_reviewer_ids = set()
         valid_reviewers = []
         if full_decision.reviewers:
@@ -205,21 +237,31 @@ class DecisionRepository:
             for u in eligible_users:
                 if u.id not in assigned_reviewer_ids:
                     assigned_reviewer_ids.add(u.id)
-                    db.add(Review(
-                        decision_id=decision_id,
-                        reviewer_id=u.id,
-                        status="Pending",
-                        approval_type="Sequential"
-                    ))
+                    existing_rev = db.query(Review).filter(Review.decision_id == decision_id, Review.reviewer_id == u.id).first()
+                    if existing_rev:
+                        existing_rev.status = "Pending"
+                    else:
+                        db.add(Review(
+                            decision_id=decision_id,
+                            reviewer_id=u.id,
+                            status="Pending",
+                            approval_type="Sequential"
+                        ))
         else:
             for rev in valid_reviewers:
-                db.add(Review(
-                    decision_id=decision_id,
-                    reviewer_id=rev.reviewer_id,
-                    status="Pending",
-                    deadline=rev.deadline,
-                    approval_type=rev.approval_type or "Sequential"
-                ))
+                existing_rev = db.query(Review).filter(Review.decision_id == decision_id, Review.reviewer_id == rev.reviewer_id).first()
+                if existing_rev:
+                    existing_rev.status = "Pending"
+                    if rev.deadline:
+                        existing_rev.deadline = rev.deadline
+                else:
+                    db.add(Review(
+                        decision_id=decision_id,
+                        reviewer_id=rev.reviewer_id,
+                        status="Pending",
+                        deadline=rev.deadline,
+                        approval_type=rev.approval_type or "Sequential"
+                    ))
             
         # 4. Attach new documents
         if full_decision.temp_file_ids:
@@ -232,6 +274,10 @@ class DecisionRepository:
         latest_version = db.query(DecisionVersion).filter(DecisionVersion.decision_id == decision_id).order_by(DecisionVersion.version_number.desc()).first()
         next_version_num = (latest_version.version_number + 1) if latest_version else 1
         
+        change_reason = full_decision.change_reason
+        if not change_reason:
+            change_reason = "Resubmitted decision after addressing review feedback" if was_rejected else "System Update"
+
         new_version = DecisionVersion(
             decision_id=db_decision.id,
             version_number=next_version_num,
@@ -243,24 +289,101 @@ class DecisionRepository:
             department=db_decision.department,
             decision_date=db_decision.decision_date,
             tags=db_decision.tags,
-            changed_by=full_decision.created_by, # Assuming creator is the one updating it here
-            change_reason=full_decision.change_reason or "System Update"
+            changed_by=full_decision.created_by,
+            change_reason=change_reason
         )
         db.add(new_version)
                 
         db.commit()
         db.refresh(db_decision)
+
+        # Trigger live notifications for resubmission
+        if was_rejected:
+            try:
+                from app.services.notification_service import NotificationService
+                NotificationService.create_notification(
+                    db,
+                    user_id=db_decision.created_by,
+                    message=f"Your decision 'DEC-{db_decision.id}: {db_decision.title}' has been resubmitted for review.",
+                    notification_type="Decision Status"
+                )
+                for rev_id in assigned_reviewer_ids:
+                    NotificationService.create_notification(
+                        db,
+                        user_id=rev_id,
+                        message=f"The decision 'DEC-{db_decision.id}: {db_decision.title}' has been updated and resubmitted for your review.",
+                        notification_type="Review Request"
+                    )
+            except Exception as e:
+                print("Error generating resubmission notifications:", e)
         return db_decision
 
     @staticmethod
-    def get_all_decisions(db: Session):
+    def get_all_decisions(db: Session, user_id: int = None, role_name: str = None):
         from sqlalchemy.orm import joinedload
-        return db.query(Decision).options(joinedload(Decision.creator), joinedload(Decision.category)).all()
+        from app.models.user import User
+        from app.models.review import Review
+
+        query = db.query(Decision).options(joinedload(Decision.creator), joinedload(Decision.category))
+
+        if user_id:
+            user = db.query(User).filter(User.id == user_id).first()
+            current_role = role_name
+            if user and user.role and not current_role:
+                current_role = user.role.role_name
+
+            role_lower = (current_role or "").strip().lower()
+
+            if role_lower in ["employee", "emp"]:
+                # Employee: ONLY own decisions
+                query = query.filter(Decision.created_by == user_id)
+            elif role_lower in ["reviewer", "rw"]:
+                # Reviewer: ONLY assigned reviews OR created by user
+                assigned_decision_ids = db.query(Review.decision_id).filter(Review.reviewer_id == user_id).subquery()
+                query = query.filter((Decision.created_by == user_id) | (Decision.id.in_(assigned_decision_ids)))
+            elif role_lower in ["manager", "mn", "lead"]:
+                # Manager: Created by user OR team members' decisions / pending reviews
+                if user and user.team_id:
+                    team_user_ids = db.query(User.id).filter(User.team_id == user.team_id).subquery()
+                    query = query.filter((Decision.created_by == user_id) | (Decision.created_by.in_(team_user_ids)))
+                else:
+                    query = query.filter((Decision.created_by == user_id) | (Decision.status.in_(["Pending", "In Review", "Approved", "Rejected"])))
+            elif role_lower in ["administrator", "admin", "ad"]:
+                # Admin: All decisions
+                pass
+            else:
+                # Default fallback for unlisted roles: only own decisions
+                query = query.filter(Decision.created_by == user_id)
+
+        return query.order_by(Decision.id.desc()).all()
 
     @staticmethod
     def get_decision_by_id(db: Session, decision_id: int, user_id: int = None):
+        from app.models.user import User
+        from app.models.review import Review
+
         db_decision = db.query(Decision).filter(Decision.id == decision_id).first()
-        if db_decision and user_id:
+        if not db_decision:
+            return None
+
+        if user_id:
+            user = db.query(User).filter(User.id == user_id).first()
+            if user and user.role:
+                role_lower = user.role.role_name.strip().lower()
+
+                if role_lower in ["employee", "emp"]:
+                    if db_decision.created_by != user_id:
+                        return None  # Unauthorized for this employee
+                elif role_lower in ["reviewer", "rw"]:
+                    is_assigned = db.query(Review).filter(Review.decision_id == decision_id, Review.reviewer_id == user_id).first()
+                    if db_decision.created_by != user_id and not is_assigned:
+                        return None  # Unauthorized for this reviewer
+                elif role_lower in ["manager", "mn", "lead"]:
+                    if db_decision.created_by != user_id and user.team_id:
+                        creator = db.query(User).filter(User.id == db_decision.created_by).first()
+                        if not creator or creator.team_id != user.team_id:
+                            return None  # Unauthorized for this manager
+
             try:
                 from app.models.activity_log import ActivityLog
                 log_entry = ActivityLog(
@@ -270,8 +393,9 @@ class DecisionRepository:
                 )
                 db.add(log_entry)
                 db.commit()
-            except Exception as e:
+            except Exception:
                 db.rollback()
+
         return db_decision
 
     @staticmethod

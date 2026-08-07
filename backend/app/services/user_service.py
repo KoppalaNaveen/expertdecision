@@ -60,11 +60,9 @@ class UserService:
 
     @staticmethod
     def _find_user_by_email(db: Session, raw_email: str):
-        clean_email = raw_email.strip().lower()
-        hashed_email = hashlib.sha256(clean_email.encode('utf-8')).hexdigest()
-        user = db.query(User).filter(User.email == clean_email).first()
-        if not user:
-            user = db.query(User).filter(User.email == hashed_email).first()
+        clean_email = (raw_email or "").strip().lower()
+        hashed_email = hashlib.sha256(clean_email.encode('utf-8')).hexdigest() if '@' in clean_email else clean_email
+        user = db.query(User).filter((User.email == clean_email) | (User.email == hashed_email) | (User.email_hash == clean_email) | (User.email_hash == hashed_email)).first()
         return user
 
     @staticmethod
@@ -182,12 +180,10 @@ class UserService:
     def login_user(db: Session, user: UserLogin):
         identifier = user.employee_id.strip()
         
-        # Check by employee_id first, then fallback to email lookup for existing users
+        # Strictly look up user by employee_id only
         db_user = UserRepository.get_user_by_employee_id(db, identifier)
-        if not db_user:
-            db_user = UserService._find_user_by_email(db, identifier)
 
-        # Case 1: Employee ID / Email not found
+        # Case 1: Employee ID not found
         if not db_user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -240,10 +236,13 @@ class UserService:
         users = UserRepository.get_pending_users(db)
         res = []
         for u in users:
+            email_value = u.email or u.email_hash or ""
             res.append({
                 "id": u.id,
                 "full_name": u.full_name,
-                "email": u.email,
+                "email": email_value,
+                "email_hash": email_value,
+                "display_email": f"{email_value[:16]}..." if email_value else u.email,
                 "employee_id": u.employee_id,
                 "role_id": u.role_id,
                 "role_name": u.role.role_name if u.role else "User",
@@ -279,8 +278,8 @@ class UserService:
     @staticmethod
     def send_verification_code(db: Session, email: str, purpose: str, is_resend: bool = False):
         # Check if email is already registered based on purpose
-        hashed_email = hashlib.sha256(email.lower().encode('utf-8')).hexdigest()
-        existing_user = UserRepository.get_user_by_email(db, hashed_email)
+        clean_email = (email or "").strip().lower()
+        existing_user = UserRepository.get_user_by_email(db, clean_email)
         
         if purpose == "register" and existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
@@ -290,19 +289,20 @@ class UserService:
         # Generate 6-digit code
         code = str(random.randint(100000, 999999))
         
-        # Set expiry: 5 minutes if resend, else 10 minutes
-        expiry_seconds = 300 if is_resend else 600
+        # Set expiry: 2 minutes (120 seconds)
+        expiry_seconds = 120
         expires_at = int(time.time()) + expiry_seconds
 
         # Delete previous codes for this email and purpose
+        clean_email = (email or "").strip().lower()
+
         db.query(VerificationCode).filter(
-            VerificationCode.email == email.lower(),
+            VerificationCode.email == clean_email,
             VerificationCode.purpose == purpose
-        ).delete()
+        ).delete(synchronize_session=False)
         
-        # Save new code
         vc = VerificationCode(
-            email=email.lower(),
+            email=clean_email,
             code=code,
             expires_at=expires_at,
             purpose=purpose
@@ -317,14 +317,15 @@ class UserService:
             except Exception as e:
                 print(f"Async OTP send note: {e}")
 
-        threading.Thread(target=_async_send, args=(email, code), daemon=True).start()
+        threading.Thread(target=_async_send, args=(clean_email, code), daemon=True).start()
             
         return {"message": "Verification code sent successfully"}
         
     @staticmethod
     def check_code(db: Session, email: str, code: str, purpose: str):
+        clean_email = (email or "").strip().lower()
         vc = db.query(VerificationCode).filter(
-            VerificationCode.email == email.lower(),
+            VerificationCode.email == clean_email,
             VerificationCode.code == code,
             VerificationCode.purpose == purpose
         ).first()
@@ -341,8 +342,9 @@ class UserService:
 
     @staticmethod
     def _verify_code(db: Session, email: str, code: str, purpose: str):
+        clean_email = (email or "").strip().lower()
         vc = db.query(VerificationCode).filter(
-            VerificationCode.email == email.lower(),
+            VerificationCode.email == clean_email,
             VerificationCode.code == code,
             VerificationCode.purpose == purpose
         ).first()
@@ -366,8 +368,8 @@ class UserService:
         UserService._verify_code(db, email, code, "reset_password")
         
         # Find user
-        hashed_email = hashlib.sha256(email.lower().encode('utf-8')).hexdigest()
-        user = UserRepository.get_user_by_email(db, hashed_email)
+        clean_email = (email or "").strip().lower()
+        user = UserRepository.get_user_by_email(db, clean_email)
         
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -380,12 +382,11 @@ class UserService:
 
     @staticmethod
     def admin_create_user(db: Session, user: AdminUserCreate):
-        # 1. Plaintext email and hash
-        plaintext_email = user.email
-        hashed_email = hashlib.sha256(user.email.lower().encode('utf-8')).hexdigest()
+        # 1. Preserve the original email value
+        plaintext_email = (user.email or "").strip().lower()
 
         # 2. Check if email already exists
-        existing_user = UserRepository.get_user_by_email(db, hashed_email)
+        existing_user = UserRepository.get_user_by_email(db, plaintext_email)
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -438,7 +439,10 @@ class UserService:
     @staticmethod
     def delete_user(db: Session, user_id: int):
         UserService._log_activity(db, 1, f"Administrator deleted user account ID: {user_id}", "")
-        success = UserRepository.delete_user(db, user_id)
+        success, err_msg = UserRepository.delete_user(db, user_id)
         if not success:
-            raise HTTPException(status_code=404, detail="User not found")
+            if err_msg == "User not found":
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            else:
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err_msg or "Failed to delete user")
         return {"message": "User deleted successfully"}

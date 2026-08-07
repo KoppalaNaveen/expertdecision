@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1">Backup Management</h3>
+            <p class="text-muted mb-0">Create full system backups and review recent backup history.</p>
+        </div>
+        <button class="btn btn-primary fw-bold" onclick="runAdminBackup()">Create Backup</button>
+    </div>
+
+    <div id="backupAlert" class="mb-3"></div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Recent Backup History</h5>
+                <span class="text-muted small">Stored for the current administrator</span>
+            </div>
+            <div id="backupHistoryList" class="list-group">
+                <div class="text-muted small">Loading backup history...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+    const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
+
+    document.addEventListener("DOMContentLoaded", () => {
+        loadBackupHistory();
+    });
+
+    async function runAdminBackup() {
+        const alertBox = document.getElementById("backupAlert");
+        if (!confirm("This will create a full backup of the platform data. Continue?")) return;
+
+        alertBox.innerHTML = '<div class="alert alert-info">Creating backup...</div>';
+        try {
+            const response = await fetch(`${API_URL}/settings/backup-data/${CURRENT_USER_ID}`);
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.detail || "Backup failed.");
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `edrp_full_backup_${CURRENT_USER_ID}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+
+            alertBox.innerHTML = '<div class="alert alert-success">Backup created successfully and downloaded.</div>';
+            loadBackupHistory();
+        } catch (err) {
+            alertBox.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+        }
+    }
+
+    async function loadBackupHistory() {
+        const list = document.getElementById("backupHistoryList");
+        try {
+            const response = await fetch(`${API_URL}/settings/backup-history/${CURRENT_USER_ID}`);
+            if (!response.ok) {
+                throw new Error("Unable to load backup history.");
+            }
+
+            const data = await response.json();
+            if (!Array.isArray(data) || data.length === 0) {
+                list.innerHTML = '<div class="text-muted small">No backup records yet.</div>';
+                return;
+            }
+
+            list.innerHTML = data.map(item => `
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="fw-bold mb-1">${item.backup_name}</h6>
+                            <div class="text-muted small">Created: ${item.created_at}</div>
+                        </div>
+                        <span class="badge bg-primary">Stored</span>
+                    </div>
+                    <div class="text-muted small mt-2">Preview: ${Object.keys(item.preview?.data || {}).length} data sections</div>
+                </div>
+            `).join("");
+        } catch (err) {
+            list.innerHTML = `<div class="text-danger small">${err.message}</div>`;
+        }
+    }
+</script>
+{% endblock %}
