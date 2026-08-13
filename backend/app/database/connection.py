@@ -10,14 +10,21 @@ from sqlalchemy import text
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Automatic Fallback for Remote Connection Timeouts
+# Optimized Connection Pool for Remote PostgreSQL (Supabase) / Local SQLite
 if not DATABASE_URL or "sqlite" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL or "sqlite:///./edrp.db"
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
     try:
-        # Connect to Supabase Postgres with a reliable 15-second timeout
-        test_engine = create_engine(DATABASE_URL, connect_args={"connect_timeout": 15})
+        test_engine = create_engine(
+            DATABASE_URL,
+            pool_size=15,
+            max_overflow=25,
+            pool_timeout=10,
+            pool_recycle=300,
+            pool_pre_ping=True,
+            connect_args={"connect_timeout": 10}
+        )
         with test_engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         engine = test_engine

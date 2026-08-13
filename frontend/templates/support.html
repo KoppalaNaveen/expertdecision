@@ -1,132 +1,217 @@
 {% extends "base.html" %}
 
 {% block content %}
+<!-- Ensure Bootstrap Icons is loaded -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
 <style>
     .support-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 16px;
+        border-radius: 18px;
         box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+        transition: all 0.2s ease;
     }
+    
     .hero-search-card {
-        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #2563eb 100%);
         color: #ffffff;
         border-radius: 20px;
+        position: relative;
+        overflow: hidden;
     }
+    .hero-search-card::after {
+        content: '';
+        position: absolute;
+        top: -40%;
+        right: -10%;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(0,0,0,0) 70%);
+        pointer-events: none;
+    }
+
     .action-grid-card {
         background: #ffffff;
-        border: 1px solid #e2e8f0;
+        border: 1.5px solid #e2e8f0;
         border-radius: 18px;
         padding: 1.25rem 0.75rem;
         text-align: center;
         cursor: pointer;
-        transition: all 0.2s ease-in-out;
-        box-shadow: 0 4px 15px -2px rgba(0, 0, 0, 0.04);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 15px -2px rgba(0, 0, 0, 0.03);
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 125px;
+        min-height: 135px;
+        position: relative;
     }
-    .action-grid-card:hover, .action-grid-card.active {
-        border-color: #3b82f6;
-        box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.15);
-        transform: translateY(-3px);
+    .action-grid-card:hover {
+        border-color: #6366f1;
+        box-shadow: 0 12px 28px -5px rgba(99, 102, 241, 0.2);
+        transform: translateY(-4px);
     }
+    .action-grid-card.active {
+        border-color: #6366f1;
+        background: #faf5ff;
+        box-shadow: 0 8px 24px -4px rgba(99, 102, 241, 0.25);
+    }
+
     .action-grid-card .icon-box {
-        width: 48px;
-        height: 48px;
-        border-radius: 14px;
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
         margin-bottom: 0.75rem;
-        font-size: 1.25rem;
+        font-size: 1.4rem;
+        transition: transform 0.2s ease;
     }
-    .icon-purple { background-color: #f3e8ff; color: #9333ea; }
-    .icon-blue { background-color: #eff6ff; color: #2563eb; }
-    .icon-red { background-color: #fef2f2; color: #ef4444; }
-    .icon-amber { background-color: #fffbeb; color: #f59e0b; }
+    .action-grid-card:hover .icon-box {
+        transform: scale(1.1);
+    }
 
-    /* Ticket Status Cards Right Column (Matching PDF Page 10) */
+    .icon-purple {
+        background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+        color: #7c3aed;
+        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+    }
+    .icon-blue {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        color: #2563eb;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+    }
+    .icon-red {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        color: #dc2626;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+    }
+    .icon-amber {
+        background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        color: #d97706;
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.15);
+    }
+
+    /* Ticket Status Cards */
     .status-box-open {
         background-color: #eff6ff;
         border: 1px solid #dbeafe;
-        border-radius: 12px;
-        padding: 0.9rem 1.25rem;
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        transition: transform 0.2s ease;
     }
+    .status-box-open:hover { transform: translateX(3px); }
     .status-box-progress {
         background-color: #fffbeb;
         border: 1px solid #fef3c7;
-        border-radius: 12px;
-        padding: 0.9rem 1.25rem;
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        transition: transform 0.2s ease;
     }
+    .status-box-progress:hover { transform: translateX(3px); }
     .status-box-resolved {
         background-color: #f0fdf4;
         border: 1px solid #dcfce7;
-        border-radius: 12px;
-        padding: 0.9rem 1.25rem;
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        transition: transform 0.2s ease;
     }
+    .status-box-resolved:hover { transform: translateX(3px); }
 
-    /* Ticket Item Cards Right Column */
+    /* Ticket Item Cards */
     .ticket-item-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
         padding: 1rem;
-        transition: all 0.15s ease;
+        transition: all 0.2s ease;
         cursor: pointer;
     }
     .ticket-item-card:hover {
-        border-color: #3b82f6;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        border-color: #6366f1;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+        transform: translateY(-2px);
     }
 
     .chat-bubble-ai {
-        background-color: #f1f5f9;
+        background-color: #f8fafc;
         color: #0f172a;
-        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
         border-top-left-radius: 4px;
+        line-height: 1.55;
     }
     .chat-bubble-user {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         color: #ffffff;
-        border-radius: 16px;
+        border-radius: 18px;
         border-top-right-radius: 4px;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+        line-height: 1.55;
     }
     .suggested-chip {
         border-radius: 20px;
-        font-size: 0.75rem;
+        font-size: 0.78rem;
         cursor: pointer;
         transition: all 0.15s ease;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #334155;
     }
     .suggested-chip:hover {
         background-color: #eff6ff !important;
-        border-color: #3b82f6 !important;
-        color: #1d4ed8 !important;
+        border-color: #6366f1 !important;
+        color: #4f46e5 !important;
+        transform: translateY(-1px);
     }
-    .faq-accordion .accordion-button:not(.collapsed) {
-        background-color: #eff6ff;
-        color: #1d4ed8;
+
+    /* Typing indicator */
+    .typing-dots span {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: #6366f1;
+        animation: typing 1.4s infinite ease-in-out both;
+        margin: 0 2px;
+    }
+    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes typing {
+        0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
+        40% { transform: scale(1); opacity: 1; }
     }
 </style>
 
 <!-- Breadcrumb Header -->
-<div class="mb-3">
-    <div class="text-xs text-muted mb-1">Home &gt; Support Center</div>
-    <h3 class="fw-bold text-dark mb-0">Support Center</h3>
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <div>
+        <div class="text-xs text-muted mb-1">Home &gt; Support Center</div>
+        <h3 class="fw-bold text-dark mb-0">Support Center</h3>
+    </div>
+    <div>
+        <button class="btn btn-outline-primary btn-sm rounded-pill px-3 d-flex align-items-center gap-1.5 shadow-sm" onclick="openNewTicketModal()">
+            <i class="bi bi-plus-circle-fill"></i> New Support Ticket
+        </button>
+    </div>
 </div>
 
 <div id="supportAlertContainer"></div>
 
-<!-- Top Grid Row: Hero Search Banner (Left ~60%) & Ticket Status (Right ~40%) -->
+<!-- Top Grid Row: Hero Search Banner (Left) & Ticket Status (Right) -->
 <div class="row g-4 mb-4">
-    
     <!-- Hero Search Card -->
     <div class="col-lg-7">
         <div class="hero-search-card p-4 p-md-5 h-100 shadow-sm d-flex flex-column justify-content-center">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-primary bg-opacity-25 text-white border border-light border-opacity-25 rounded-pill px-3 py-1 text-xs">
+                    <i class="bi bi-stars text-warning me-1"></i> EDRP AI Powered
+                </span>
+            </div>
             <h3 class="fw-bold text-white mb-2">How can we help you?</h3>
-            <p class="text-white opacity-90 text-sm mb-3">Search our knowledge base or start an AI-powered support chat for instant resolution.</p>
+            <p class="text-white opacity-90 text-sm mb-3">Search our knowledge base or chat with our intelligent AI Support Assistant for instant resolution.</p>
             <div class="input-group input-group-lg shadow-sm" style="max-width: 580px;">
                 <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
                 <input type="text" id="knowledgeSearchInput" class="form-control border-start-0 text-sm fs-6" placeholder="Search help articles, FAQs, guides..." oninput="handleFaqSearch()">
@@ -135,22 +220,25 @@
         </div>
     </div>
 
-    <!-- Ticket Status Card (Page 10 Matching Vertical Stack) -->
+    <!-- Ticket Status Card -->
     <div class="col-lg-5">
         <div class="support-card p-4 h-100">
-            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Ticket Status</h6>
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h6 class="fw-bold text-dark mb-0">Ticket Status</h6>
+                <span class="text-xs text-muted">Real-time Overview</span>
+            </div>
             
             <div class="d-flex flex-column gap-2.5">
                 <div class="status-box-open d-flex justify-content-between align-items-center">
                     <span class="fw-bold text-primary text-xs d-flex align-items-center gap-2">
-                        <i class="bi bi-circle-fill text-primary" style="font-size: 8px;"></i> Open
+                        <i class="bi bi-circle-fill text-primary" style="font-size: 8px;"></i> Open Tickets
                     </span>
                     <span class="fw-bold text-primary fs-4" id="cntOpenTickets">0</span>
                 </div>
 
                 <div class="status-box-progress d-flex justify-content-between align-items-center">
                     <span class="fw-bold text-warning-emphasis text-xs d-flex align-items-center gap-2">
-                        <i class="bi bi-circle-fill text-warning-emphasis" style="font-size: 8px;"></i> In Progress
+                        <i class="bi bi-circle-fill text-warning" style="font-size: 8px;"></i> In Progress
                     </span>
                     <span class="fw-bold text-warning-emphasis fs-4" id="cntProgressTickets">0</span>
                 </div>
@@ -166,71 +254,98 @@
     </div>
 </div>
 
-<!-- Main Content Grid Row: AI Chat & Action Cards (Left) vs Previous Requests & FAQs (Right) -->
+<!-- Main Content Grid Row: AI Chat & 4 Action Cards (Left) vs Previous Requests & FAQs (Right) -->
 <div class="row g-4">
-    
-    <!-- LEFT COLUMN (~60% width): 4 Action Cards & AI Support Chat Card -->
+    <!-- LEFT COLUMN: 4 Feature Action Cards & AI Support Chat Card -->
     <div class="col-lg-7">
         
-        <!-- 4 Feature Action Cards (Matching Screenshot & PDF Page 10) -->
+        <!-- 4 Feature Action Cards with Crystal Clear Icons -->
         <div class="row g-3 mb-4">
+            <!-- 1. AI Support Chat -->
             <div class="col-3">
-                <div class="action-grid-card active" onclick="activateActionCard('chat', this)">
+                <div class="action-grid-card active" id="cardAiChat" onclick="activateActionCard('chat', this)">
                     <div class="icon-box icon-purple">
                         <i class="bi bi-robot"></i>
                     </div>
-                    <div class="fw-bold text-dark text-xs">AI Support Chat</div>
+                    <div class="fw-bold text-dark text-xs mb-0.5">AI Support Chat</div>
+                    <span class="text-muted" style="font-size: 10px;">Instant AI Help</span>
                 </div>
             </div>
+            <!-- 2. Ask a Question -->
             <div class="col-3">
-                <div class="action-grid-card" onclick="activateActionCard('ask', this)">
+                <div class="action-grid-card" id="cardAsk" onclick="activateActionCard('ask', this)">
                     <div class="icon-box icon-blue">
-                        <i class="bi bi-pencil-square"></i>
+                        <i class="bi bi-question-circle-fill"></i>
                     </div>
-                    <div class="fw-bold text-dark text-xs">Ask a Question</div>
+                    <div class="fw-bold text-dark text-xs mb-0.5">Ask a Question</div>
+                    <span class="text-muted" style="font-size: 10px;">Knowledge Base</span>
                 </div>
             </div>
+            <!-- 3. Report an Issue -->
             <div class="col-3">
-                <div class="action-grid-card" onclick="activateActionCard('issue', this)">
+                <div class="action-grid-card" id="cardIssue" onclick="activateActionCard('issue', this)">
                     <div class="icon-box icon-red">
-                        <i class="bi bi-exclamation-circle"></i>
+                        <i class="bi bi-exclamation-triangle-fill"></i>
                     </div>
-                    <div class="fw-bold text-dark text-xs">Report an Issue</div>
+                    <div class="fw-bold text-dark text-xs mb-0.5">Report an Issue</div>
+                    <span class="text-muted" style="font-size: 10px;">Bug Report</span>
                 </div>
             </div>
+            <!-- 4. Create Ticket -->
             <div class="col-3">
-                <div class="action-grid-card" onclick="openNewTicketModal()">
+                <div class="action-grid-card" id="cardTicket" onclick="activateActionCard('ticket', this)">
                     <div class="icon-box icon-amber">
-                        <i class="bi bi-ticket-perforated"></i>
+                        <i class="bi bi-ticket-perforated-fill"></i>
                     </div>
-                    <div class="fw-bold text-dark text-xs">Create Ticket</div>
+                    <div class="fw-bold text-dark text-xs mb-0.5">Create Ticket</div>
+                    <span class="text-muted" style="font-size: 10px;">Custom Request</span>
                 </div>
             </div>
         </div>
 
         <!-- AI Support Chat Card -->
-        <div class="support-card p-4 d-flex flex-column justify-content-between" style="min-height: 540px;">
+        <div class="support-card p-4 d-flex flex-column justify-content-between" style="min-height: 560px;">
             <div>
                 <!-- Chat Header -->
                 <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="avatar-sm bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px;">
+                    <div class="d-flex align-items-center gap-2.5">
+                        <div class="avatar-sm text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
                             <i class="bi bi-robot fs-5"></i>
                         </div>
                         <div>
-                            <h6 class="fw-bold text-dark mb-0 text-sm">AI Support Chat</h6>
-                            <span class="text-xs text-success fw-semibold"><i class="bi bi-circle-fill me-1" style="font-size: 7px;"></i>Online — Typical response &lt;1 min</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <h6 class="fw-bold text-dark mb-0 text-sm">EDRP AI Support Assistant</h6>
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill text-xs px-2">AI Online</span>
+                            </div>
+                            <span class="text-xs text-success fw-semibold d-flex align-items-center gap-1 mt-0.5">
+                                <i class="bi bi-circle-fill" style="font-size: 7px;"></i> Online — Typical response instant
+                            </span>
                         </div>
                     </div>
-                    <span class="text-xs text-muted font-monospace" id="activeChatTicketNum">Ticket #TKT-0051</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-light border text-muted px-2.5 py-1 text-xs rounded-pill" onclick="clearAiChatFeed()" title="Clear Chat History">
+                            <i class="bi bi-trash3 me-1"></i> Clear
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Live Chat Feed Container -->
-                <div class="d-flex flex-column gap-3 p-3 bg-light rounded-3 mb-3 border overflow-y-auto" id="aiChatFeed" style="max-height: 320px; min-height: 240px;">
-                    <!-- Welcome Initial AI Message -->
+                <div class="d-flex flex-column gap-3 p-3 bg-light bg-opacity-50 rounded-3 mb-3 border overflow-y-auto" id="aiChatFeed" style="max-height: 330px; min-height: 250px;">
+                    <!-- Initial Welcome Message -->
                     <div class="d-flex flex-column align-items-start">
-                        <div class="chat-bubble-ai p-3 text-xs shadow-2xs" style="max-width: 85%;">
-                            Hello! I am your EDRP AI Support Assistant. How can I help you today? Ask any question or click a suggested question below.
+                        <div class="chat-bubble-ai p-3 text-xs shadow-sm" style="max-width: 88%;">
+                            <div class="fw-bold text-primary mb-1 d-flex align-items-center gap-1.5">
+                                <i class="bi bi-stars text-warning"></i> EDRP AI Assistant
+                            </div>
+                            Hello! I am your <strong>EDRP AI Support Assistant</strong>. How can I help you today?
+                            <br><br>
+                            You can ask me about:
+                            <ul class="mb-1 ps-3 mt-1">
+                                <li>Creating decisions and evaluating alternatives</li>
+                                <li>Multi-tier approval workflows and reviewer stages</li>
+                                <li>Decision Replay and version snapshotting</li>
+                                <li>Audit trails, diff logs, and compliance exports</li>
+                            </ul>
                         </div>
                         <span class="text-muted opacity-75 mt-1" style="font-size: 10px;">Just now</span>
                     </div>
@@ -238,165 +353,147 @@
 
                 <!-- Suggested Quick Questions Chips -->
                 <div class="mb-3">
-                    <span class="text-xs fw-bold text-secondary text-uppercase d-block mb-1.5">Suggested Questions</span>
-                    <div class="d-flex flex-wrap gap-1.5">
-                        <span class="badge bg-light text-dark border suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('How do I reset my password?')">How do I reset my password?</span>
-                        <span class="badge bg-light text-dark border suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('Explain the approval workflow')">Explain the approval workflow</span>
-                        <span class="badge bg-light text-dark border suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('How do I export a report?')">How do I export a report?</span>
-                        <span class="badge bg-light text-dark border suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('What is a decision rationale?')">What is a decision rationale?</span>
+                    <span class="text-xs fw-bold text-secondary text-uppercase d-block mb-1.5 d-flex align-items-center gap-1">
+                        <i class="bi bi-lightbulb-fill text-warning"></i> Suggested Questions
+                    </span>
+                    <div class="d-flex flex-wrap gap-1.5" id="suggestedChipsContainer">
+                        <span class="badge suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('How do I create a new decision?')">How do I create a new decision?</span>
+                        <span class="badge suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('Explain the approval workflow')">Explain the approval workflow</span>
+                        <span class="badge suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('How does Decision Replay work?')">How does Decision Replay work?</span>
+                        <span class="badge suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('How do I view Audit Logs?')">How do I view Audit Logs?</span>
+                        <span class="badge suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('How do I reset my password?')">How do I reset my password?</span>
                     </div>
                 </div>
             </div>
 
             <!-- Full Width Chat Input Form -->
-            <form onsubmit="handleAiChatSubmit(event)" class="w-100 mt-3 pt-3 border-top">
-                <div class="input-group input-group-lg shadow-2xs">
-                    <input type="text" id="aiChatInputText" class="form-control text-sm px-3" placeholder="Type your question or issue message..." required style="height: 46px;">
-                    <button type="submit" class="btn btn-primary fw-bold px-4 text-sm d-inline-flex align-items-center gap-2" style="height: 46px;">
+            <form onsubmit="handleAiChatSubmit(event)" class="w-100 mt-2 pt-3 border-top">
+                <div class="input-group input-group-lg shadow-sm">
+                    <input type="text" id="aiChatInputText" class="form-control text-sm px-3" placeholder="Ask AI anything about decisions, approvals, workflows, or account..." required style="height: 48px;">
+                    <button type="submit" id="btnSendAiChat" class="btn btn-primary fw-bold px-4 text-sm d-inline-flex align-items-center gap-2" style="height: 48px;">
                         <i class="bi bi-send-fill"></i> Send
                     </button>
                 </div>
             </form>
         </div>
-
     </div>
 
-    <!-- RIGHT COLUMN (~40% width): Previous Requests, FAQs & Contact Support -->
+    <!-- RIGHT COLUMN: Previous Requests & FAQs -->
     <div class="col-lg-5">
-        
-        <!-- Previous Requests Card (Matching PDF Page 10 Layout) -->
+        <!-- Previous Requests Card -->
         <div class="support-card p-4 mb-4">
             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                <h6 class="fw-bold text-dark mb-0">Previous Requests</h6>
-                <button type="button" class="btn btn-link text-xs text-primary p-0 text-decoration-none fw-bold" onclick="loadMySupportTickets()">View all &rarr;</button>
+                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-clock-history text-primary"></i> Previous Requests
+                </h6>
+                <button type="button" class="btn btn-link text-xs text-primary p-0 text-decoration-none fw-bold" onclick="loadMySupportTickets()">Refresh &rarr;</button>
             </div>
 
-            <!-- List of Previous Requests (Loaded live from DB backend) -->
-            <div class="d-flex flex-column gap-3" id="supportTicketsListContainer">
+            <!-- List of Previous Requests -->
+            <div class="d-flex flex-column gap-2.5" id="supportTicketsListContainer" style="max-height: 380px; overflow-y: auto;">
                 <div class="text-center py-4 text-muted text-xs">
                     <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading requests...
                 </div>
             </div>
         </div>
 
-        <!-- Frequently Asked Questions (FAQ Accordion) -->
+        <!-- Frequently Asked Questions -->
         <div class="support-card p-4 mb-4">
             <h6 class="fw-bold text-dark border-bottom pb-2 mb-3 d-flex align-items-center gap-2">
-                <i class="bi bi-question-circle text-primary fs-5"></i> Frequently Asked Questions
+                <i class="bi bi-question-circle-fill text-primary"></i> Frequently Asked Questions
             </h6>
             
             <div class="accordion accordion-flush faq-accordion" id="faqAccordion">
                 <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
                     <h2 class="accordion-header" id="faqHeadOne">
-                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColOne" aria-expanded="false" aria-controls="faqColOne">
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColOne">
                             Q: How do I create a new decision?
                         </button>
                     </h2>
-                    <div id="faqColOne" class="accordion-collapse collapse" aria-labelledby="faqHeadOne" data-bs-parent="#faqAccordion">
+                    <div id="faqColOne" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body text-xs text-muted py-2.5 px-3">
-                            Navigate to <strong>'Create Decision'</strong> in the sidebar. Follow the 4-step guided wizard to fill in title, rationale alternatives, supporting files, and reviewers.
+                            Navigate to <strong>'Create Decision'</strong> in the sidebar. Fill in the title, problem statement, evaluated alternatives (with cost/risk metrics), and submit for approval.
                         </div>
                     </div>
                 </div>
 
                 <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
                     <h2 class="accordion-header" id="faqHeadTwo">
-                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColTwo" aria-expanded="false" aria-controls="faqColTwo">
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColTwo">
                             Q: How do I track approval status?
                         </button>
                     </h2>
-                    <div id="faqColTwo" class="accordion-collapse collapse" aria-labelledby="faqHeadTwo" data-bs-parent="#faqAccordion">
+                    <div id="faqColTwo" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body text-xs text-muted py-2.5 px-3">
-                            Open any decision from <strong>'My Decisions'</strong> to view the complete sequential Approval Chain (Reviewer → Manager → Administrator) in real time.
+                            Go to <strong>'My Decisions'</strong> and filter by <strong>'In Review'</strong>. You can click on any decision to see reviewer progress and timeline notes.
                         </div>
                     </div>
                 </div>
 
                 <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
                     <h2 class="accordion-header" id="faqHeadThree">
-                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColThree" aria-expanded="false" aria-controls="faqColThree">
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColThree">
                             Q: Can I edit a submitted decision?
                         </button>
                     </h2>
-                    <div id="faqColThree" class="accordion-collapse collapse" aria-labelledby="faqHeadThree" data-bs-parent="#faqAccordion">
+                    <div id="faqColThree" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body text-xs text-muted py-2.5 px-3">
-                            Yes — decisions in Draft or Review status can be edited by the owner or administrator. Approved decisions are permanently locked for compliance.
+                            Once submitted, decisions are locked from direct editing. If a reviewer requests changes, status returns to <strong>Draft</strong>, allowing you to update and create version <code>v2</code>.
                         </div>
                     </div>
                 </div>
 
                 <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
                     <h2 class="accordion-header" id="faqHeadFour">
-                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColFour" aria-expanded="false" aria-controls="faqColFour">
-                            Q: How do I add a reviewer to my decision?
+                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColFour">
+                            Q: What file formats are supported?
                         </button>
                     </h2>
-                    <div id="faqColFour" class="accordion-collapse collapse" aria-labelledby="faqHeadFour" data-bs-parent="#faqAccordion">
+                    <div id="faqColFour" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                         <div class="accordion-body text-xs text-muted py-2.5 px-3">
-                            In Step 4 of the Create Decision Wizard, search and assign reviewers by Employee ID, Name, or Department role.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="accordion-item border rounded-3 mb-2 overflow-hidden">
-                    <h2 class="accordion-header" id="faqHeadFive">
-                        <button class="accordion-button collapsed text-xs fw-bold py-2.5 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#faqColFive" aria-expanded="false" aria-controls="faqColFive">
-                            Q: What file formats can I upload as documents?
-                        </button>
-                    </h2>
-                    <div id="faqColFive" class="accordion-collapse collapse" aria-labelledby="faqHeadFive" data-bs-parent="#faqAccordion">
-                        <div class="accordion-body text-xs text-muted py-2.5 px-3">
-                            PDF, DOCX, XLSX, and PPTX are fully supported up to 50 MB per file.
+                            EDRP supports PDF, Word documents (.docx), PowerPoint presentations (.pptx), and CSV files up to 200MB in size.
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Contact Support Card -->
-        <div class="support-card p-4 bg-light">
-            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Contact Support</h6>
-            <div class="d-flex flex-column gap-2 text-xs text-muted">
-                <div><strong class="text-dark"><i class="bi bi-envelope me-1.5 text-primary"></i> Email Support:</strong> support@edrp.enterprise.com</div>
-                <div><strong class="text-dark"><i class="bi bi-chat-dots me-1.5 text-primary"></i> Live Chat:</strong> Available 9 AM – 6 PM IST</div>
-                <div><strong class="text-dark"><i class="bi bi-journal-code me-1.5 text-primary"></i> Help Docs:</strong> docs.edrp.enterprise.com</div>
-            </div>
-        </div>
-
     </div>
 </div>
 
-<!-- Submit Support Ticket Modal -->
+<!-- New Support Ticket Modal -->
 <div class="modal fade" id="newSupportTicketModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header border-bottom py-3 px-4">
-                <h6 class="modal-title fw-bold text-dark"><i class="bi bi-ticket-perforated text-primary me-1"></i> Submit Support Ticket</h6>
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="ticketModalTitle">
+                    <i class="bi bi-ticket-perforated-fill text-primary"></i> Create Support Ticket
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form onsubmit="handleCreateSupportTicket(event)">
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Subject</label>
-                        <input type="text" id="ticketSubjectInput" class="form-control text-sm" placeholder="Brief summary of issue..." required>
+                        <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Subject / Issue Title</label>
+                        <input type="text" id="ticketSubjectInput" class="form-control text-sm" placeholder="e.g. Need assistance with Approval Chain configuration" required>
                     </div>
                     <div class="row g-3 mb-3">
-                        <div class="col-md-6">
+                        <div class="col-6">
                             <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Category</label>
                             <select id="ticketCategorySelect" class="form-select text-sm">
                                 <option value="General Query">General Query</option>
                                 <option value="Technical Issue">Technical Issue</option>
-                                <option value="Account Access">Account Access</option>
-                                <option value="Data Export">Data Export</option>
+                                <option value="Bug / Error">Bug / Error</option>
+                                <option value="Approval Workflow">Approval Workflow</option>
+                                <option value="Account / Access">Account / Access</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-6">
                             <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Priority</label>
                             <select id="ticketPrioritySelect" class="form-select text-sm">
                                 <option value="Low">Low</option>
                                 <option value="Medium" selected>Medium</option>
                                 <option value="High">High</option>
-                                <option value="Critical">Critical</option>
+                                <option value="Urgent">Urgent</option>
                             </select>
                         </div>
                     </div>
@@ -407,7 +504,7 @@
                 </div>
                 <div class="modal-footer border-top py-2.5 px-4">
                     <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-2xs">Submit Ticket</button>
+                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm">Submit Ticket</button>
                 </div>
             </form>
         </div>
@@ -420,7 +517,7 @@
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header border-bottom py-3 px-4">
                 <h6 class="modal-title fw-bold text-dark d-flex align-items-center gap-2">
-                    <span id="detailTicketNumber" class="text-primary">SUP-0000</span>
+                    <span id="detailTicketNumber" class="text-primary font-monospace">SUP-0000</span>
                     <span id="detailTicketStatus" class="badge rounded-pill text-xs">Status</span>
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -448,20 +545,23 @@
 
 <script>
 const USER_ID = {{ session.get('user_id', 1) }};
+const USER_NAME = "{{ session.get('full_name', 'User') }}";
 const IS_ADMIN = {{ 'true' if ('admin' in (session.get('role_name') or 'Employee')|string|lower) else 'false' }};
-// Robust dynamic API_URL detection with fallback
-const API_URL = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") 
-    ? `${window.location.protocol}//${window.location.hostname}:8000` 
-    : window.location.origin;
+const API_URL = "http://127.0.0.1:8000";
 
 let supportTicketsCache = [];
+let conversationHistory = [];
 
 window.addEventListener('DOMContentLoaded', () => {
     loadMySupportTickets();
 });
 
-function openNewTicketModal() {
-    new bootstrap.Modal(document.getElementById('newSupportTicketModal')).show();
+function openNewTicketModal(category = "General Query", priority = "Medium", title = "Create Support Ticket") {
+    const modalEl = document.getElementById('newSupportTicketModal');
+    document.getElementById('ticketCategorySelect').value = category;
+    document.getElementById('ticketPrioritySelect').value = priority;
+    document.getElementById('ticketModalTitle').innerHTML = `<i class="bi bi-ticket-perforated-fill text-primary"></i> ${title}`;
+    new bootstrap.Modal(modalEl).show();
 }
 
 function activateActionCard(type, cardEl) {
@@ -470,67 +570,187 @@ function activateActionCard(type, cardEl) {
 
     const input = document.getElementById('aiChatInputText');
     if (type === 'ask') {
-        if (input) input.placeholder = "Ask any question about EDRP platform...";
-        if (input) input.focus();
+        if (input) {
+            input.placeholder = "Ask any question about EDRP platform...";
+            input.focus();
+        }
     } else if (type === 'issue') {
-        openNewTicketModal();
+        openNewTicketModal("Bug / Error", "High", "Report an Issue / Bug");
+    } else if (type === 'ticket') {
+        openNewTicketModal("General Query", "Medium", "Create Support Ticket");
     } else {
-        if (input) input.placeholder = "Type your question or issue message...";
-        if (input) input.focus();
+        if (input) {
+            input.placeholder = "Ask AI anything about decisions, approvals, workflows, or account...";
+            input.focus();
+        }
     }
 }
 
-function sendSuggestedQuestion(qText) {
+function clearAiChatFeed() {
     const feed = document.getElementById('aiChatFeed');
     if (!feed) return;
+    conversationHistory = [];
+    feed.innerHTML = `
+        <div class="d-flex flex-column align-items-start">
+            <div class="chat-bubble-ai p-3 text-xs shadow-sm" style="max-width: 88%;">
+                <div class="fw-bold text-primary mb-1 d-flex align-items-center gap-1.5">
+                    <i class="bi bi-stars text-warning"></i> EDRP AI Assistant
+                </div>
+                Chat cleared. How else can I help you today?
+            </div>
+            <span class="text-muted opacity-75 mt-1" style="font-size: 10px;">Just now</span>
+        </div>
+    `;
+}
 
+function sendSuggestedQuestion(qText) {
+    const input = document.getElementById('aiChatInputText');
+    if (input) input.value = qText;
+    handleAiChatSubmit(new Event('submit'));
+}
+
+async function handleAiChatSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const input = document.getElementById('aiChatInputText');
+    const sendBtn = document.getElementById('btnSendAiChat');
+    const feed = document.getElementById('aiChatFeed');
+    if (!input || !feed) return;
+
+    const userMessage = input.value.trim();
+    if (!userMessage) return;
+
+    input.value = '';
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Append User message
+    // 1. Append User Message to UI
     feed.innerHTML += `
         <div class="d-flex flex-column align-items-end mb-2">
-            <div class="chat-bubble-user p-3 text-xs shadow-2xs" style="max-width: 85%;">
-                ${escapeHtml(qText)}
+            <div class="chat-bubble-user p-3 text-xs shadow-sm" style="max-width: 88%;">
+                ${escapeHtml(userMessage)}
             </div>
             <span class="text-muted opacity-75 mt-1" style="font-size: 10px;">${timeNow}</span>
         </div>
     `;
 
-    let aiReply = "Thank you for asking! You can find detailed instructions in our knowledge base or submit a support ticket above.";
-    if (qText.includes("password")) {
-        aiReply = "To reset your password, click on Settings → Security → Update Password, or contact your Administrator.";
-    } else if (qText.includes("workflow")) {
-        aiReply = "The approval workflow follows a sequential chain: Submitter → Reviewer → Manager → Administrator.";
-    } else if (qText.includes("export")) {
-        aiReply = "You can export reports by navigating to 'Reports & Analytics' and clicking 'Export PDF / Excel'.";
-    } else if (qText.includes("rationale")) {
-        aiReply = "The Decision Rationale captures the core justification, business benefits ($ ROI), pros/cons analysis, and risk mitigation strategy.";
-    }
+    // 2. Append Typing Indicator
+    const typingId = "ai-typing-" + Date.now();
+    feed.innerHTML += `
+        <div class="d-flex flex-column align-items-start mb-2" id="${typingId}">
+            <div class="chat-bubble-ai p-3 text-xs shadow-sm d-flex align-items-center gap-2">
+                <span class="text-muted">AI is thinking</span>
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+    `;
+    feed.scrollTop = feed.scrollHeight;
 
-    setTimeout(() => {
+    if (sendBtn) sendBtn.disabled = true;
+
+    try {
+        // Send request to AI backend proxy
+        let response = await fetch('/api/support/ai-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: userMessage,
+                user_id: USER_ID,
+                user_name: USER_NAME,
+                conversation_history: conversationHistory
+            })
+        }).catch(() => null);
+
+        let data = null;
+        if (response && response.ok) {
+            data = await response.json();
+        } else {
+            // Fallback direct backend call
+            let directResp = await fetch(`${API_URL}/support/ai-chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: userMessage,
+                    user_id: USER_ID,
+                    user_name: USER_NAME
+                })
+            }).catch(() => null);
+            if (directResp && directResp.ok) {
+                data = await directResp.json();
+            }
+        }
+
+        // Remove typing indicator
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        const replyText = (data && data.reply) ? data.reply : "I am here to assist you with the Expert Decision Replay Platform. Please feel free to ask any question regarding decision workflows, approvals, or audit logs.";
+        const source = (data && data.source) ? data.source : "EDRP AI Assistant";
+        const suggestions = (data && data.suggested_actions) ? data.suggested_actions : [];
+
+        // Format basic Markdown in reply
+        const formattedReply = formatMarkdown(replyText);
+
+        // Append AI Reply to UI
         feed.innerHTML += `
             <div class="d-flex flex-column align-items-start mb-2">
-                <div class="chat-bubble-ai p-3 text-xs shadow-2xs" style="max-width: 85%;">
-                    ${aiReply}
+                <div class="chat-bubble-ai p-3 text-xs shadow-sm" style="max-width: 88%;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-primary d-flex align-items-center gap-1">
+                            <i class="bi bi-stars text-warning"></i> ${escapeHtml(source)}
+                        </span>
+                    </div>
+                    <div class="ai-reply-content">${formattedReply}</div>
                 </div>
                 <span class="text-muted opacity-75 mt-1" style="font-size: 10px;">${timeNow}</span>
             </div>
         `;
-        feed.scrollTop = feed.scrollHeight;
-    }, 400);
 
-    setTimeout(() => { feed.scrollTop = feed.scrollHeight; }, 50);
+        // Update suggested chips if provided
+        if (suggestions.length > 0) {
+            const chipsContainer = document.getElementById('suggestedChipsContainer');
+            if (chipsContainer) {
+                chipsContainer.innerHTML = suggestions.map(s => `
+                    <span class="badge suggested-chip px-2.5 py-1.5" onclick="sendSuggestedQuestion('${escapeHtml(s)}')">${escapeHtml(s)}</span>
+                `).join('');
+            }
+        }
+
+        conversationHistory.push({ role: "user", content: userMessage });
+        conversationHistory.push({ role: "assistant", content: replyText });
+
+    } catch (err) {
+        console.error("AI Chat error:", err);
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        feed.innerHTML += `
+            <div class="d-flex flex-column align-items-start mb-2">
+                <div class="chat-bubble-ai p-3 text-xs shadow-sm text-danger" style="max-width: 88%;">
+                    <i class="bi bi-exclamation-circle me-1"></i> I am your EDRP AI Assistant. How can I help you today with decisions, approvals, or account settings?
+                </div>
+                <span class="text-muted opacity-75 mt-1" style="font-size: 10px;">${timeNow}</span>
+            </div>
+        `;
+    } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        feed.scrollTop = feed.scrollHeight;
+    }
 }
 
-function handleAiChatSubmit(e) {
-    e.preventDefault();
-    const input = document.getElementById('aiChatInputText');
-    if (!input) return;
-    const txt = input.value.trim();
-    if (!txt) return;
-
-    input.value = '';
-    sendSuggestedQuestion(txt);
+function formatMarkdown(text) {
+    if (!text) return '';
+    let html = escapeHtml(text);
+    // Bold
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Inline code
+    html = html.replace(/`(.*?)`/g, '<code class="bg-light px-1 py-0.5 rounded text-dark border">$1</code>');
+    // Bullet points
+    html = html.replace(/^\s*-\s+(.*)$/gm, '<li class="ms-3">$1</li>');
+    html = html.replace(/(<li.*<\/li>)/s, '<ul class="mb-2 ps-2">$1</ul>');
+    // Newlines
+    html = html.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+    return html;
 }
 
 function handleFaqSearch() {
@@ -552,26 +772,23 @@ async function loadMySupportTickets() {
 
     try {
         const endpoint = IS_ADMIN ? `${API_URL}/support/all` : `${API_URL}/support/my-tickets/${USER_ID}`;
-        
         let res = await fetch(endpoint).catch(() => null);
         if (!res || !res.ok) {
-            // Fallback try port 8000 explicit
             res = await fetch(`http://127.0.0.1:8000/support/my-tickets/${USER_ID}`).catch(() => null);
         }
 
         if (!res || !res.ok) {
-            throw new Error("Unable to reach support backend server");
+            throw new Error("Unable to reach support backend");
         }
 
         supportTicketsCache = await res.json();
-
         let cntOpen = 0, cntProg = 0, cntRes = 0;
 
         if (supportTicketsCache.length === 0) {
             container.innerHTML = `
                 <div class="text-center py-4 text-muted text-xs">
                     <i class="bi bi-ticket-perforated d-block fs-3 mb-1 text-secondary opacity-50"></i>
-                    No support requests found. Click "Create Ticket" above to submit one.
+                    No support requests found. Click "Create Ticket" to submit one.
                 </div>
             `;
             if (document.getElementById('cntOpenTickets')) document.getElementById('cntOpenTickets').innerText = 0;

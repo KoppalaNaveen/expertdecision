@@ -9,13 +9,43 @@ from app.database.connection import get_db
 from app.models.support_ticket import SupportTicket
 from app.models.user import User
 from app.models.activity_log import ActivityLog
-from app.schemas.support_schema import SupportTicketCreate, SupportTicketReply, SupportTicketResponse
+from app.schemas.support_schema import (
+    SupportTicketCreate,
+    SupportTicketReply,
+    SupportTicketResponse,
+    AiSupportChatRequest,
+    AiSupportChatResponse
+)
 from app.services.email_service import _send_smtp_mail
+from app.services.ai_support_service import generate_ai_response
 
 router = APIRouter(
     prefix="/support",
     tags=["Support"]
 )
+
+@router.post("/ai-chat", response_model=AiSupportChatResponse)
+def ai_support_chat(req: AiSupportChatRequest, db: Session = Depends(get_db)):
+    """
+    Intelligent AI Support Assistant for EDRP with live LLM integrations and fallback knowledge engine.
+    """
+    user_name = req.user_name or "User"
+    if req.user_id:
+        user = db.query(User).filter(User.id == req.user_id).first()
+        if user and user.full_name:
+            user_name = user.full_name
+
+    response_data = generate_ai_response(
+        user_message=req.message,
+        user_name=user_name,
+        conversation_history=req.conversation_history
+    )
+    return AiSupportChatResponse(
+        reply=response_data["reply"],
+        suggested_actions=response_data.get("suggested_actions", []),
+        source=response_data.get("source", "EDRP AI Assistant")
+    )
+
 
 def _generate_ticket_number() -> str:
     return f"SUP-{random.randint(1000, 9999)}"

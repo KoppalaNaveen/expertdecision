@@ -7,9 +7,30 @@ from flask import (
     session,
     flash,
     make_response,
+    jsonify,
 )
+import os
+import sys
 import requests
+import time
 from datetime import timedelta
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+import importlib.util
+
+def _load_ai_support_generator():
+    try:
+        service_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend", "app", "services", "ai_support_service.py"))
+        spec = importlib.util.spec_from_file_location("ai_support_service_module", service_file)
+        ai_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ai_module)
+        return ai_module.generate_ai_response
+    except Exception as e:
+        print(f"AI loader note: {e}")
+        return None
+
+generate_ai_response = _load_ai_support_generator()
 
 app = Flask(__name__)
 
@@ -18,6 +39,12 @@ app.secret_key = "expert_decision_platform"
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=72)
 # Maximum upload size set to 200 MB
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
+
+# Reusable high-performance HTTP session with connection pooling
+http_session = requests.Session()
+adapter = HTTPAdapter(pool_connections=30, pool_maxsize=30, max_retries=Retry(total=2, backoff_factor=0.05))
+http_session.mount("http://", adapter)
+http_session.mount("https://", adapter)
 
 @app.after_request
 def disable_client_caching(response):
@@ -31,10 +58,10 @@ API_URL = "http://127.0.0.1:8000"
 
 def make_backend_request(method, path, **kwargs):
     """
-    Sends an HTTP request to the FastAPI backend with automatic retry and host fallback.
+    Sends an HTTP request to the FastAPI backend with automatic retry and connection pooling.
     """
     if "timeout" not in kwargs:
-        kwargs["timeout"] = 10
+        kwargs["timeout"] = 5
 
     urls = [API_URL, "http://127.0.0.1:8000", "http://localhost:8000"]
     seen = set()
@@ -48,7 +75,7 @@ def make_backend_request(method, path, **kwargs):
     for base in unique_urls:
         full_url = f"{base}{path}" if path.startswith("/") else f"{base}/{path}"
         try:
-            res = requests.request(method, full_url, **kwargs)
+            res = http_session.request(method, full_url, **kwargs)
             return res
         except requests.exceptions.RequestException as e:
             last_exception = e
@@ -65,6 +92,8 @@ CONTACT_CONFIG = {
     "location": "Enterprise Tech Tower, Suite 500, New York, NY 10001"
 }
 
+_GLOBAL_STATS_CACHE = {}
+
 @app.context_processor
 def inject_global_stats():
     base_data = {
@@ -75,20 +104,31 @@ def inject_global_stats():
     if not session.get("logged_in"):
         return base_data
     
+    user_id = session.get("user_id")
+    token = session.get("token")
+    if not user_id or not token:
+        return base_data
+
+    now = time.time()
+    cached = _GLOBAL_STATS_CACHE.get(user_id)
+    if cached and (now - cached["ts"] < 25):
+        base_data.update(cached["data"])
+        return base_data
+        
     try:
-        user_id = session.get("user_id")
-        token = session.get("token")
-        if not user_id or not token:
-            return base_data
-            
         headers = {"Authorization": f"Bearer {token}"}
-        response = requests.get(f"{API_URL}/dashboard/{user_id}", headers=headers, timeout=2.0)
+        response = http_session.get(f"{API_URL}/dashboard/{user_id}", headers=headers, timeout=0.6)
         if response.status_code == 200:
             data = response.json()
-            base_data["unread_notifications_count"] = data.get("unread_notifications_count", 0)
-            base_data["pending_reviews"] = data.get("pending_reviews", 0)
+            fresh = {
+                "unread_notifications_count": data.get("unread_notifications_count", 0),
+                "pending_reviews": data.get("pending_reviews", 0)
+            }
+            _GLOBAL_STATS_CACHE[user_id] = {"data": fresh, "ts": now}
+            base_data.update(fresh)
     except Exception:
-        pass
+        if cached:
+            base_data.update(cached["data"])
     
     return base_data
 
@@ -383,12 +423,52 @@ def api_delete_support_ticket(ticket_id):
         return jsonify({"detail": "Access Denied: Only Administrators can delete support tickets."}), 403
 
     try:
-        response = requests.delete(f"{API_URL}/support/{ticket_id}", timeout=5)
+        response = http_session.delete(f"{API_URL}/support/{ticket_id}", timeout=5)
         if response.status_code == 404:
-            response = requests.delete(f"{API_URL}/support/delete/{ticket_id}", timeout=5)
+            response = http_session.delete(f"{API_URL}/support/delete/{ticket_id}", timeout=5)
         return jsonify(response.json()), response.status_code
     except Exception as e:
         return jsonify({"detail": f"Error deleting support ticket: {e}"}), 500
+
+
+@app.route("/api/support/ai-chat", methods=["POST"])
+def api_support_ai_chat():
+    data = request.json or {}
+    user_id = session.get("user_id")
+    user_name = session.get("full_name") or "User"
+    if user_id and not data.get("user_id"):
+        data["user_id"] = user_id
+    if user_name and not data.get("user_name"):
+        data["user_name"] = user_name
+
+    user_msg = data.get("message", "")
+    
+    # 1. Direct high-performance response using EDRP AI Service
+    if generate_ai_response:
+        try:
+            res_dict = generate_ai_response(
+                user_message=user_msg,
+                user_name=user_name,
+                conversation_history=data.get("conversation_history")
+            )
+            return jsonify(res_dict), 200
+        except Exception as ai_err:
+            print(f"Direct AI service execution note: {ai_err}")
+
+    # 2. Backend API fallback
+    try:
+        response = http_session.post(f"{API_URL}/support/ai-chat", json=data, timeout=8)
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+    except Exception as e:
+        print(f"AI chat backend call note: {e}")
+
+    return jsonify({
+        "reply": f"Hello {user_name}! In EDRP, decisions follow a structured lifecycle: Draft → In Review → Approved / Rejected. You can create decisions from the sidebar, evaluate alternatives, track reviewer approval chains, or inspect audit diffs.",
+        "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "How does Decision Replay work?"],
+        "source": "EDRP AI Assistant"
+    }), 200
+
 
 
 @app.route("/api/pending-approvals/action", methods=["POST"])

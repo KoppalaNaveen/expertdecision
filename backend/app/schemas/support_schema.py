@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class SupportTicketCreate(BaseModel):
@@ -31,3 +31,15 @@ class SupportTicketResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class AiSupportChatRequest(BaseModel):
+    message: str
+    user_id: Optional[int] = None
+    user_name: Optional[str] = "User"
+    category: Optional[str] = "General"
+    conversation_history: Optional[List[dict]] = []
+
+class AiSupportChatResponse(BaseModel):
+    reply: str
+    suggested_actions: Optional[List[str]] = []
+    source: str = "EDRP AI Assistant"

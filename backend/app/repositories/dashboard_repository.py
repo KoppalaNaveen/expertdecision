@@ -55,12 +55,19 @@ def _module_for_action(action: str) -> str:
     return "System"
 
 
+import time
+_DASHBOARD_CACHE = {}  # {user_id: (data, timestamp)}
+
 class DashboardRepository:
 
     @staticmethod
     def get_dashboard(db: Session, user_id: int):
-
         import hashlib
+
+        now = time.time()
+        cached = _DASHBOARD_CACHE.get(user_id)
+        if cached and (now - cached[1] < 8):  # 8-second fast in-memory cache
+            return cached[0]
 
         user = (
             db.query(User)
@@ -570,7 +577,7 @@ class DashboardRepository:
                 "time_ago": _time_ago(n.created_at)
             })
 
-        return {
+        result = {
             "user": display_user,
             "role": role_name,
             "team": team.team_name if team else "",
@@ -602,3 +609,5 @@ class DashboardRepository:
             "security_events": security_events,
             "admin_tasks": admin_tasks,
         }
+        _DASHBOARD_CACHE[user_id] = (result, time.time())
+        return result

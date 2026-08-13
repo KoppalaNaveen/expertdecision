@@ -327,24 +327,28 @@ class DecisionRepository:
         query = db.query(Decision).options(joinedload(Decision.creator), joinedload(Decision.category))
 
         if user_id:
-            user = db.query(User).filter(User.id == user_id).first()
+            current_role = role_name
+            user = None
+            if not current_role:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user and user.role:
+                    current_role = user.role.role_name
+
+            role_lower = (current_role or "").strip().lower()
+
+            if role_lower in ["administrator", "admin", "ad"]:
+                # Admin: All decisions (fast return without extra queries)
+                return query.order_by(Decision.id.desc()).all()
+
+            if not user:
+                user = db.query(User).filter(User.id == user_id).first()
+
             target_uids = {user_id}
             if user:
                 if user.email:
-                    for (uid,) in db.query(User.id).filter((User.email == user.email) | (User.email_original == user.email)).all():
+                    uids = db.query(User.id).filter((User.email == user.email) | (User.email_original == user.email)).all()
+                    for (uid,) in uids:
                         target_uids.add(uid)
-                if getattr(user, 'email_original', None):
-                    for (uid,) in db.query(User.id).filter((User.email == user.email_original) | (User.email_original == user.email_original)).all():
-                        target_uids.add(uid)
-                if user.full_name:
-                    for (uid,) in db.query(User.id).filter(User.full_name == user.full_name).all():
-                        target_uids.add(uid)
-
-            current_role = role_name
-            if user and user.role and not current_role:
-                current_role = user.role.role_name
-
-            role_lower = (current_role or "").strip().lower()
 
             if role_lower in ["employee", "emp"]:
                 # Employee: ONLY own decisions
@@ -360,11 +364,8 @@ class DecisionRepository:
                     query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.created_by.in_(team_user_ids)))
                 else:
                     query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.status.in_(["Pending", "In Review", "Approved", "Rejected"])))
-            elif role_lower in ["administrator", "admin", "ad"]:
-                # Admin: All decisions
-                pass
             else:
-                # Default fallback for unlisted roles: only own decisions
+                # Default fallback: only own decisions
                 query = query.filter(Decision.created_by.in_(list(target_uids)))
 
         return query.order_by(Decision.id.desc()).all()
