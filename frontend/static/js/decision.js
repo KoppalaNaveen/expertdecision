@@ -47,11 +47,6 @@ async function fetchDecisions() {
         const data = await response.json();
         allDecisions = Array.isArray(data) ? data : [];
 
-        // Additional client-side check: Employee role should strictly see only their own decisions
-        if (roleParam && roleParam.toLowerCase().includes('employee') && userParam) {
-            allDecisions = allDecisions.filter(d => Number(d.created_by) === Number(userParam));
-        }
-
         renderTable();
     } catch (error) {
         console.error("Error loading decisions:", error);

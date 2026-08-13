@@ -10,6 +10,7 @@ class InternalEmailCreate(BaseModel):
     priority: Optional[str] = "Medium"
     message: str
     attachment_name: Optional[str] = None
+    delivery_method: Optional[str] = "gmail" # "gmail" or "smtp"
 
 class InternalEmailResponse(BaseModel):
     id: int

@@ -24,11 +24,13 @@ from app.models.notification import Notification
 from app.models.replay import Replay
 from app.models.support_ticket import SupportTicket
 from app.schemas.settings_schema import (
-    SystemSettingUpdate, SystemSettingResponse, ChangePasswordRequest, TestEmailRequest
+    SystemSettingUpdate, SystemSettingResponse, ChangePasswordRequest, DeleteAccountRequest, TestEmailRequest
 )
 from app.services.email_service import _send_smtp_mail
 from app.core.security import verify_password, hash_password
+from app.models.category import Category
 from app.models.backup_record import BackupRecord
+from app.repositories.user_repository import UserRepository
 
 router = APIRouter(
     prefix="/settings",
@@ -38,6 +40,8 @@ router = APIRouter(
 def _get_or_create_settings(db: Session) -> SystemSetting:
     setting = db.query(SystemSetting).first()
     if not setting:
+        first_reviewer = db.query(User).filter(User.is_active == True).first()
+        def_reviewer = first_reviewer.full_name if first_reviewer else "Automated Assignment"
         setting = SystemSetting(
             language="English (US)",
             timezone="Asia/Kolkata (IST)",
@@ -56,7 +60,7 @@ def _get_or_create_settings(db: Session) -> SystemSetting:
             profile_visibility=True,
             activity_visibility=False,
             default_decision_category="Technology",
-            default_reviewer="Dr. Mark Lee",
+            default_reviewer=def_reviewer,
             auto_save_draft=True,
             default_document_format="PDF",
             enable_accessibility=False,
@@ -74,6 +78,35 @@ def _get_or_create_settings(db: Session) -> SystemSetting:
         db.commit()
         db.refresh(setting)
     return setting
+
+@router.get("/options")
+def get_settings_options(db: Session = Depends(get_db)):
+    users = db.query(User).filter(User.is_active == True).all()
+    reviewers_list = []
+    for u in users:
+        role_name = (u.role.role_name if u.role else "User").strip()
+        reviewers_list.append({
+            "id": u.id,
+            "full_name": u.full_name,
+            "role_name": role_name,
+            "employee_id": u.employee_id or f"EMP-{u.id:04d}",
+            "display": f"{u.full_name} ({role_name} · {u.employee_id or 'ID'})"
+        })
+    reviewers_list.sort(key=lambda x: x["full_name"])
+
+    try:
+        categories = db.query(Category).all()
+        cat_names = [c.name for c in categories if c.name]
+    except Exception:
+        cat_names = []
+
+    if not cat_names:
+        cat_names = ["Technology", "Finance", "Operations", "HR Policy", "Legal & Compliance", "Product Engineering"]
+
+    return {
+        "reviewers": reviewers_list,
+        "categories": cat_names
+    }
 
 @router.get("/", response_model=SystemSettingResponse)
 def get_settings(db: Session = Depends(get_db)):
@@ -125,6 +158,27 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
     user.password = hash_password(req.new_password)
     db.commit()
 
+    # 1. In-App Notification (Guaranteed independent)
+    try:
+        NotificationService.create_notification(
+            db,
+            user_id=user.id,
+            message="Your account password was changed successfully.",
+            notification_type="Security Alert"
+        )
+    except Exception as notif_err:
+        print(f"Password change notification error: {notif_err}")
+
+    # 2. Automated Security Email via Original Gmail (Async post-commit)
+    if user.email:
+        import threading
+        from app.services.email_service import send_password_changed_email
+        threading.Thread(
+            target=send_password_changed_email,
+            args=(user.email, user.full_name),
+            daemon=True
+        ).start()
+
     # Log security audit
     try:
         log = ActivityLog(user_id=user.id, action="Changed account password", details="Password updated successfully from Settings")
@@ -134,6 +188,40 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
         print(f"Password change audit log note: {e}")
 
     return {"message": "Password changed successfully! Please use your new password for future sign-ins.", "status": "success"}
+
+@router.post("/delete-account")
+def delete_account(req: DeleteAccountRequest, db: Session = Depends(get_db)):
+    if not req.password or not req.password.strip():
+        raise HTTPException(status_code=400, detail="Account password is required for verification.")
+
+    user = db.query(User).filter(User.id == req.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    if not verify_password(req.password, user.password):
+        raise HTTPException(status_code=400, detail="Incorrect password. Account deletion aborted.")
+
+    user_name = user.full_name
+    user_email = user.email
+
+    success, err_msg = UserRepository.delete_user(db, user.id)
+    if not success:
+        raise HTTPException(status_code=500, detail=err_msg or "Failed to delete account.")
+
+    # Send account deletion email after successful database deletion
+    if user_email:
+        import threading
+        from app.services.email_service import send_account_deleted_email
+        threading.Thread(
+            target=send_account_deleted_email,
+            args=(user_email, user_name),
+            daemon=True
+        ).start()
+
+    return {
+        "message": f"Account '{user_name}' and all associated data have been permanently deleted.",
+        "status": "success"
+    }
 
 @router.post("/reset", response_model=SystemSettingResponse)
 def reset_settings(db: Session = Depends(get_db)):

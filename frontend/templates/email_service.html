@@ -127,6 +127,25 @@
                     </div>
                 </div>
 
+                <!-- Email Delivery Method -->
+                <div class="mb-3">
+                    <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1.5">Email Delivery Method</label>
+                    <div class="d-flex flex-wrap gap-4 p-2.5 bg-light rounded-3 border">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="radio" name="emailDeliveryMethod" id="deliveryMethodGmail" value="gmail" checked>
+                            <label class="form-check-label text-sm fw-semibold text-dark" for="deliveryMethodGmail">
+                                <i class="bi bi-google text-danger me-1"></i> Original Gmail
+                            </label>
+                        </div>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="radio" name="emailDeliveryMethod" id="deliveryMethodSmtp" value="smtp">
+                            <label class="form-check-label text-sm fw-semibold text-dark" for="deliveryMethodSmtp">
+                                <i class="bi bi-hdd-network text-primary me-1"></i> Project SMTP Email Service
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Message Body -->
                 <div class="mb-3 position-relative">
                     <label class="form-label text-xs fw-bold text-secondary text-uppercase mb-1">Message</label>
@@ -272,7 +291,7 @@
 </div>
 
 <script>
-const USER_ID = {{ session.get('user_id', 1) }};
+const USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10) || 1;
 const API_URL = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") 
     ? `${window.location.protocol}//${window.location.hostname}:8000` 
     : window.location.origin;
@@ -596,6 +615,7 @@ async function handleSendEmail(e) {
     const subject = document.getElementById('emailSubjectInput').value.trim();
     const priority = document.getElementById('emailPrioritySelect').value;
     const message = document.getElementById('emailMessageTextarea').value.trim();
+    const deliveryMethod = document.querySelector('input[name="emailDeliveryMethod"]:checked')?.value || "gmail";
 
     if (!to || !subject || !message) {
         showGlobalAlert("warning", "Please fill in recipient, subject, and message.");
@@ -612,7 +632,8 @@ async function handleSendEmail(e) {
                 recipient_names: to,
                 subject: subject,
                 priority: priority,
-                message: message
+                message: message,
+                delivery_method: deliveryMethod
             })
         });
 
@@ -621,7 +642,8 @@ async function handleSendEmail(e) {
             throw new Error(errData.detail || "Failed to send email");
         }
 
-        showGlobalAlert("success", `Internal email sent successfully! Receiver notified.`);
+        const methodName = deliveryMethod === "gmail" ? "Original Gmail" : "Project SMTP Email Service";
+        showGlobalAlert("success", `Email sent successfully via ${methodName}! Receiver notified.`);
         resetEmailForm();
         loadInboxEmails();
         loadSentEmails();

@@ -139,6 +139,11 @@ class UserRepository:
                 db.query(EmailVerification).filter(EmailVerification.email == clean_e).delete(synchronize_session=False)
 
             db.query(SupportTicket).filter(SupportTicket.user_id == user_id).delete(synchronize_session=False)
+            try:
+                from app.models.backup_record import BackupRecord
+                db.query(BackupRecord).filter(BackupRecord.user_id == user_id).delete(synchronize_session=False)
+            except Exception:
+                pass
 
             # Nullify self-referential replies on comments created by user
             user_comment_ids = [c.id for c in db.query(Comment.id).filter(Comment.user_id == user_id).all()]

@@ -328,6 +328,18 @@ class DecisionRepository:
 
         if user_id:
             user = db.query(User).filter(User.id == user_id).first()
+            target_uids = {user_id}
+            if user:
+                if user.email:
+                    for (uid,) in db.query(User.id).filter((User.email == user.email) | (User.email_original == user.email)).all():
+                        target_uids.add(uid)
+                if getattr(user, 'email_original', None):
+                    for (uid,) in db.query(User.id).filter((User.email == user.email_original) | (User.email_original == user.email_original)).all():
+                        target_uids.add(uid)
+                if user.full_name:
+                    for (uid,) in db.query(User.id).filter(User.full_name == user.full_name).all():
+                        target_uids.add(uid)
+
             current_role = role_name
             if user and user.role and not current_role:
                 current_role = user.role.role_name
@@ -336,24 +348,24 @@ class DecisionRepository:
 
             if role_lower in ["employee", "emp"]:
                 # Employee: ONLY own decisions
-                query = query.filter(Decision.created_by == user_id)
+                query = query.filter(Decision.created_by.in_(list(target_uids)))
             elif role_lower in ["reviewer", "rw"]:
                 # Reviewer: ONLY assigned reviews OR created by user
-                assigned_decision_ids = db.query(Review.decision_id).filter(Review.reviewer_id == user_id).subquery()
-                query = query.filter((Decision.created_by == user_id) | (Decision.id.in_(assigned_decision_ids)))
+                assigned_decision_ids = db.query(Review.decision_id).filter(Review.reviewer_id.in_(list(target_uids))).subquery()
+                query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.id.in_(assigned_decision_ids)))
             elif role_lower in ["manager", "mn", "lead"]:
                 # Manager: Created by user OR team members' decisions / pending reviews
                 if user and user.team_id:
                     team_user_ids = db.query(User.id).filter(User.team_id == user.team_id).subquery()
-                    query = query.filter((Decision.created_by == user_id) | (Decision.created_by.in_(team_user_ids)))
+                    query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.created_by.in_(team_user_ids)))
                 else:
-                    query = query.filter((Decision.created_by == user_id) | (Decision.status.in_(["Pending", "In Review", "Approved", "Rejected"])))
+                    query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.status.in_(["Pending", "In Review", "Approved", "Rejected"])))
             elif role_lower in ["administrator", "admin", "ad"]:
                 # Admin: All decisions
                 pass
             else:
                 # Default fallback for unlisted roles: only own decisions
-                query = query.filter(Decision.created_by == user_id)
+                query = query.filter(Decision.created_by.in_(list(target_uids)))
 
         return query.order_by(Decision.id.desc()).all()
 
@@ -368,18 +380,30 @@ class DecisionRepository:
 
         if user_id:
             user = db.query(User).filter(User.id == user_id).first()
+            target_uids = {user_id}
+            if user:
+                if user.email:
+                    for (uid,) in db.query(User.id).filter((User.email == user.email) | (User.email_original == user.email)).all():
+                        target_uids.add(uid)
+                if getattr(user, 'email_original', None):
+                    for (uid,) in db.query(User.id).filter((User.email == user.email_original) | (User.email_original == user.email_original)).all():
+                        target_uids.add(uid)
+                if user.full_name:
+                    for (uid,) in db.query(User.id).filter(User.full_name == user.full_name).all():
+                        target_uids.add(uid)
+
             if user and user.role:
                 role_lower = user.role.role_name.strip().lower()
 
                 if role_lower in ["employee", "emp"]:
-                    if db_decision.created_by != user_id:
+                    if db_decision.created_by not in target_uids:
                         return None  # Unauthorized for this employee
                 elif role_lower in ["reviewer", "rw"]:
-                    is_assigned = db.query(Review).filter(Review.decision_id == decision_id, Review.reviewer_id == user_id).first()
-                    if db_decision.created_by != user_id and not is_assigned:
+                    is_assigned = db.query(Review).filter(Review.decision_id == decision_id, Review.reviewer_id.in_(list(target_uids))).first()
+                    if db_decision.created_by not in target_uids and not is_assigned:
                         return None  # Unauthorized for this reviewer
                 elif role_lower in ["manager", "mn", "lead"]:
-                    if db_decision.created_by != user_id and user.team_id:
+                    if db_decision.created_by not in target_uids and user.team_id:
                         creator = db.query(User).filter(User.id == db_decision.created_by).first()
                         if not creator or creator.team_id != user.team_id:
                             return None  # Unauthorized for this manager

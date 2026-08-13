@@ -155,13 +155,20 @@
                                 <td class="small text-muted">{{ user.created_at }}</td>
                                 <td><span class="badge-status-pending" id="statusBadge-{{ user.id }}">{{ user.status }}</span></td>
                                 <td class="text-end">
-                                    <button class="btn-action-view me-1" onclick="viewUserDetails({{ user.id }}, '{{ user.full_name }}', '{{ user.email_hash or user.email }}', '{{ user.employee_id }}', '{{ user.role_name }}', '{{ user.created_at }}')">
+                                    <button class="btn-action-view me-1" 
+                                            data-id="{{ user.id }}" 
+                                            data-name="{{ user.full_name }}" 
+                                            data-email="{{ user.display_email if user.display_email else (user.email_hash or user.email) }}" 
+                                            data-emp-id="{{ user.employee_id }}" 
+                                            data-role="{{ user.role_name }}" 
+                                            data-date="{{ user.created_at }}" 
+                                            onclick="viewUserDetails(this)">
                                         <i data-lucide="eye" style="width: 14px; height: 14px; vertical-align: -2px;"></i> View
                                     </button>
-                                    <button class="btn-action-approve me-1" onclick="processApproval({{ user.id }}, 'approve')">
+                                    <button class="btn-action-approve me-1" data-id="{{ user.id }}" onclick="processApproval(this, 'approve')">
                                         <i data-lucide="check-circle" style="width: 14px; height: 14px; vertical-align: -2px;"></i> Approve
                                     </button>
-                                    <button class="btn-action-reject" onclick="processApproval({{ user.id }}, 'reject')">
+                                    <button class="btn-action-reject" data-id="{{ user.id }}" onclick="processApproval(this, 'reject')">
                                         <i data-lucide="x-circle" style="width: 14px; height: 14px; vertical-align: -2px;"></i> Reject
                                     </button>
                                 </td>
@@ -224,21 +231,32 @@
     <script>
         lucide.createIcons();
 
-        function viewUserDetails(id, name, email, empId, role, date) {
-            document.getElementById('modalName').textContent = name;
-            document.getElementById('modalEmail').textContent = email;
-            document.getElementById('modalEmpId').textContent = empId;
-            document.getElementById('modalRole').textContent = role;
-            document.getElementById('modalDate').textContent = date;
+        function viewUserDetails(btnOrId, name, email, empId, role, date) {
+            let uName = name, uEmail = email, uEmpId = empId, uRole = role, uDate = date;
             
-            const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            if (typeof btnOrId === 'object' && btnOrId !== null && btnOrId.dataset) {
+                uName = btnOrId.dataset.name || '';
+                uEmail = btnOrId.dataset.email || '';
+                uEmpId = btnOrId.dataset.empId || '';
+                uRole = btnOrId.dataset.role || '';
+                uDate = btnOrId.dataset.date || '';
+            }
+
+            document.getElementById('modalName').textContent = uName || 'N/A';
+            document.getElementById('modalEmail').textContent = uEmail || 'N/A';
+            document.getElementById('modalEmpId').textContent = uEmpId || 'N/A';
+            document.getElementById('modalRole').textContent = uRole || 'N/A';
+            document.getElementById('modalDate').textContent = uDate || 'N/A';
+            
+            const initials = (uName || '').trim().split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
             document.getElementById('modalAvatar').textContent = initials;
 
             const modal = new bootstrap.Modal(document.getElementById('userModal'));
             modal.show();
         }
 
-        async function processApproval(userId, action) {
+        async function processApproval(target, action) {
+            const userId = (typeof target === 'object' && target !== null && target.dataset) ? target.dataset.id : target;
             const container = document.getElementById('alertContainer');
             try {
                 const res = await fetch('/api/pending-approvals/action', {

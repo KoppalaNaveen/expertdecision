@@ -1,6 +1,21 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% set role_lower = (profile.role or session.get('role_name', 'Employee'))|lower %}
+{% if 'admin' in role_lower %}
+    {% set role_theme_class = 'profile-theme-admin' %}
+    {% set role_text_class = 'profile-text-admin' %}
+    {% set avatar_bg = '3B82F6' %}
+{% elif 'manager' in role_lower or 'lead' in role_lower %}
+    {% set role_theme_class = 'profile-theme-manager' %}
+    {% set role_text_class = 'profile-text-manager' %}
+    {% set avatar_bg = '14B8A6' %}
+{% else %}
+    {% set role_theme_class = 'profile-theme-employee' %}
+    {% set role_text_class = 'profile-text-employee' %}
+    {% set avatar_bg = '06B6D4' %}
+{% endif %}
+
 <div style="background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); padding: 2rem 0;">
     <div class="container-fluid px-4">
         <!-- Header Section -->
@@ -10,14 +25,14 @@
                 <!-- Avatar & Name Section -->
                 <div style="display: flex; align-items: center; gap: 2rem; margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #E2E8F0;">
                     <img
-                        src="https://ui-avatars.com/api/?name={{ profile.full_name }}&background={% if 'admin' in session.get('role_name', 'Employee')|lower %}3B82F6{% elif 'manager' in session.get('role_name', 'Employee')|lower or 'lead' in session.get('role_name', 'Employee')|lower %}14B8A6{% else %}2563EB{% endif %}&color=fff&size=120&bold=true&font-size=0.4"
+                        src="https://ui-avatars.com/api/?name={{ profile.full_name }}&background={{ avatar_bg }}&color=fff&size=120&bold=true&font-size=0.4"
                         style="width: 120px; height: 120px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.12);"
                     >
                     <div>
                         <h2 style="font-size: 28px; font-weight: 800; color: #0F172A; margin: 0 0 0.5rem 0;">{{ profile.full_name }}</h2>
                         <p style="font-size: 14px; color: #64748B; margin: 0 0 1rem 0; font-weight: 500;">{{ profile.designation or 'Team Member' }}</p>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <span style="background: {% if 'admin' in profile.role|lower %}linear-gradient(135deg, #3B82F6, #2563EB){% elif 'manager' in profile.role|lower or 'lead' in profile.role|lower %}linear-gradient(135deg, #14B8A6, #0D9488){% else %}linear-gradient(135deg, #06B6D4, #0891B2){% endif %}; color: white; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 8px;">{{ profile.role }}</span>
+                            <span class="{{ role_theme_class }}" style="color: white; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 8px;">{{ profile.role }}</span>
                             <span style="background: #F3F4F6; color: #374151; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;">{{ profile.team }}</span>
                         </div>
                     </div>
@@ -42,7 +57,7 @@
             <!-- Right: Statistics -->
             <div style="display: flex; flex-direction: column; gap: 1rem;">
                 <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); text-align: center; border: 1px solid #E2E8F0; min-width: 180px;">
-                    <div style="font-size: 28px; font-weight: 800; color: {% if 'admin' in profile.role|lower %}#3B82F6{% elif 'manager' in profile.role|lower or 'lead' in profile.role|lower %}#14B8A6{% else %}#06B6D4{% endif %}; margin-bottom: 0.25rem;">{{ profile.role }}</div>
+                    <div class="{{ role_text_class }}" style="font-size: 28px; font-weight: 800; margin-bottom: 0.25rem;">{{ profile.role }}</div>
                     <div style="font-size: 12px; color: #64748B; font-weight: 500;">Role</div>
                 </div>
             </div>
@@ -57,7 +72,7 @@
         <div>
             <!-- Account Information Card -->
             <div style="background: white; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid #E2E8F0; margin-bottom: 2rem; overflow: hidden;">
-                <div style="background: {% if 'admin' in profile.role|lower %}linear-gradient(135deg, #3B82F6, #2563EB){% elif 'manager' in profile.role|lower or 'lead' in profile.role|lower %}linear-gradient(135deg, #14B8A6, #0D9488){% else %}linear-gradient(135deg, #06B6D4, #0891B2){% endif %}; color: white; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+                <div class="{{ role_theme_class }}" style="color: white; padding: 1.5rem; display: flex; align-items: center; gap: 1rem;">
                     <i data-lucide="user-circle" style="width: 24px; height: 24px;"></i>
                     <h3 style="margin: 0; font-size: 18px; font-weight: 700;">Account Information</h3>
                 </div>
@@ -134,7 +149,8 @@
                         <div style="display: flex; gap: 1rem;">
                             <button
                                 type="submit"
-                                style="background: linear-gradient(135deg, {% if 'admin' in profile.role|lower %}#3B82F6, #2563EB{% elif 'manager' in profile.role|lower or 'lead' in profile.role|lower %}#14B8A6, #0D9488{% else %}#06B6D4, #0891B2{% endif %}); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);"
+                                class="{{ role_theme_class }}"
+                                style="color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);"
                                 onMouseOver="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 24px rgba(59, 130, 246, 0.4)'"
                                 onMouseOut="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.3)'"
                             >
@@ -173,7 +189,7 @@
                     <!-- Role -->
                     <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #E2E8F0;">
                         <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Role</div>
-                        <div style="font-size: 14px; font-weight: 600; color: white; background: {% if 'admin' in profile.role|lower %}linear-gradient(135deg, #3B82F6, #2563EB){% elif 'manager' in profile.role|lower or 'lead' in profile.role|lower %}linear-gradient(135deg, #14B8A6, #0D9488){% else %}linear-gradient(135deg, #06B6D4, #0891B2){% endif %}; padding: 0.5rem 1rem; border-radius: 8px; display: inline-block;">{{ profile.role }}</div>
+                        <div class="{{ role_theme_class }}" style="font-size: 14px; font-weight: 600; color: white; padding: 0.5rem 1rem; border-radius: 8px; display: inline-block;">{{ profile.role }}</div>
                     </div>
 
                     <!-- Team -->
@@ -224,6 +240,25 @@
 </script>
 
 <style>
+    .profile-theme-admin {
+        background: linear-gradient(135deg, #3B82F6, #2563EB) !important;
+    }
+    .profile-theme-manager {
+        background: linear-gradient(135deg, #14B8A6, #0D9488) !important;
+    }
+    .profile-theme-employee {
+        background: linear-gradient(135deg, #06B6D4, #0891B2) !important;
+    }
+    .profile-text-admin {
+        color: #3B82F6 !important;
+    }
+    .profile-text-manager {
+        color: #14B8A6 !important;
+    }
+    .profile-text-employee {
+        color: #06B6D4 !important;
+    }
+
     @keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
@@ -231,3 +266,4 @@
 </style>
 
 {% endblock %}
+

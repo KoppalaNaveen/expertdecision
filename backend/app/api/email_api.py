@@ -15,11 +15,18 @@ router = APIRouter(
     tags=["Email Service"]
 )
 
+import threading
+from app.services.email_service import send_smtp_service_email
+
 @router.post("/send", response_model=InternalEmailResponse)
 def send_email(req: InternalEmailCreate, db: Session = Depends(get_db)):
     sender = db.query(User).filter(User.id == req.sender_id).first()
     if not sender:
         raise HTTPException(status_code=404, detail="Sender user not found")
+
+    delivery_method = (req.delivery_method or "gmail").lower().strip()
+    if delivery_method not in ["gmail", "smtp"]:
+        delivery_method = "gmail"
 
     new_email = InternalEmail(
         sender_id=req.sender_id,
@@ -40,22 +47,27 @@ def send_email(req: InternalEmailCreate, db: Session = Depends(get_db)):
     try:
         log = ActivityLog(
             user_id=req.sender_id,
-            action=f"Sent internal email to {new_email.recipient_names[:30]}",
-            details=f"Subject: {new_email.subject[:40]}"
+            action=f"Sent internal email via {delivery_method.upper()} to {new_email.recipient_names[:30]}",
+            details=f"Subject: {new_email.subject[:40]} | Method: {delivery_method}"
         )
         db.add(log)
         db.commit()
     except Exception as e:
         print(f"Error logging email activity: {e}")
 
-    # Send in-app Notifications to mentioned recipient names/IDs
+    # 1. Independent In-App Notifications (Guaranteed to always succeed)
+    matched_recipient_emails = []
     try:
         all_users = db.query(User).all()
         for u in all_users:
             if u.id != req.sender_id:
                 name_match = u.full_name and u.full_name.lower() in req.recipient_names.lower()
                 id_match = u.employee_id and u.employee_id.lower() in req.recipient_names.lower()
-                if name_match or id_match:
+                email_match = u.email and u.email.lower() in req.recipient_names.lower()
+                
+                if name_match or id_match or email_match:
+                    if u.email:
+                        matched_recipient_emails.append(u.email)
                     NotificationService.create_notification(
                         db,
                         user_id=u.id,
@@ -64,6 +76,37 @@ def send_email(req: InternalEmailCreate, db: Session = Depends(get_db)):
                     )
     except Exception as notif_err:
         print(f"Error notifying email recipients: {notif_err}")
+
+    # If raw email address was typed directly in recipient_names, include it
+    for word in req.recipient_names.replace(",", " ").replace(";", " ").split():
+        clean_word = word.strip()
+        if "@" in clean_word and "." in clean_word and clean_word not in matched_recipient_emails:
+            matched_recipient_emails.append(clean_word)
+
+    # 2. Routed Email Delivery (Original Gmail vs Project SMTP Email Service)
+    # Strictly sends through the single chosen delivery method
+    if matched_recipient_emails:
+        target_emails = list(set(matched_recipient_emails))
+        sender_name = sender.full_name or "EDRP User"
+        subj = new_email.subject
+        msg_body = new_email.message
+        prio = new_email.priority
+
+        def _async_dispatch_email():
+            for dest_email in target_emails:
+                try:
+                    send_smtp_service_email(
+                        to_email=dest_email,
+                        sender_name=sender_name,
+                        subject=subj,
+                        message=msg_body,
+                        priority=prio,
+                        delivery_method=delivery_method
+                    )
+                except Exception as mail_err:
+                    print(f"Email delivery error ({delivery_method}) to {dest_email}: {mail_err}")
+
+        threading.Thread(target=_async_dispatch_email, daemon=True).start()
 
     res = InternalEmailResponse.from_orm(new_email)
     res.sender_name = sender.full_name

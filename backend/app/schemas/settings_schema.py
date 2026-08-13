@@ -89,7 +89,12 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
     confirm_password: str
 
+class DeleteAccountRequest(BaseModel):
+    user_id: int
+    password: str
+
 class TestEmailRequest(BaseModel):
     target_email: str
     subject: Optional[str] = "EDRP System Test Email"
     message: Optional[str] = "This is a test notification email sent from EDRP system settings."
+

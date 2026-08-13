@@ -1702,7 +1702,7 @@
         const payload = {
             title: decisionPayload.title,
             description: decisionPayload.description || "No description provided.",
-            created_by: parseInt("{{ session.get('user_id', 2) }}", 10),
+            created_by: parseInt("{{ session.get('user_id', '') }}" || localStorage.getItem('user_id') || 1, 10),
             category_id: decisionPayload.category_id || 1,
             priority_level: decisionPayload.priority_level,
             department: decisionPayload.department,
@@ -1814,6 +1814,18 @@
         if (catSelect) catSelect.addEventListener('change', updateApprovalFlowCard);
         const prioSelect = document.getElementById('cdPriority');
         if (prioSelect) prioSelect.addEventListener('change', updateApprovalFlowCard);
+
+        // Apply default category from settings if not editing
+        const defCat = localStorage.getItem('edrp_default_category');
+        if (defCat && catSelect) {
+            for (let i = 0; i < catSelect.options.length; i++) {
+                if (catSelect.options[i].text.toLowerCase().includes(defCat.toLowerCase())) {
+                    catSelect.selectedIndex = i;
+                    updateApprovalFlowCard();
+                    break;
+                }
+            }
+        }
 
         // Check if we are in Edit Mode
         const urlParams = new URLSearchParams(window.location.search);

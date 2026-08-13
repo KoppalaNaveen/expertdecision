@@ -10,7 +10,18 @@ from app.repositories.user_repository import UserRepository
 from app.core.security import hash_password, verify_password
 from app.core.auth import create_access_token
 from app.models.user import VerificationCode, User
-from app.services.email_service import send_otp_email, send_id_email, send_account_approved_email
+from app.services.email_service import (
+    send_otp_email,
+    send_id_email,
+    send_account_approved_email,
+    send_account_rejected_email,
+    send_password_reset_confirmation_email,
+    send_new_login_email,
+    send_account_deleted_email,
+    send_role_changed_email,
+    send_account_status_email
+)
+from app.services.notification_service import NotificationService
 
 class UserService:
 
@@ -221,6 +232,18 @@ class UserService:
         # Case 6: Approved -> generate JWT
         access_token = create_access_token({"sub": db_user.employee_id})
 
+        # Automated Security Email: New Login Notification via Original Gmail (Async)
+        if db_user.email:
+            def _async_login_email(target_email, name):
+                try:
+                    from datetime import datetime, timezone
+                    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+                    send_new_login_email(target_email, name, login_time=now_str, device_info="Web Browser Session")
+                except Exception as log_err:
+                    print(f"New login email dispatch note: {log_err}")
+
+            threading.Thread(target=_async_login_email, args=(db_user.email, db_user.full_name), daemon=True).start()
+
         UserService._log_activity(db, db_user.id, f"User login successful: {db_user.full_name} ({db_user.employee_id})", f"Role: {db_user.role.role_name if db_user.role else 'User'}")
 
         return {
@@ -257,16 +280,32 @@ class UserService:
         if not updated_user:
             raise HTTPException(status_code=404, detail="User not found.")
 
-        if action == "approve" and updated_user.email:
-            def _async_approval_email(target_email, emp_id, name):
+        # 1. In-App Notification (Independent)
+        try:
+            status_msg = "Your account has been approved by the Administrator." if action == "approve" else "Your account registration application was not approved."
+            NotificationService.create_notification(
+                db,
+                user_id=updated_user.id,
+                message=status_msg,
+                notification_type="Account Status"
+            )
+        except Exception as notif_err:
+            print(f"Approval status notification note: {notif_err}")
+
+        # 2. Automated Email via Original Gmail (Async post-commit)
+        if updated_user.email:
+            def _async_status_email(target_email, emp_id, name, act):
                 try:
-                    send_account_approved_email(target_email, emp_id, name)
+                    if act == "approve":
+                        send_account_approved_email(target_email, emp_id, name)
+                    else:
+                        send_account_rejected_email(target_email, name, "Administrative review")
                 except Exception as e:
-                    print(f"Approval email dispatch exception: {e}")
+                    print(f"Approval/rejection email dispatch exception: {e}")
 
             threading.Thread(
-                target=_async_approval_email,
-                args=(updated_user.email, updated_user.employee_id, updated_user.full_name),
+                target=_async_status_email,
+                args=(updated_user.email, updated_user.employee_id, updated_user.full_name, action),
                 daemon=True
             ).start()
 
@@ -377,6 +416,27 @@ class UserService:
         # Update password
         user.password = hash_password(new_password)
         db.commit()
+
+        # 1. In-App Notification (Independent)
+        try:
+            NotificationService.create_notification(
+                db,
+                user_id=user.id,
+                message="Your account password was successfully reset.",
+                notification_type="Security Alert"
+            )
+        except Exception as notif_err:
+            print(f"Password reset notification note: {notif_err}")
+
+        # 2. Automated Security Email via Original Gmail (Async post-commit)
+        if user.email:
+            def _async_reset_email(target_email, name):
+                try:
+                    send_password_reset_confirmation_email(target_email, name)
+                except Exception as mail_err:
+                    print(f"Password reset email dispatch exception: {mail_err}")
+
+            threading.Thread(target=_async_reset_email, args=(user.email, user.full_name), daemon=True).start()
         
         return {"message": "Password reset successfully"}
 
@@ -438,6 +498,10 @@ class UserService:
 
     @staticmethod
     def delete_user(db: Session, user_id: int):
+        user = UserRepository.get_user_by_id(db, user_id)
+        target_email = user.email if user else None
+        target_name = user.full_name if user else "User"
+
         UserService._log_activity(db, 1, f"Administrator deleted user account ID: {user_id}", "")
         success, err_msg = UserRepository.delete_user(db, user_id)
         if not success:
@@ -445,4 +509,15 @@ class UserService:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
             else:
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err_msg or "Failed to delete user")
+
+        # Send account deletion email after successful database deletion
+        if target_email:
+            def _async_del_email(em, nm):
+                try:
+                    send_account_deleted_email(em, nm)
+                except Exception as mail_err:
+                    print(f"Account deletion email dispatch exception: {mail_err}")
+
+            threading.Thread(target=_async_del_email, args=(target_email, target_name), daemon=True).start()
+
         return {"message": "User deleted successfully"}

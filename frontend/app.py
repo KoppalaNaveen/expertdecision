@@ -499,17 +499,26 @@ def api_dashboard():
 
 @app.route("/api/decisions", methods=["GET"])
 def api_decisions():
-    if not session.get("logged_in"):
-        return jsonify({"detail": "Unauthorized"}), 401
-    user_id = session.get("user_id")
-    role_name = session.get("role_name", "Employee")
     try:
-        response = make_backend_request("GET", f"/decisions/?user_id={user_id}&role_name={role_name}", timeout=5)
-        if response is not None and response.status_code == 200:
+        params = {}
+        user_id = request.args.get("user_id") or session.get("user_id")
+        role_name = request.args.get("role_name") or session.get("role_name") or "Employee"
+        if user_id:
+            params["user_id"] = user_id
+        if role_name:
+            params["role_name"] = role_name
+
+        headers = {}
+        if "token" in session:
+            headers["Authorization"] = f"Bearer {session['token']}"
+
+        response = requests.get(f"{API_URL}/decisions/", params=params, headers=headers, timeout=5)
+        if response.status_code == 200:
             return jsonify(response.json()), 200
-        return jsonify([]), 200
-    except Exception:
-        return jsonify([]), 200
+        return jsonify([]), response.status_code
+    except Exception as e:
+        print(f"Error fetching decisions in frontend proxy: {e}")
+        return jsonify([]), 500
 
 # ===========================
 # NOTIFICATIONS PROXIES
@@ -548,26 +557,6 @@ def clear_all_notifications(user_id):
     except Exception as e:
         return jsonify({"detail": "Error"}), 500
 
-@app.route("/api/decisions")
-def api_get_decisions():
-    if not session.get("logged_in") and "token" not in session:
-        return jsonify([]), 401
-    try:
-        params = {}
-        user_id = request.args.get("user_id") or session.get("user_id")
-        role_name = request.args.get("role_name") or session.get("role_name")
-        if user_id:
-            params["user_id"] = user_id
-        if role_name:
-            params["role_name"] = role_name
-        response = requests.get(f"{API_URL}/decisions/", params=params, timeout=5)
-        if response.status_code == 200:
-            return jsonify(response.json()), 200
-        return jsonify([]), response.status_code
-    except Exception as e:
-        print(f"Error fetching decisions in frontend proxy: {e}")
-        return jsonify([]), 500
-
 @app.route("/api/dashboard")
 def api_get_dashboard():
     if "token" not in session or "user_id" not in session:
@@ -598,15 +587,16 @@ def dashboard():
 
     user_id = session.get("user_id", 2)
 
-    response = requests.get(
-        f"{API_URL}/dashboard/{user_id}",
-        headers=headers
-    )
-
     dashboard = {}
-
-    if response.status_code == 200:
-        dashboard = response.json()
+    try:
+        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=5)
+        if response is not None and response.status_code == 200:
+            dashboard = response.json()
+        else:
+            flash("Backend service returned an error. Showing offline dashboard view.", "warning")
+    except Exception as e:
+        print(f"[FRONTEND DASHBOARD REQ ERR] {e}")
+        flash("Backend server is unreachable. Please ensure the backend is running.", "warning")
 
     role = (session.get("role_name") or "Employee").strip()
     role_lower = role.lower()
@@ -861,18 +851,22 @@ def profile():
         return redirect(url_for("login"))
 
     current_user_id = session.get("user_id")
-    response = requests.get(
-        f"{API_URL}/profile/{current_user_id}",
-        params={"current_user_id": current_user_id}
-    )
-
-    if response.status_code != 200:
-
-        flash("Unable to load profile.", "danger")
-
+    profile = {}
+    try:
+        response = make_backend_request(
+            "GET",
+            f"/profile/{current_user_id}",
+            params={"current_user_id": current_user_id},
+            timeout=5
+        )
+        if response is None or response.status_code != 200:
+            flash("Unable to load profile.", "danger")
+            return redirect(url_for("dashboard"))
+        profile = response.json()
+    except Exception as e:
+        print(f"[FRONTEND PROFILE REQ ERR] {e}")
+        flash("Backend connection error. Please ensure the backend service is running.", "danger")
         return redirect(url_for("dashboard"))
-
-    profile = response.json()
 
     return render_template(
         "profile.html",
@@ -897,21 +891,20 @@ def update_profile():
 
     }
 
-    response = requests.put(
-
-        f"{API_URL}/profile/{session['user_id']}",
-
-        json=payload
-
-    )
-
-    if response.status_code == 200:
-
-        flash("Profile Updated Successfully", "success")
-
-    else:
-
-        flash("Unable to update profile", "danger")
+    try:
+        response = make_backend_request(
+            "PUT",
+            f"/profile/{session['user_id']}",
+            json=payload,
+            timeout=5
+        )
+        if response is not None and response.status_code == 200:
+            flash("Profile Updated Successfully", "success")
+        else:
+            flash("Unable to update profile", "danger")
+    except Exception as e:
+        print(f"[FRONTEND PROFILE UPDATE REQ ERR] {e}")
+        flash("Backend connection error. Unable to save profile changes.", "danger")
 
     return redirect(url_for("profile"))
 
@@ -985,6 +978,17 @@ def logout():
     session.clear()
     session.permanent = False
     flash("Logged Out Successfully", "info")
+    res = make_response(redirect(url_for("login")))
+    res.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    res.headers["Pragma"] = "no-cache"
+    res.headers["Expires"] = "0"
+    return res
+
+@app.route("/account-deleted")
+def account_deleted():
+    session.clear()
+    session.permanent = False
+    flash("Your account and all associated data have been permanently deleted.", "warning")
     res = make_response(redirect(url_for("login")))
     res.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
     res.headers["Pragma"] = "no-cache"
