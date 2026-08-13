@@ -544,9 +544,9 @@
 </div>
 
 <script>
-const USER_ID = {{ session.get('user_id', 1) }};
+const USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10) || 1;
 const USER_NAME = "{{ session.get('full_name', 'User') }}";
-const IS_ADMIN = {{ 'true' if ('admin' in (session.get('role_name') or 'Employee')|string|lower) else 'false' }};
+const IS_ADMIN = "{{ 'true' if ('admin' in (session.get('role_name') or 'Employee')|string|lower) else 'false' }}" === "true";
 const API_URL = "http://127.0.0.1:8000";
 
 let supportTicketsCache = [];

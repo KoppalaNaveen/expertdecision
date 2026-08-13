@@ -441,27 +441,27 @@ def api_support_ai_chat():
     if user_name and not data.get("user_name"):
         data["user_name"] = user_name
 
-    user_msg = data.get("message", "")
-    
-    # 1. Direct high-performance response using EDRP AI Service
-    if generate_ai_response:
-        try:
-            res_dict = generate_ai_response(
-                user_message=user_msg,
-                user_name=user_name,
-                conversation_history=data.get("conversation_history")
-            )
-            return jsonify(res_dict), 200
-        except Exception as ai_err:
-            print(f"Direct AI service execution note: {ai_err}")
-
-    # 2. Backend API fallback
+    # 1. Primary: Forward to FastAPI backend (which runs live Groq LLM with hot reload)
     try:
-        response = http_session.post(f"{API_URL}/support/ai-chat", json=data, timeout=8)
+        response = http_session.post(f"{API_URL}/support/ai-chat", json=data, timeout=15)
         if response.status_code == 200:
             return jsonify(response.json()), 200
     except Exception as e:
-        print(f"AI chat backend call note: {e}")
+        print(f"AI chat backend forward note: {e}")
+
+    # 2. Dynamic direct execution fallback
+    try:
+        fn = _load_ai_support_generator()
+        if fn:
+            res_dict = fn(
+                user_message=data.get("message", ""),
+                user_name=user_name,
+                user_id=data.get("user_id") or user_id,
+                conversation_history=data.get("conversation_history")
+            )
+            return jsonify(res_dict), 200
+    except Exception as ai_err:
+        print(f"Direct AI service fallback note: {ai_err}")
 
     return jsonify({
         "reply": f"Hello {user_name}! In EDRP, decisions follow a structured lifecycle: Draft → In Review → Approved / Rejected. You can create decisions from the sidebar, evaluate alternatives, track reviewer approval chains, or inspect audit diffs.",

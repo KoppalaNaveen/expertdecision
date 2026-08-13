@@ -1829,6 +1829,475 @@
         })();
     </script>
 
+    <!-- ================= CONTEXTUAL AI SELECTION TOOL & MODAL ================= -->
+    <!-- Floating AI Quick-Action Pill on Text Selection -->
+    <div id="edrpAiSelectionPill" class="edrp-ai-selection-pill d-none" style="position: absolute; z-index: 9999; transform: translate(-50%, -100%);">
+        <button class="btn btn-sm btn-primary rounded-pill shadow-lg d-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold" onclick="openAiSelectionAssistant(event)" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border: none; font-size: 12px; letter-spacing: 0.2px;">
+            <i class="bi bi-stars text-warning animate-pulse"></i>
+            <span>Ask AI</span>
+            <span class="badge bg-white bg-opacity-20 text-white rounded-pill px-1.5 py-0.5 ms-1" style="font-size: 10px;">Details</span>
+        </button>
+    </div>
+
+    <!-- Floating Global AI Assistant Orb (Bottom Right) -->
+    <div id="edrpAiFloatingOrb" class="edrp-floating-ai-orb" onclick="openAiSelectionAssistant(null, true)" title="Ask EDRP AI Assistant (Ctrl + Space)">
+        <div class="orb-glow"></div>
+        <div class="orb-inner">
+            <i class="bi bi-stars fs-5 text-white"></i>
+        </div>
+        <span class="orb-label">AI Assistant</span>
+    </div>
+
+    <!-- Contextual AI Intelligence Modal -->
+    <div class="modal fade" id="edrpAiSelectionModal" tabindex="-1" aria-labelledby="edrpAiSelectionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-2xl rounded-4 overflow-hidden" style="background: var(--bs-body-bg, #ffffff);">
+                <!-- Modal Header -->
+                <div class="modal-header border-bottom py-3 px-4" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(124, 58, 237, 0.08) 100%);">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="p-2 rounded-3 text-white d-flex align-items-center justify-content-center shadow-sm" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); width: 34px; height: 34px;">
+                            <i class="bi bi-stars"></i>
+                        </div>
+                        <div>
+                            <h6 class="modal-title fw-bold text-dark mb-0 d-flex align-items-center gap-2" id="edrpAiSelectionModalLabel" style="font-size: 15px;">
+                                EDRP AI Intelligence Assistant
+                                <span class="badge rounded-pill text-xs fw-normal px-2.5 py-1" style="background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe;">
+                                    <i class="bi bi-cpu me-1"></i>Groq Llama 3.3
+                                </span>
+                            </h6>
+                            <small class="text-muted" style="font-size: 11px;">Instant analysis, explanations, alternatives & decision insights</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body p-4">
+                    <!-- Selected Text Highlight Card -->
+                    <div id="aiSelectedTextCard" class="p-3 rounded-3 mb-3 border position-relative" style="background: rgba(241, 245, 249, 0.7); border-color: rgba(203, 213, 225, 0.6) !important;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-xs fw-bold text-primary text-uppercase tracking-wider">
+                                <i class="bi bi-quote me-1"></i> Selected Content Context
+                            </span>
+                            <span id="aiSelectionCharCount" class="text-xs text-muted font-monospace">0 chars</span>
+                        </div>
+                        <div id="aiSelectedTextPreview" class="text-dark text-xs fst-italic" style="max-height: 90px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5;">
+                            No specific text selected. Ask any general question or highlight text on the screen.
+                        </div>
+                    </div>
+
+                    <!-- Quick Insight Action Chips -->
+                    <div class="mb-3">
+                        <label class="text-xs fw-bold text-secondary mb-2 d-block text-uppercase tracking-wider">
+                            <i class="bi bi-lightning-charge-fill text-warning me-1"></i> Quick Action Prompts
+                        </label>
+                        <div class="d-flex flex-wrap gap-2" id="aiQuickActionChips">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill text-xs px-3 py-1.5 d-flex align-items-center gap-1.5 quick-ai-chip" onclick="triggerAiSelectionAction('explain')">
+                                <i class="bi bi-lightbulb-fill text-warning"></i> Explain Details
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill text-xs px-3 py-1.5 d-flex align-items-center gap-1.5 quick-ai-chip" onclick="triggerAiSelectionAction('pros_cons')">
+                                <i class="bi bi-scale text-info"></i> Strategic Pros & Cons
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill text-xs px-3 py-1.5 d-flex align-items-center gap-1.5 quick-ai-chip" onclick="triggerAiSelectionAction('rewrite')">
+                                <i class="bi bi-pencil-square text-success"></i> Polish & Rewrite
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill text-xs px-3 py-1.5 d-flex align-items-center gap-1.5 quick-ai-chip" onclick="triggerAiSelectionAction('alternatives')">
+                                <i class="bi bi-diagram-3-fill text-primary"></i> Suggest Alternatives
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill text-xs px-3 py-1.5 d-flex align-items-center gap-1.5 quick-ai-chip" onclick="triggerAiSelectionAction('risks')">
+                                <i class="bi bi-shield-exclamation text-danger"></i> Audit & Risks
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Prompt Input Bar -->
+                    <form id="aiSelectionCustomForm" onsubmit="handleAiSelectionCustomSubmit(event)" class="mb-3">
+                        <div class="input-group shadow-sm rounded-pill overflow-hidden border">
+                            <span class="input-group-text bg-white border-0 ps-3 text-muted">
+                                <i class="bi bi-chat-left-dots text-primary"></i>
+                            </span>
+                            <input type="text" id="aiSelectionCustomInput" class="form-control border-0 text-xs py-2.5 px-2" placeholder="Ask anything about this selection or platform (e.g. 'Is this realistic?', 'Summarize in 2 points')...">
+                            <button class="btn btn-primary px-4 fw-semibold text-xs rounded-pill" type="submit" id="btnSendAiSelection" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none;">
+                                <i class="bi bi-send-fill me-1"></i> Ask AI
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- AI Response Area -->
+                    <div id="aiSelectionResponseContainer" class="p-3 rounded-3 border d-none" style="background: rgba(248, 250, 252, 0.85); min-height: 120px;">
+                        <!-- Loading State -->
+                        <div id="aiSelectionLoading" class="text-center py-4 d-none">
+                            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                            <div class="text-xs text-muted fw-semibold">Groq AI is analyzing your selection & platform context...</div>
+                        </div>
+
+                        <!-- Content Display -->
+                        <div id="aiSelectionResponseContent" class="text-xs text-dark" style="line-height: 1.6; white-space: pre-wrap;"></div>
+
+                        <!-- Response Toolbar -->
+                        <div id="aiSelectionResponseToolbar" class="d-flex justify-content-between align-items-center border-top pt-2.5 mt-3 d-none">
+                            <div class="text-muted" style="font-size: 11px;">
+                                <i class="bi bi-check2-circle text-success me-1"></i> Verified by <strong class="text-dark" id="aiResponseSourceLabel">Groq Llama 3.3</strong>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-light border rounded-pill px-2.5 py-1 text-xs" onclick="copyAiSelectionResponse(this)">
+                                    <i class="bi bi-clipboard me-1"></i> Copy
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5 py-1 text-xs" onclick="focusAiCustomInput()">
+                                    <i class="bi bi-arrow-return-right me-1"></i> Follow-up
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* ── Floating AI Selection Pill Styling ── */
+        .edrp-ai-selection-pill {
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            pointer-events: auto;
+        }
+        .edrp-ai-selection-pill button {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .edrp-ai-selection-pill button:hover {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.5) !important;
+        }
+        .animate-pulse {
+            animation: edrpPulse 1.8s infinite;
+        }
+        @keyframes edrpPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+        }
+
+        /* ── Floating Global AI Orb ── */
+        .edrp-floating-ai-orb {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1040;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px 6px 6px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 999px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+        .edrp-floating-ai-orb:hover {
+            transform: translateY(-3px) scale(1.04);
+            box-shadow: 0 16px 36px rgba(79, 70, 229, 0.35);
+            border-color: rgba(99, 102, 241, 0.6);
+        }
+        .orb-inner {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+        }
+        .orb-label {
+            color: #ffffff;
+            font-size: 12.5px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+        }
+        .quick-ai-chip {
+            background-color: var(--bs-body-bg, #ffffff);
+            transition: all 0.2s ease;
+        }
+        .quick-ai-chip:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.15);
+        }
+
+        /* Dark mode overrides */
+        [data-bs-theme="dark"] #aiSelectedTextCard {
+            background: rgba(30, 41, 59, 0.7) !important;
+            border-color: rgba(51, 65, 85, 0.8) !important;
+        }
+        [data-bs-theme="dark"] #aiSelectionResponseContainer {
+            background: rgba(15, 23, 42, 0.85) !important;
+            border-color: rgba(51, 65, 85, 0.8) !important;
+        }
+        [data-bs-theme="dark"] #aiSelectionCustomForm .input-group-text,
+        [data-bs-theme="dark"] #aiSelectionCustomInput {
+            background: #1e293b !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+        [data-bs-theme="dark"] #aiSelectionCustomInput::placeholder {
+            color: #94a3b8 !important;
+        }
+    </style>
+
+    <script>
+        // ── Contextual AI Selection Logic ──
+        let currentSelectedText = "";
+        let selectionModalInstance = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const pill = document.getElementById('edrpAiSelectionPill');
+            const modalEl = document.getElementById('edrpAiSelectionModal');
+            if (modalEl) {
+                selectionModalInstance = new bootstrap.Modal(modalEl);
+                modalEl.addEventListener('show.bs.modal', () => {
+                    if (pill) pill.classList.add('d-none');
+                    try { if (window.getSelection) window.getSelection().removeAllRanges(); } catch(e) {}
+                });
+                modalEl.addEventListener('shown.bs.modal', () => {
+                    if (pill) pill.classList.add('d-none');
+                });
+                modalEl.addEventListener('hide.bs.modal', () => {
+                    if (pill) pill.classList.add('d-none');
+                });
+            }
+
+            // Listen for text selection changes
+            document.addEventListener('mouseup', handleTextSelectionEvent);
+            document.addEventListener('keyup', (e) => {
+                if (e.key === 'Shift' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    handleTextSelectionEvent();
+                }
+            });
+
+            // Hide pill on click outside
+            document.addEventListener('mousedown', (e) => {
+                if (pill && !pill.contains(e.target) && !e.target.closest('#edrpAiFloatingOrb')) {
+                    pill.classList.add('d-none');
+                }
+            });
+
+            // Keyboard shortcut: Ctrl + Space or Alt + A
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey && e.code === 'Space') || (e.altKey && e.code === 'KeyA')) {
+                    e.preventDefault();
+                    openAiSelectionAssistant(null, true);
+                }
+            });
+        });
+
+        function handleTextSelectionEvent() {
+            const pill = document.getElementById('edrpAiSelectionPill');
+            if (!pill) return;
+
+            // Never show the floating pill if modal is already open
+            const modalEl = document.getElementById('edrpAiSelectionModal');
+            if (modalEl && (modalEl.classList.contains('show') || modalEl.style.display === 'block')) {
+                pill.classList.add('d-none');
+                return;
+            }
+
+            const selection = window.getSelection();
+            const text = selection ? selection.toString().trim() : '';
+
+            // Require at least 3 characters and ignore when user is actively inside modal or form controls
+            if (text.length >= 3) {
+                try {
+                    const range = selection.getRangeAt(0);
+                    let parent = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+                    if (parent && (parent.closest('#edrpAiSelectionModal') || parent.closest('.modal') || parent.closest('#edrpAiSelectionPill') || parent.closest('#edrpAiFloatingOrb'))) {
+                        pill.classList.add('d-none');
+                        return;
+                    }
+
+                    const rect = range.getBoundingClientRect();
+                    // Check valid coordinates
+                    if (rect.width > 0 && rect.height > 0) {
+                        currentSelectedText = text;
+                        const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+                        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+                        pill.style.left = `${rect.left + scrollX + (rect.width / 2)}px`;
+                        pill.style.top = `${rect.top + scrollY - 8}px`;
+                        pill.classList.remove('d-none');
+                        return;
+                    }
+                } catch (err) {}
+            }
+            // If selection is cleared or invalid
+            if (pill) {
+                pill.classList.add('d-none');
+            }
+        }
+
+        function openAiSelectionAssistant(event, isGlobalTrigger = false) {
+            if (event) event.stopPropagation();
+            const pill = document.getElementById('edrpAiSelectionPill');
+            if (pill) pill.classList.add('d-none');
+
+            // Clear browser selection range to prevent ghost floating pill
+            try {
+                if (window.getSelection) window.getSelection().removeAllRanges();
+            } catch(e) {}
+
+            // If global trigger without selection, use active or placeholder text
+            if (isGlobalTrigger && !currentSelectedText) {
+                const sel = window.getSelection() ? window.getSelection().toString().trim() : '';
+                currentSelectedText = sel || "";
+            }
+
+            const previewEl = document.getElementById('aiSelectedTextPreview');
+            const countEl = document.getElementById('aiSelectionCharCount');
+            const textCard = document.getElementById('aiSelectedTextCard');
+
+            if (currentSelectedText) {
+                previewEl.innerText = `"${currentSelectedText}"`;
+                countEl.innerText = `${currentSelectedText.length} chars`;
+                textCard.classList.remove('d-none');
+            } else {
+                previewEl.innerText = "No specific text selected. Ask any platform or decision question below.";
+                countEl.innerText = "General Assistant Mode";
+            }
+
+            // Reset response container
+            document.getElementById('aiSelectionResponseContainer').classList.add('d-none');
+            document.getElementById('aiSelectionResponseContent').innerHTML = '';
+            document.getElementById('aiSelectionResponseToolbar').classList.add('d-none');
+            document.getElementById('aiSelectionCustomInput').value = '';
+
+            if (selectionModalInstance) {
+                selectionModalInstance.show();
+            }
+        }
+
+        async function triggerAiSelectionAction(actionType) {
+            let promptText = "";
+            const textContext = currentSelectedText ? `Content Context:\n"${currentSelectedText}"\n\n` : "";
+
+            switch (actionType) {
+                case 'explain':
+                    promptText = `${textContext}Please explain this in clear, actionable detail. Break down key terms, business implications, and why this matters for the decision workflow.`;
+                    break;
+                case 'pros_cons':
+                    promptText = `${textContext}Analyze the strategic Pros, Cons, and potential Risk Factors associated with this statement or decision alternative.`;
+                    break;
+                case 'rewrite':
+                    promptText = `${textContext}Rewrite and polish this content to make it professional, concise, authoritative, and ready for an EDRP enterprise decision rationale.`;
+                    break;
+                case 'alternatives':
+                    promptText = `${textContext}Generate 2 to 3 structured alternatives for this statement with Pros, Cons, Estimated Cost, Feasibility Score (1-10), and Risk Level.`;
+                    break;
+                case 'risks':
+                    promptText = `${textContext}Perform a thorough risk audit on this. Highlight technical risks, operational bottlenecks, compliance considerations, and how to mitigate them.`;
+                    break;
+                default:
+                    promptText = `${textContext}Provide expert insights on this selection.`;
+            }
+
+            await executeAiSelectionQuery(promptText);
+        }
+
+        async function handleAiSelectionCustomSubmit(e) {
+            if (e && e.preventDefault) e.preventDefault();
+            const input = document.getElementById('aiSelectionCustomInput');
+            const customQ = input ? input.value.trim() : "";
+            if (!customQ) return;
+
+            let promptText = "";
+            if (currentSelectedText) {
+                promptText = `Context on Selection:\n"${currentSelectedText}"\n\nUser Question: ${customQ}`;
+            } else {
+                promptText = customQ;
+            }
+
+            await executeAiSelectionQuery(promptText);
+        }
+
+        async function executeAiSelectionQuery(prompt) {
+            const container = document.getElementById('aiSelectionResponseContainer');
+            const loading = document.getElementById('aiSelectionLoading');
+            const content = document.getElementById('aiSelectionResponseContent');
+            const toolbar = document.getElementById('aiSelectionResponseToolbar');
+            const sourceLabel = document.getElementById('aiResponseSourceLabel');
+            const sendBtn = document.getElementById('btnSendAiSelection');
+
+            container.classList.remove('d-none');
+            loading.classList.remove('d-none');
+            content.innerHTML = '';
+            toolbar.classList.add('d-none');
+            if (sendBtn) sendBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/support/ai-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: prompt,
+                        user_id: window.CURRENT_USER_ID || window.LOGGED_USER_ID || 1,
+                        user_name: "{{ session.get('full_name', 'User') }}"
+                    })
+                });
+
+                if (!res.ok) throw new Error("Failed to contact AI service");
+                const data = await res.json();
+
+                loading.classList.add('d-none');
+                const replyMarkdown = data.reply || "No insights returned.";
+                content.innerHTML = formatMarkdownGlobal(replyMarkdown);
+                if (sourceLabel) sourceLabel.innerText = data.source || "Groq Llama 3.3";
+                toolbar.classList.remove('d-none');
+            } catch (err) {
+                loading.classList.add('d-none');
+                content.innerHTML = `<div class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> Unable to complete AI analysis: ${err.message}</div>`;
+            } finally {
+                if (sendBtn) sendBtn.disabled = false;
+            }
+        }
+
+        function formatMarkdownGlobal(text) {
+            if (!text) return '';
+            let html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            // Headings
+            html = html.replace(/^### (.*$)/gim, '<h6 class="fw-bold text-dark mt-2 mb-1">$1</h6>');
+            html = html.replace(/^## (.*$)/gim, '<h6 class="fw-bold text-primary mt-2 mb-1">$1</h6>');
+            html = html.replace(/^# (.*$)/gim, '<h5 class="fw-bold text-primary mt-2 mb-2">$1</h5>');
+            // Bold
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // Inline code
+            html = html.replace(/`(.*?)`/g, '<code class="bg-light px-1.5 py-0.5 rounded text-dark border font-monospace" style="font-size: 11px;">$1</code>');
+            // Bullet points
+            html = html.replace(/^\s*[\-\*]\s+(.*)$/gm, '<li class="ms-3 mb-1">$1</li>');
+            html = html.replace(/(<li.*<\/li>)/s, '<ul class="mb-2 ps-2">$1</ul>');
+            // Linebreaks
+            html = html.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+            return html;
+        }
+
+        function copyAiSelectionResponse(btn) {
+            const content = document.getElementById('aiSelectionResponseContent');
+            if (!content) return;
+            const textToCopy = content.innerText;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const origHtml = btn.innerHTML;
+                btn.innerHTML = `<i class="bi bi-check-lg text-success me-1"></i> Copied!`;
+                setTimeout(() => { btn.innerHTML = origHtml; }, 2000);
+            });
+        }
+
+        function focusAiCustomInput() {
+            const input = document.getElementById('aiSelectionCustomInput');
+            if (input) {
+                input.focus();
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    </script>
+
     {% block js %}{% endblock %}
 </body>
 </html>

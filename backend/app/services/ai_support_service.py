@@ -3,60 +3,192 @@ import json
 import urllib.request
 import urllib.error
 import re
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 
-EDRP_SYSTEM_PROMPT = """You are the EDRP AI Support Assistant for the Expert Decision Replay Platform (EDRP).
-EDRP is an enterprise platform for documenting, reviewing, approving, auditing, and replaying strategic business decisions.
+try:
+    from dotenv import load_dotenv
+    _curr_dir = os.path.dirname(os.path.abspath(__file__))
+    _backend_env = os.path.join(_curr_dir, "..", "..", ".env")
+    _root_env = os.path.join(_curr_dir, "..", "..", "..", ".env")
+    if os.path.exists(_backend_env):
+        load_dotenv(_backend_env)
+    if os.path.exists(_root_env):
+        load_dotenv(_root_env)
+    load_dotenv()
+except Exception:
+    pass
 
-Key Platform Knowledge:
-- 4 Roles: Administrator (AD-xxx), Manager (MN-xxx), Reviewer (RW-xxx), Employee (EMP-xxx).
-- Decision Workflow: Draft -> In Review -> Approved / Rejected / Revision Requested -> Archived.
-- Decision Creation: Requires Title, Problem Rationale, Category, Stakeholders, Urgency, Budget/Financial Impact, and at least one Recommended Alternative.
-- Alternatives: Evaluates pros, cons, estimated cost, feasibility score (1-10), risk level (Low/Med/High).
-- Multi-Tier Approval Chains: Sequential review stages (Reviewer -> Manager -> Administrator). Reviewers can Approve, Reject (with reason), or Request Revision.
-- Decision Replay: Point-in-time version snapshotting (v1, v2, etc.) and visual timeline playback of the full rationale and reviewer evaluations.
-- Audit System: Structured append-only audit trail with field-level before/after diffs in JSON, database triggers preventing modification/deletion, and CSV export.
-- User Onboarding: 6-digit email OTP verification via SMTP + Administrator verification queue.
-- File Uploads: Supports PDF, DOCX, PPTX up to 200MB.
+EDRP_SYSTEM_PROMPT = """You are the EDRP AI Assistant for the Expert Decision Replay Platform (EDRP).
+EDRP is an enterprise platform for creating, evaluating, reviewing, approving, replaying, and auditing critical strategic business decisions.
 
-Always provide an accurate, helpful, step-by-step response directly answering the user's specific question using clean Markdown formatting.
+=== Core Platform Knowledge ===
+1. User Roles:
+   - Administrator (AD-xxxx): Platform governance, user verification, system settings, final approval stage, master audit logs.
+   - Manager (MN-xxxx): Team oversight, budget review, Stage 2 approval authority, department analytics.
+   - Reviewer (RW-xxxx): Domain expert review, evaluating alternatives, Stage 1 approval/rejection/revision requests.
+   - Employee (EMP-xxxx): Creating decisions, proposing alternatives, tracking status, participating in decision discussions.
+
+2. Step-by-Step Decision Creation Process (UI Navigation & Fields):
+   - Step 1: Open the Sidebar and click "Create Decision" (or go to /create-decision).
+   - Step 2: Fill in the Primary Information:
+     * Title: Descriptive decision name (e.g. "Select Cloud Provider for EDRP").
+     * Problem Statement / Rationale: Detailed problem description and business necessity.
+     * Category: Technology, Finance, Operations, Legal, HR, Infrastructure, etc.
+     * Department: Target department (Engineering, Sales, IT, etc.).
+     * Priority / Urgency: Low, Medium, High, or Critical.
+     * Stakeholders: Key persons/groups impacted.
+     * Financial Impact / Budget: Estimated total cost/investment.
+   - Step 3: Define Alternatives (Must evaluate at least 1 alternative, recommended 2+):
+     * Alternative Title & Description.
+     * Pros & Cons: Key benefits and trade-offs.
+     * Estimated Cost ($): Projected implementation cost.
+     * Feasibility Score (1-10): Implementation practicality rating.
+     * Risk Level: Low, Medium, or High.
+   - Step 4: Attach Files: Optional supporting documents (PDF, DOCX, PPTX up to 200MB).
+   - Step 5: Save as "Draft" or click "Submit Decision" to transition status to "In Review" and trigger the approval chain.
+
+3. Approval & Review Workflow:
+   - Lifecycle: Draft → In Review → Approved / Rejected / Revision Requested → Archived.
+   - Sequential Approval Chain: Reviewer (RW) → Manager (MN) → Administrator (AD).
+   - Reviewer Actions:
+     * Approve: Endorses the decision and advances it to the next tier or final approval.
+     * Reject: Denies the decision with mandatory rejection justification.
+     * Request Revision: Sends the decision back to the author with required modifications and feedback.
+
+4. Decision Replay & Versioning:
+   - Navigate to any decision detail page and click "Decision Replay" (or Replay tab).
+   - Step-by-step visual timeline reconstruction of the decision's entire history: initial draft, reviewer comments, alternative comparisons, and version diffs (v1, v2, etc.).
+
+5. Audit Logs & Compliance:
+   - Append-only immutable audit trail capturing every change, field-level before/after JSON diffs, timestamps, user IDs, and IP addresses.
+   - Exportable to CSV or PDF for compliance audits.
+
+6. Support Center & Tickets:
+   - Use the AI Support Assistant for instant answers or click "Create Ticket" to generate a formal support ticket (SUP-xxxx) for helpdesk assistance.
+
+=== Response Instructions ===
+- When the user asks "how to create a decision", "explain the steps", or questions about platform features, provide clear, step-by-step instructions with exact UI buttons, fields, and workflow stages.
+- When the user asks to "create", "generate", "write", "draft", or "suggest" a Problem Statement or Alternatives for a decision title (e.g. "create and generate a new problem statement for the decision title Cloud mitigation"):
+  * Generate a comprehensive, professional, enterprise-grade problem statement and rationale tailored to that topic.
+  * Structure the response with:
+    1. **Executive Problem Statement / Rationale** (A crisp, impactful rationale paragraph ready to paste into EDRP).
+    2. **Background & Technical / Business Friction** (Current challenges and root causes).
+    3. **Key Risks & Business Impact** (Security, downtime, compliance, financial impact).
+    4. **Success Criteria & Objectives** (Measurable goals like 99.99% availability, SLA compliance).
+    5. **Recommended Alternatives to Evaluate in EDRP** (2-3 structured alternatives with Pros, Cons, Estimated Cost, Feasibility Score, and Risk Level).
+- Format all responses using clean Markdown with bold headings, numbered lists, bullet points, and code spans.
+- If real platform decisions, alternatives, or reviews are provided in the [Database Context], seamlessly reference them as concrete examples.
 """
 
-def generate_ai_response(user_message: str, user_name: str = "User", conversation_history: List[dict] = None) -> Dict[str, Any]:
+def generate_ai_response(user_message: str, user_name: str = "User", user_id: Optional[int] = None, conversation_history: List[dict] = None) -> Dict[str, Any]:
     """
     Generates an intelligent AI response for the EDRP Support Center.
-    First attempts live LLM APIs (Gemini / Groq / OpenAI), and seamlessly
-    falls back to the built-in intelligent EDRP Knowledge Engine.
+    Queries real platform database records (RAG), attempts live LLM APIs (Gemini, OpenAI, Groq, Claude, OpenRouter),
+    and falls back to the high-precision EDRP Knowledge Engine.
     """
     clean_msg = (user_message or "").strip()
     if not clean_msg:
         return {
-            "reply": f"Hello {user_name}! How can I assist you with the Expert Decision Replay Platform today? Ask me any question about creating decisions, approval workflows, audit diffs, or account settings.",
-            "suggested_actions": ["How do I create a decision?", "Explain approval workflow", "How does Decision Replay work?", "How do I reset my password?"],
+            "reply": f"Hello {user_name}! How can I assist you with the Expert Decision Replay Platform today? Ask me any question about your decisions, problem statements, alternatives, approval workflows, or audit diffs.",
+            "suggested_actions": ["How do I create a decision?", "Show my decisions", "Explain approval workflow", "How does Decision Replay work?"],
             "source": "EDRP AI Assistant"
         }
 
-    # 1. Live Google Gemini API (if key available)
+    # 1. Retrieve Real Database Context (Decisions, Alternatives, Reviews)
+    db_context = _retrieve_database_context(clean_msg, user_id)
+
+    # 2. Check if this is a direct Decision Data Query (e.g. "what problem did i add for...", "my decisions", "status of DEC-28")
+    data_response = _answer_decision_data_query(clean_msg, user_name, db_context)
+    if data_response is not None:
+        return data_response
+
+    # 3. Live Google Gemini API (with RAG Context Injection)
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if gemini_key:
+        resp = _call_gemini_api(clean_msg, user_name, db_context, conversation_history, gemini_key)
+        if resp:
+            return resp
+
+    # 4. Free Grok API Wrapper (https://github.com/realasfngl/Grok-Api)
+    grok_api_url = os.getenv("GROK_API_URL") or (os.getenv("USE_FREE_GROK", "").lower() == "true" and "http://localhost:6969/ask")
+    if grok_api_url:
+        resp = _call_free_grok_wrapper_api(clean_msg, user_name, db_context, conversation_history, str(grok_api_url))
+        if resp:
+            return resp
+
+    # 5. Live Official xAI Grok API
+    xai_key = os.getenv("XAI_API_KEY") or os.getenv("GROK_API_KEY")
+    if xai_key:
+        resp = _call_xai_grok_api(clean_msg, user_name, db_context, conversation_history, xai_key)
+        if resp:
+            return resp
+
+    # 6. Live OpenAI API (with RAG Context Injection)
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if openai_key:
+        resp = _call_openai_api(clean_msg, user_name, db_context, conversation_history, openai_key)
+        if resp:
+            return resp
+
+    # 7. Live Groq API (with RAG Context Injection)
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
+        resp = _call_groq_api(clean_msg, user_name, db_context, conversation_history, groq_key)
+        if resp:
+            return resp
+
+    # 8. Live Anthropic Claude API
+    claude_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
+    if claude_key:
+        resp = _call_anthropic_api(clean_msg, user_name, db_context, conversation_history, claude_key)
+        if resp:
+            return resp
+
+    # 9. Live OpenRouter API
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    if openrouter_key:
+        resp = _call_openrouter_api(clean_msg, user_name, db_context, conversation_history, openrouter_key)
+        if resp:
+            return resp
+
+    # 10. High-Precision EDRP Knowledge Engine fallback
+    return _answer_with_knowledge_engine(clean_msg, user_name, db_context)
+
+
+def _call_gemini_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], conversation_history: Optional[List[dict]], api_key: str) -> Optional[Dict[str, Any]]:
+    """Calls Google Gemini API with RAG context."""
+    models_to_try = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-pro"]
+    rag_context = db_context.get('summary_text', '').strip()
+    system_ctx = f"{EDRP_SYSTEM_PROMPT}\n\n[Database Context]:\n{rag_context}" if rag_context else EDRP_SYSTEM_PROMPT
+    
+    contents = []
+    if conversation_history:
+        for turn in conversation_history[-6:]:
+            role = "user" if turn.get("role") == "user" else "model"
+            content = turn.get("content", "")
+            if content:
+                contents.append({"role": role, "parts": [{"text": content}]})
+    
+    user_part = f"{system_ctx}\n\nUser ({user_name}) asks: {clean_msg}"
+    contents.append({"role": "user", "parts": [{"text": user_part}]})
+
+    for model in models_to_try:
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             payload = {
-                "contents": [
-                    {"role": "user", "parts": [{"text": f"{EDRP_SYSTEM_PROMPT}\n\nUser Question from {user_name}: {clean_msg}"}]}
-                ],
+                "contents": contents,
                 "generationConfig": {
-                    "temperature": 0.2,
-                    "maxOutputTokens": 700
+                    "temperature": 0.3,
+                    "maxOutputTokens": 800
                 }
             }
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", "User-Agent": "EDRP-App/1.0"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=4.0) as resp:
+            with urllib.request.urlopen(req, timeout=8.0) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     candidates = data.get("candidates", [])
@@ -65,86 +197,623 @@ def generate_ai_response(user_message: str, user_name: str = "User", conversatio
                         if parts and "text" in parts[0]:
                             return {
                                 "reply": parts[0]["text"].strip(),
-                                "suggested_actions": _derive_custom_suggestions(clean_msg),
-                                "source": "Google Gemini AI"
+                                "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
+                                "source": f"Google Gemini AI ({model})"
                             }
         except Exception as e:
-            print(f"[AI SUPPORT GEMINI] Note: {e}")
+            print(f"[AI SUPPORT GEMINI {model}] Note: {e}")
+    return None
 
-    # 2. Live Groq / OpenAI API (if key available)
-    groq_key = os.getenv("GROQ_API_KEY")
-    if groq_key:
+
+def _call_free_grok_wrapper_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], conversation_history: Optional[List[dict]], endpoint_url: str) -> Optional[Dict[str, Any]]:
+    """
+    Calls the local or remote Free Grok API server wrapper (https://github.com/realasfngl/Grok-Api).
+    Default endpoint: http://localhost:6969/ask
+    """
+    rag_context = db_context.get('summary_text', '').strip()
+    system_ctx = f"{EDRP_SYSTEM_PROMPT}\n\n[Database Context]:\n{rag_context}" if rag_context else EDRP_SYSTEM_PROMPT
+    model = os.getenv("GROK_MODEL", "grok-3-fast")
+    proxy = os.getenv("GROK_PROXY", None)
+
+    # Format full context into message for Grok wrapper
+    history_lines = []
+    if conversation_history:
+        for turn in conversation_history[-4:]:
+            role = "User" if turn.get("role") == "user" else "AI Assistant"
+            c = turn.get("content", "")
+            if c:
+                history_lines.append(f"{role}: {c}")
+    
+    history_block = f"\n\n[Recent Conversation History]:\n" + "\n".join(history_lines) if history_lines else ""
+    full_message = f"{system_ctx}{history_block}\n\nUser Question ({user_name}): {clean_msg}"
+
+    try:
+        payload = {
+            "message": full_message,
+            "model": model,
+            "proxy": proxy,
+            "extra_data": None
+        }
+        req = urllib.request.Request(
+            endpoint_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "EDRP-App/1.0"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=20.0) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode("utf-8"))
+                reply_text = data.get("response") or data.get("reply")
+                if reply_text:
+                    return {
+                        "reply": str(reply_text).strip(),
+                        "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
+                        "source": f"Free Grok AI ({model})"
+                    }
+    except Exception as e:
+        print(f"[AI SUPPORT FREE GROK WRAPPER] Note: {e}")
+    return None
+
+
+def _call_xai_grok_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], conversation_history: Optional[List[dict]], api_key: str) -> Optional[Dict[str, Any]]:
+    """Calls official xAI Grok API (https://api.x.ai/v1/chat/completions)."""
+    rag_context = db_context.get('summary_text', '').strip()
+    system_ctx = f"{EDRP_SYSTEM_PROMPT}\n\n[Database Context]:\n{rag_context}" if rag_context else EDRP_SYSTEM_PROMPT
+
+    messages = [{"role": "system", "content": system_ctx}]
+    if conversation_history:
+        for turn in conversation_history[-6:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            if content and role in ["user", "assistant"]:
+                messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
+
+    models = ["grok-2-latest", "grok-beta", "grok-2-vision-1212"]
+    for model in models:
         try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
+            url = "https://api.x.ai/v1/chat/completions"
             payload = {
-                "model": "llama-3.1-8b-instant",
-                "messages": [
-                    {"role": "system", "content": EDRP_SYSTEM_PROMPT},
-                    {"role": "user", "content": clean_msg}
-                ],
-                "temperature": 0.2,
-                "max_tokens": 700
+                "model": model,
+                "messages": messages,
+                "temperature": 0.3,
+                "max_tokens": 800
             }
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode("utf-8"),
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {groq_key}"
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": "EDRP-App/1.0"
                 },
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=4.0) as resp:
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     choices = data.get("choices", [])
                     if choices and "message" in choices[0]:
                         return {
                             "reply": choices[0]["message"].get("content", "").strip(),
-                            "suggested_actions": _derive_custom_suggestions(clean_msg),
-                            "source": "Groq AI Engine"
+                            "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
+                            "source": f"xAI Grok ({model})"
                         }
         except Exception as e:
-            print(f"[AI SUPPORT GROQ] Note: {e}")
-
-    # 3. Comprehensive Built-in Semantic AI Engine
-    return _answer_with_semantic_engine(clean_msg, user_name)
+            print(f"[AI SUPPORT XAI GROK {model}] Note: {e}")
+    return None
 
 
-def _answer_with_semantic_engine(query: str, user_name: str) -> Dict[str, Any]:
+def _call_openai_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], conversation_history: Optional[List[dict]], api_key: str) -> Optional[Dict[str, Any]]:
+    """Calls OpenAI API with RAG context."""
+    rag_context = db_context.get('summary_text', '').strip()
+    system_ctx = f"{EDRP_SYSTEM_PROMPT}\n\n[Database Context]:\n{rag_context}" if rag_context else EDRP_SYSTEM_PROMPT
+
+    messages = [{"role": "system", "content": system_ctx}]
+    if conversation_history:
+        for turn in conversation_history[-6:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            if content and role in ["user", "assistant"]:
+                messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
+
+    models = ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
+    for model in models:
+        try:
+            url = "https://api.openai.com/v1/chat/completions"
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.3,
+                "max_tokens": 800
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": "EDRP-App/1.0"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=8.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    choices = data.get("choices", [])
+                    if choices and "message" in choices[0]:
+                        return {
+                            "reply": choices[0]["message"].get("content", "").strip(),
+                            "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
+                            "source": f"OpenAI ({model})"
+                        }
+        except Exception as e:
+            print(f"[AI SUPPORT OPENAI {model}] Note: {e}")
+    return None
+
+
+def _call_groq_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], conversation_history: Optional[List[dict]], api_key: str) -> Optional[Dict[str, Any]]:
+    """Calls Groq Cloud API with RAG context."""
+    rag_context = db_context.get('summary_text', '').strip()
+    system_ctx = f"{EDRP_SYSTEM_PROMPT}\n\n[Database Context]:\n{rag_context}" if rag_context else EDRP_SYSTEM_PROMPT
+
+    messages = [{"role": "system", "content": system_ctx}]
+    if conversation_history:
+        for turn in conversation_history[-6:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            if content and role in ["user", "assistant"]:
+                messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
+
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+    for model in models:
+        try:
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.3,
+                "max_tokens": 800
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": "EDRP-App/1.0"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=8.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    choices = data.get("choices", [])
+                    if choices and "message" in choices[0]:
+                        return {
+                            "reply": choices[0]["message"].get("content", "").strip(),
+                            "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
+                            "source": f"Groq ({model})"
+                        }
+        except Exception as e:
+            print(f"[AI SUPPORT GROQ {model}] Note: {e}")
+    return None
+
+
+def _call_anthropic_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], conversation_history: Optional[List[dict]], api_key: str) -> Optional[Dict[str, Any]]:
+    """Calls Anthropic Claude API."""
+    rag_context = db_context.get('summary_text', '').strip()
+    system_ctx = f"{EDRP_SYSTEM_PROMPT}\n\n[Database Context]:\n{rag_context}" if rag_context else EDRP_SYSTEM_PROMPT
+
+    messages = []
+    if conversation_history:
+        for turn in conversation_history[-6:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            if content and role in ["user", "assistant"]:
+                messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
+
+    models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    for model in models:
+        try:
+            url = "https://api.anthropic.com/v1/messages"
+            payload = {
+                "model": model,
+                "system": system_ctx,
+                "messages": messages,
+                "max_tokens": 800
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "User-Agent": "EDRP-App/1.0"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=8.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    content_parts = data.get("content", [])
+                    if content_parts and "text" in content_parts[0]:
+                        return {
+                            "reply": content_parts[0]["text"].strip(),
+                            "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
+                            "source": f"Anthropic Claude ({model})"
+                        }
+        except Exception as e:
+            print(f"[AI SUPPORT CLAUDE {model}] Note: {e}")
+    return None
+
+
+def _call_openrouter_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], conversation_history: Optional[List[dict]], api_key: str) -> Optional[Dict[str, Any]]:
+    """Calls OpenRouter API."""
+    rag_context = db_context.get('summary_text', '').strip()
+    system_ctx = f"{EDRP_SYSTEM_PROMPT}\n\n[Database Context]:\n{rag_context}" if rag_context else EDRP_SYSTEM_PROMPT
+
+    messages = [{"role": "system", "content": system_ctx}]
+    if conversation_history:
+        for turn in conversation_history[-6:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            if content and role in ["user", "assistant"]:
+                messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
+
+    try:
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        payload = {
+            "model": "meta-llama/llama-3.3-70b-instruct:free",
+            "messages": messages,
+            "max_tokens": 800
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+                "User-Agent": "EDRP-App/1.0"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=8.0) as resp:
+            if resp.status == 200:
+                data = json.loads(resp.read().decode("utf-8"))
+                choices = data.get("choices", [])
+                if choices and "message" in choices[0]:
+                    return {
+                        "reply": choices[0]["message"].get("content", "").strip(),
+                        "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
+                        "source": "OpenRouter AI"
+                    }
+    except Exception as e:
+        print(f"[AI SUPPORT OPENROUTER] Note: {e}")
+    return None
+
+
+def _retrieve_database_context(query: str, user_id: Optional[int] = None) -> Dict[str, Any]:
     """
-    High-precision dynamic question answering system that parses the user's intent,
-    keywords, question structure, and contextual entities to formulate tailored replies.
+    Queries the database for decisions, alternatives, and reviews matching the query or user.
+    """
+    context = {
+        "matched_decisions": [],
+        "user_decisions": [],
+        "summary_text": ""
+    }
+
+    try:
+        from app.database.connection import SessionLocal
+        from app.models.decision import Decision
+        from app.models.alternative import Alternative
+        from app.models.review import Review
+        from app.models.user import User
+
+        db = SessionLocal()
+        all_decisions = db.query(Decision).all()
+
+        # Stop words to filter out during tokenization
+        stop_words = {
+            'what', 'problem', 'did', 'i', 'add', 'for', 'this', 'title', 'is', 'the',
+            'a', 'an', 'in', 'of', 'to', 'my', 'decision', 'about', 'show', 'me', 'details',
+            'tell', 'give', 'how', 'when', 'why', 'who', 'where', 'which', 'we', 'are', 'was'
+        }
+
+        q_clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', query.lower())
+        q_tokens = [w for w in q_clean.split() if w not in stop_words and len(w) > 1]
+
+        # Check explicit ID match (e.g. DEC-28, #28, 28)
+        id_match = re.search(r'\b(?:dec[-_ ]?)?(\d+)\b', query, re.IGNORECASE)
+        explicit_id = int(id_match.group(1)) if id_match else None
+
+        scored_decisions = []
+        for d in all_decisions:
+            alts = db.query(Alternative).filter(Alternative.decision_id == d.id).all()
+            reviews = db.query(Review).filter(Review.decision_id == d.id).all()
+            creator = db.query(User).filter(User.id == d.created_by).first()
+
+            alts_titles = [a.title for a in alts]
+            alts_text = " ".join([f"{a.title} {a.description or ''}" for a in alts]).lower()
+            d_text = f"{d.title} {d.description} {d.department or ''} {d.tags or ''} {alts_text}".lower()
+
+            score = 0
+            if explicit_id and d.id == explicit_id:
+                score += 50
+
+            for t in q_tokens:
+                if t in d.title.lower():
+                    score += 6
+                elif t in d.description.lower():
+                    score += 3
+                elif t in alts_text:
+                    score += 3
+                elif t in d_text:
+                    score += 1
+
+            d_info = {
+                "id": d.id,
+                "title": d.title,
+                "description": d.description,
+                "status": d.status or "Pending",
+                "department": d.department or "General",
+                "priority_level": d.priority_level or "Medium",
+                "created_by": d.created_by,
+                "creator_name": creator.full_name if creator else "Enterprise User",
+                "created_at": d.created_at.strftime("%b %d, %Y") if d.created_at else "Recently",
+                "alternatives": [
+                    {
+                        "title": a.title,
+                        "cost": a.cost or 0,
+                        "feasibility_score": a.feasibility_score or 0,
+                        "risk_level": a.risk_level or "Medium",
+                        "pros": a.pros or "",
+                        "cons": a.cons or ""
+                    }
+                    for a in alts
+                ],
+                "reviews": [
+                    {
+                        "reviewer_id": r.reviewer_id,
+                        "status": r.status,
+                        "comments": r.comments or "No comments provided"
+                    }
+                    for r in reviews
+                ]
+            }
+
+            if user_id and d.created_by == user_id:
+                context["user_decisions"].append(d_info)
+
+            if score > 0:
+                scored_decisions.append((score, d_info))
+
+        scored_decisions.sort(key=lambda x: x[0], reverse=True)
+        context["matched_decisions"] = [x[1] for x in scored_decisions]
+
+        # Build concise summary text for LLM RAG
+        lines = []
+        for d in context["matched_decisions"][:4]:
+            lines.append(f"- Decision DEC-{d['id']} ('{d['title']}'): Status={d['status']}, Creator={d['creator_name']}, Problem/Description=\"{d['description']}\", Alternatives={[a['title'] for a in d['alternatives']]}")
+        context["summary_text"] = "\n".join(lines)
+
+        db.close()
+    except Exception as e:
+        print(f"[AI RAG RETRIEVAL] Note: {e}")
+
+    return context
+
+
+def _answer_decision_data_query(query: str, user_name: str, db_context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Detects if the user is asking about specific decisions, problem statements,
+    alternatives, statuses, or their own decision list, and generates direct data-driven replies.
+    If the user is asking to CREATE / GENERATE / DRAFT new content, returns None to allow LLM generation.
+    """
+    q = query.lower().strip()
+    matched = db_context.get("matched_decisions", [])
+    user_decisions = db_context.get("user_decisions", [])
+
+    # If the user is asking the AI to generate, create, draft, or suggest something new, bypass lookup
+    is_generative_intent = any(g in q for g in [
+        "create and generate", "generate a", "generate new", "create a new", "create new",
+        "write a", "write new", "draft a", "draft new", "suggest a", "suggest new",
+        "help me write", "help me create", "help me draft", "brainstorm", "formulate",
+        "give me a problem", "generate problem", "write problem", "create problem",
+        "suggest problem", "generate alternative", "suggest alternative", "create alternative",
+        "write alternative", "propose a", "propose new", "compose a", "compose new",
+        "how should i write", "how should i formulate", "recommend alternatives", "generate for the decision",
+        "create for the decision", "make a problem statement", "give a problem statement"
+    ])
+    if is_generative_intent:
+        return None
+
+    # 1. Problem Statement / Description Inquiry (Look up existing database records)
+    is_problem_inquiry = any(k in q for k in [
+        "what problem did i add", "what problem is added", "problem did i add",
+        "description did i add", "what did i add for", "what rationale did i",
+        "why did i create", "what did i write for", "tell me the problem i wrote",
+        "show problem statement for dec", "problem statement of dec-", "problem statement for dec-"
+    ]) or (any(k in q for k in ["what problem", "what description", "what rationale"]) and any(w in q for w in ["i add", "added", "existing", "dec-", "my decision"]))
+
+    if is_problem_inquiry and matched:
+        top_d = matched[0]
+        alts_str = ", ".join([f"`{a['title']}`" for a in top_d['alternatives']]) if top_d['alternatives'] else "None specified"
+        
+        reply_lines = [
+            f"Here is the **Problem Statement / Description** added for **\"{top_d['title']}\"** (DEC-{top_d['id']}):\n",
+            f"> ❝ **{top_d['description']}** ❞\n",
+            f"**Decision Overview:**",
+            f"- **Decision ID**: `DEC-{top_d['id']}`",
+            f"- **Status**: **{top_d['status']}**",
+            f"- **Department**: {top_d['department']} · **Priority**: {top_d['priority_level']}",
+            f"- **Created By**: {top_d['creator_name']} on {top_d['created_at']}",
+            f"- **Alternatives Evaluated**: {alts_str}"
+        ]
+
+        # If there were multiple close matches (e.g. "cloud" and "mitigation" matching 2 different decisions)
+        if len(matched) > 1 and matched[1]['id'] != top_d['id']:
+            other_d = matched[1]
+            reply_lines.append(f"\n*Related Match — **\"{other_d['title']}\"** (DEC-{other_d['id']}):*")
+            reply_lines.append(f"> ❝ {other_d['description']} ❞")
+
+        return {
+            "reply": "\n".join(reply_lines),
+            "suggested_actions": [
+                f"What are the alternatives for DEC-{top_d['id']}?",
+                f"What is the status of DEC-{top_d['id']}?",
+                "How does Decision Replay work?",
+                "Show my decisions"
+            ],
+            "source": "EDRP Decision Engine"
+        }
+
+    # 2. Alternatives Inquiry (e.g. "what are the alternatives for Cloud Provider", "alternatives of DEC-36")
+    is_alts_inquiry = any(k in q for k in [
+        "what are the alternatives", "alternatives for", "alternatives of", "options for",
+        "what alternatives", "cost of", "feasibility of", "risk of"
+    ])
+
+    if is_alts_inquiry and matched:
+        top_d = matched[0]
+        reply_lines = [
+            f"**Evaluated Alternatives for \"{top_d['title']}\" (DEC-{top_d['id']}):**\n"
+        ]
+
+        if top_d['alternatives']:
+            for idx, a in enumerate(top_d['alternatives'], 1):
+                reply_lines.append(f"**{idx}. {a['title']}**")
+                if a['cost']:
+                    reply_lines.append(f"   - **Estimated Cost**: ${a['cost']:,.2f}" if isinstance(a['cost'], (int, float)) else f"   - **Estimated Cost**: {a['cost']}")
+                if a['feasibility_score']:
+                    reply_lines.append(f"   - **Feasibility Score**: {a['feasibility_score']} / 10")
+                if a['risk_level']:
+                    reply_lines.append(f"   - **Risk Level**: {a['risk_level']}")
+                if a['pros']:
+                    reply_lines.append(f"   - **Pros**: {a['pros']}")
+                if a['cons']:
+                    reply_lines.append(f"   - **Cons**: {a['cons']}")
+                reply_lines.append("")
+        else:
+            reply_lines.append("No alternatives have been documented for this decision yet.")
+
+        return {
+            "reply": "\n".join(reply_lines),
+            "suggested_actions": [
+                f"What is the problem statement for DEC-{top_d['id']}?",
+                f"What is the status of DEC-{top_d['id']}?",
+                "How does Decision Replay work?"
+            ],
+            "source": "EDRP Decision Engine"
+        }
+
+    # 3. Status / Review Inquiry (e.g. "what is the status of DEC-28", "is cloud decision approved")
+    is_status_inquiry = any(k in q for k in [
+        "status of", "is it approved", "is my decision approved", "who reviewed", "review status",
+        "is it rejected", "pending approval"
+    ])
+
+    if is_status_inquiry and matched:
+        top_d = matched[0]
+        status_badge = "✅ Approved" if top_d['status'].lower() == "approved" else ("⏳ " + top_d['status'])
+        reply_lines = [
+            f"**Status Information for \"{top_d['title']}\" (DEC-{top_d['id']}):**\n",
+            f"- **Current Status**: **{status_badge}**",
+            f"- **Department**: {top_d['department']}",
+            f"- **Priority**: {top_d['priority_level']}",
+            f"- **Submitted by**: {top_d['creator_name']} ({top_d['created_at']})\n"
+        ]
+
+        if top_d['reviews']:
+            reply_lines.append("**Reviewer Evaluations:**")
+            for r in top_d['reviews']:
+                reply_lines.append(f"- Status: **{r['status']}** · Feedback: *\"{r['comments']}\"*")
+
+        return {
+            "reply": "\n".join(reply_lines),
+            "suggested_actions": [
+                f"What is the problem statement for DEC-{top_d['id']}?",
+                f"What are the alternatives for DEC-{top_d['id']}?",
+                "How does Decision Replay work?"
+            ],
+            "source": "EDRP Decision Engine"
+        }
+
+    # 4. User Decisions List (e.g. "what decisions did i create", "show my decisions", "list my decisions")
+    is_my_decisions = any(k in q for k in [
+        "what decisions did i create", "my decisions", "show my decisions", "list my decisions",
+        "decisions i made", "what did i submit"
+    ])
+
+    if is_my_decisions:
+        target_list = user_decisions if user_decisions else matched
+        if target_list:
+            reply_lines = [f"**Decisions Found in Your Organization:**\n"]
+            for d in target_list[:6]:
+                st_icon = "✅" if d['status'].lower() == "approved" else "⏳"
+                reply_lines.append(f"- **DEC-{d['id']} — {d['title']}**")
+                reply_lines.append(f"  - Status: {st_icon} **{d['status']}** · Dept: {d['department']} · Created: {d['created_at']}")
+                reply_lines.append(f"  - *Problem*: \"{d['description'][:80]}...\"" if len(d['description']) > 80 else f"  - *Problem*: \"{d['description']}\"")
+                reply_lines.append("")
+            
+            return {
+                "reply": "\n".join(reply_lines),
+                "suggested_actions": [
+                    "How do I create a new decision?",
+                    "Explain the approval workflow",
+                    "How does Decision Replay work?"
+                ],
+                "source": "EDRP Decision Engine"
+            }
+        else:
+            return {
+                "reply": "No decisions were found for your user account yet. You can create your first decision by clicking **'Create Decision'** in the sidebar navigation.",
+                "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow"],
+                "source": "EDRP Decision Engine"
+            }
+
+    return None
+
+
+def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Intelligent built-in EDRP Knowledge Engine that understands all workflows,
+    lifecycle states, approval tiers, audit trails, and troubleshooting steps.
     """
     q = query.lower().strip()
 
     # --- Greetings & Casual Chat ---
     if q in ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "greetings", "help"]:
         return {
-            "reply": f"Hello **{user_name}**! I am your **EDRP AI Support Assistant**.\n\nI can help you navigate decision creation, reviewer approval chains, version replay, audit diffs, and account settings.\n\nWhat would you like assistance with today?",
-            "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "How does Decision Replay work?", "How do I reset my password?"],
+            "reply": f"Hello **{user_name}**! I am your **EDRP AI Support Assistant**.\n\nI can help you look up decisions, problem statements, alternatives, reviewer approval chains, version replay, and audit diffs.\n\nWhat would you like assistance with today?",
+            "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "Show my decisions", "How do I reset my password?"],
             "source": "EDRP AI Assistant"
         }
 
     if any(k in q for k in ["thank", "thanks", "appreciate", "helpful"]):
         return {
-            "reply": f"You're very welcome, **{user_name}**! Let me know if you have any other questions regarding EDRP workflows, approvals, or reports.",
+            "reply": f"You're very welcome, **{user_name}**! Let me know if you need anything else regarding decision tracking, approvals, or reports.",
             "suggested_actions": ["How do I export reports?", "How to view audit logs?", "Explain approval workflow"],
             "source": "EDRP AI Assistant"
         }
 
     if any(k in q for k in ["who are you", "what is your name", "what can you do", "what are you"]):
         return {
-            "reply": """I am the **EDRP AI Support Assistant**, designed to provide real-time guidance on the **Expert Decision Replay Platform**.
+            "reply": """I am the **EDRP AI Support Assistant**, designed to provide real-time guidance and data lookups on the **Expert Decision Replay Platform**.
 
 **What I Can Do:**
-- 📋 Guide you through **creating decisions** and structuring alternative matrices.
+- 🔍 Look up your **actual decisions, problem statements, and alternative matrices**.
+- 📋 Guide you through **creating decisions** and structuring evaluations.
 - ⚡ Explain **multi-tier approval chains** (Reviewer → Manager → Administrator).
 - ⏪ Explain **Decision Replay**, version snapshotting (`v1`, `v2`), and timeline diffs.
 - 🔒 Clarify **append-only audit logs**, field-level diffs, and compliance exports.
-- 🔑 Assist with **password resets**, OTP verification, role permissions, and ticket creation.
 """,
-            "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "How does Decision Replay work?"],
+            "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "Show my decisions"],
             "source": "EDRP AI Assistant"
         }
 
@@ -419,7 +1088,7 @@ Decisions progress through sequential review stages:
             "source": "EDRP AI Assistant"
         }
 
-    # --- 11. Support Tickets & Contact ---
+    # --- 13. Support Tickets & Contact ---
     if any(k in q for k in ["ticket", "contact", "support email", "office hours", "phone", "helpdesk"]):
         return {
             "reply": """**Need Assistance or Encountered a Bug?**
@@ -435,7 +1104,7 @@ Decisions progress through sequential review stages:
             "source": "EDRP AI Assistant"
         }
 
-    # --- 12. Theme & Accessibility ---
+    # --- 14. Theme & Accessibility ---
     if any(k in q for k in ["dark mode", "theme", "light mode", "accessibility", "color"]):
         return {
             "reply": """**Theme & Accessibility Options:**
@@ -448,11 +1117,11 @@ Decisions progress through sequential review stages:
             "source": "EDRP AI Assistant"
         }
 
-    # --- 13. Dynamic Fallback: Parse specific user keywords to build a tailored answer ---
-    tailored_reply = _build_dynamic_tailored_reply(clean_msg, user_name)
+    # --- 15. Dynamic Fallback: Parse specific user keywords to build a tailored answer ---
+    tailored_reply = _build_dynamic_tailored_reply(query, user_name)
     return {
         "reply": tailored_reply,
-        "suggested_actions": _derive_custom_suggestions(clean_msg),
+        "suggested_actions": _derive_custom_suggestions(query, db_context),
         "source": "EDRP AI Assistant"
     }
 
@@ -464,7 +1133,6 @@ def _build_dynamic_tailored_reply(query: str, user_name: str) -> str:
     clean = query.strip()
     words = re.findall(r'\b\w+\b', clean.lower())
     
-    # Extract question subject
     subject_snippet = clean
     if len(clean) > 80:
         subject_snippet = clean[:80] + "..."
@@ -473,7 +1141,6 @@ def _build_dynamic_tailored_reply(query: str, user_name: str) -> str:
         f"Regarding your query about **\"{subject_snippet}\"**:\n"
     ]
 
-    # Provide targeted guidance based on recognized entities
     if "decision" in words:
         response_parts.append("• **Decisions**: All strategic decisions in EDRP follow a structured lifecycle: `Draft` → `In Review` → `Approved` / `Rejected`. You can create decisions from the sidebar wizard, attach alternative matrices, and submit them for multi-stage review.")
     
@@ -490,17 +1157,20 @@ def _build_dynamic_tailored_reply(query: str, user_name: str) -> str:
         response_parts.append("• **User Accounts & Security**: Roles (Admin, Manager, Reviewer, Employee) control access. Password resets use 6-digit email OTP verification, and 'Remember Me' maintains sessions for 72 hours.")
 
     if len(response_parts) == 1:
-        # General response if no specific keyword triggered
         response_parts.append(f"In the **Expert Decision Replay Platform**, you can manage decisions, coordinate multi-stage approvals, track append-only audit diffs, and inspect version replays.\n\nTo help you with this, you can:\n1. Check the relevant section in the **Sidebar Navigation**.\n2. Click **'Create Ticket'** above to submit a specific support request to our engineering team.\n3. Or ask me a more specific question about decision creation, workflows, or account settings!")
 
     return "\n\n".join(response_parts)
 
 
-def _derive_custom_suggestions(query: str) -> List[str]:
+def _derive_custom_suggestions(query: str, db_context: Optional[Dict[str, Any]] = None) -> List[str]:
     q = query.lower()
-    if any(k in q for k in ["create", "draft", "new", "rationale"]):
+    if any(k in q for k in ["problem", "what did i add", "rationale"]):
+        return ["What are the alternatives for this decision?", "What is the status of this decision?", "Show my decisions", "Explain approval workflow"]
+    if any(k in q for k in ["alternative", "feasibility", "cost"]):
+        return ["What is the problem statement for this decision?", "What is the status of this decision?", "How does Decision Replay work?"]
+    if any(k in q for k in ["create", "draft", "new"]):
         return ["What is an Alternative Analysis?", "Explain the approval workflow", "Can I edit a submitted decision?"]
-    if any(k in q for k in ["approve", "reject", "review", "workflow", "revision"]):
+    if any(k in q for k in ["approve", "reject", "review", "workflow", "revision", "status"]):
         return ["Where do I find my pending reviews?", "What happens when a decision is rejected?", "How does Decision Replay work?"]
     if any(k in q for k in ["replay", "version", "history", "v1", "v2"]):
         return ["How do I view Audit Logs?", "How do I create a new decision?", "Explain the approval workflow"]
@@ -508,4 +1178,4 @@ def _derive_custom_suggestions(query: str) -> List[str]:
         return ["How do I export audit logs?", "Who can view Audit Logs?", "Explain the approval workflow"]
     if any(k in q for k in ["password", "otp", "login", "account", "role"]):
         return ["How does OTP verification work?", "What are the roles in EDRP?", "How do I create a support ticket?"]
-    return ["How do I create a new decision?", "Explain the approval workflow", "How does Decision Replay work?", "How do I reset my password?"]
+    return ["How do I create a new decision?", "Explain the approval workflow", "Show my decisions", "How does Decision Replay work?"]
