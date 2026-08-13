@@ -1,18 +1,7 @@
 # Expert Decision Replay Platform (EDRP) — Milestone 3
 
-> **Group 5** | Academic Year 2025–26  
-> **Milestone 3: Enterprise Approvals, Append-Only Audit Engine, Security Hardening & Decision Replay**
-
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Flask](https://img.shields.io/badge/Flask-3.1+-000000?style=flat&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![Milestone](https://img.shields.io/badge/Milestone-3%20Completed-brightgreen?style=flat&logo=target)](https://github.com/KoppalaNaveen/EDRP)
-[![Security](https://img.shields.io/badge/Security-Append--Only%20Audit-orange?style=flat&logo=auth0&logoColor=white)](https://github.com/KoppalaNaveen/EDRP)
-
----
-
 ## Milestone 3 Executive Summary
+
 
 Milestone 3 completes the core enterprise requirements of the **Expert Decision Replay Platform (EDRP)**, delivering:
 1. **Append-Only Structured Audit Logging** with field-level before/after diff tracking and database-level immutability triggers.
