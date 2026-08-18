@@ -611,7 +611,7 @@
     const adminUserId = parseInt("{{ session.get('user_id', 0) }}", 10);
     function updateSidebarNotifications() {
         if (!adminUserId) return;
-        fetch(`http://127.0.0.1:8000/notifications/${adminUserId}`)
+        fetch(`/api/notifications/${adminUserId}`)
             .then(r => r.json())
             .then(data => {
                 const unread = data.filter(n => !n.is_read).length;

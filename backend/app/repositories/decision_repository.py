@@ -20,10 +20,10 @@ class DecisionRepository:
             description=decision.description,
             created_by=decision.created_by,
             category_id=decision.category_id,
-            priority_level=decision.priority_level,
-            department=decision.department,
-            decision_date=decision.decision_date,
-            tags=decision.tags,
+            priority_level=getattr(decision, "priority_level", None),
+            department=getattr(decision, "department", None),
+            decision_date=getattr(decision, "decision_date", None),
+            tags=getattr(decision, "tags", None),
             content_hash=content_hash
         )
         db.add(new_decision)
@@ -347,6 +347,14 @@ class DecisionRepository:
             if user:
                 if user.email:
                     uids = db.query(User.id).filter((User.email == user.email) | (User.email_original == user.email)).all()
+                    for (uid,) in uids:
+                        target_uids.add(uid)
+                if getattr(user, 'email_original', None):
+                    uids = db.query(User.id).filter((User.email == user.email_original) | (User.email_original == user.email_original)).all()
+                    for (uid,) in uids:
+                        target_uids.add(uid)
+                if user.full_name:
+                    uids = db.query(User.id).filter(User.full_name == user.full_name).all()
                     for (uid,) in uids:
                         target_uids.add(uid)
 

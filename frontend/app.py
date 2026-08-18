@@ -53,8 +53,8 @@ def disable_client_caching(response):
     response.headers["Expires"] = "0"
     return response
 
-# FastAPI Backend URL
-API_URL = "http://127.0.0.1:8000"
+# FastAPI Backend URL (Server-side Flask to FastAPI communication)
+API_URL = os.getenv("BACKEND_URL", os.getenv("API_URL", "http://127.0.0.1:8000")).rstrip("/")
 
 def make_backend_request(method, path, **kwargs):
     """
@@ -468,6 +468,193 @@ def api_support_ai_chat():
         "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "How does Decision Replay work?"],
         "source": "EDRP AI Assistant"
     }), 200
+
+
+@app.route("/api/users/", methods=["GET"])
+@app.route("/users/", methods=["GET"])
+def proxy_get_users():
+    try:
+        resp = make_backend_request("GET", "/users/", timeout=8)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/upload/", methods=["POST"])
+@app.route("/api/upload/", methods=["POST"])
+def proxy_upload_file():
+    try:
+        files = {}
+        for key in request.files:
+            file_obj = request.files[key]
+            files[key] = (file_obj.filename, file_obj.read(), file_obj.content_type or 'application/octet-stream')
+        data = request.form.to_dict()
+        if "user_id" not in data or not data["user_id"]:
+            data["user_id"] = str(session.get("user_id", 1))
+        
+        resp = make_backend_request("POST", "/upload/", files=files, data=data, timeout=30)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"detail": f"Upload error: {e}"}), 500
+
+
+@app.route("/upload/<int:attachment_id>", methods=["GET"])
+@app.route("/api/upload/<int:attachment_id>", methods=["GET"])
+def proxy_get_upload(attachment_id):
+    try:
+        user_id = session.get("user_id", 1)
+        resp = make_backend_request("GET", f"/upload/{attachment_id}?user_id={user_id}", timeout=15)
+        headers = {}
+        if "Content-Type" in resp.headers:
+            headers["Content-Type"] = resp.headers["Content-Type"]
+        if "Content-Disposition" in resp.headers:
+            headers["Content-Disposition"] = resp.headers["Content-Disposition"]
+        return make_response(resp.content, resp.status_code, headers)
+    except Exception as e:
+        return jsonify({"detail": f"File fetch error: {e}"}), 500
+
+
+@app.route("/api/decisions", methods=["GET"])
+@app.route("/api/decisions/", methods=["GET"])
+def proxy_get_all_decisions():
+    try:
+        user_id = request.args.get("user_id") or session.get("user_id", "")
+        role_name = request.args.get("role_name") or session.get("role_name", "")
+        params = []
+        if user_id:
+            params.append(f"user_id={user_id}")
+        if role_name:
+            params.append(f"role_name={role_name}")
+        query_str = f"?{'&'.join(params)}" if params else ""
+        resp = make_backend_request("GET", f"/decisions/{query_str}", timeout=15)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"detail": f"Decisions fetch error: {e}"}), 500
+
+
+@app.route("/api/decisions/full", methods=["POST"])
+@app.route("/decisions/full", methods=["POST"])
+def proxy_create_decision_full():
+    try:
+        data = request.json or {}
+        if not data.get("created_by"):
+            data["created_by"] = session.get("user_id", 1)
+        resp = make_backend_request("POST", "/decisions/full", json=data, timeout=30)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"detail": f"Decision creation error: {e}"}), 500
+
+
+@app.route("/api/decisions/<int:decision_id>/full", methods=["PUT"])
+@app.route("/decisions/<int:decision_id>/full", methods=["PUT"])
+def proxy_update_decision_full(decision_id):
+    try:
+        data = request.json or {}
+        resp = make_backend_request("PUT", f"/decisions/{decision_id}/full", json=data, timeout=30)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"detail": f"Decision update error: {e}"}), 500
+
+
+@app.route("/api/decisions/<int:decision_id>", methods=["GET"])
+def proxy_get_decision_details(decision_id):
+    try:
+        user_id = request.args.get("user_id") or session.get("user_id", 1)
+        resp = make_backend_request("GET", f"/decisions/{decision_id}?user_id={user_id}", timeout=15)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"detail": f"Fetch error: {e}"}), 500
+
+
+@app.route("/api/decisions/<int:decision_id>", methods=["DELETE"])
+@app.route("/decisions/<int:decision_id>", methods=["DELETE"])
+def proxy_delete_decision(decision_id):
+    try:
+        user_id = request.args.get("user_id") or session.get("user_id", "")
+        role_name = request.args.get("role_name") or session.get("role_name", "")
+        params = []
+        if user_id:
+            params.append(f"user_id={user_id}")
+        if role_name:
+            params.append(f"role_name={role_name}")
+        query_str = f"?{'&'.join(params)}" if params else ""
+        resp = make_backend_request("DELETE", f"/decisions/{decision_id}{query_str}", timeout=15)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"detail": f"Decision delete error: {e}"}), 500
+
+
+@app.route("/api/decisions/<int:decision_id>/status", methods=["PATCH"])
+@app.route("/decisions/<int:decision_id>/status", methods=["PATCH"])
+def proxy_update_decision_status(decision_id):
+    try:
+        user_id = session.get("user_id", 1)
+        data = request.json or {}
+        resp = make_backend_request("PATCH", f"/decisions/{decision_id}/status?user_id={user_id}", json=data, timeout=15)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"detail": f"Decision status update error: {e}"}), 500
+
+
+@app.route("/api/decisions/<int:decision_id>/send_reminder", methods=["POST"])
+@app.route("/decisions/<int:decision_id>/send_reminder", methods=["POST"])
+def proxy_send_decision_reminder(decision_id):
+    try:
+        user_id = session.get("user_id", 1)
+        resp = make_backend_request("POST", f"/decisions/{decision_id}/send_reminder?user_id={user_id}", timeout=15)
+        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"detail": f"Decision reminder error: {e}"}), 500
+
+
+@app.route("/api/<path:endpoint>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+def universal_api_proxy(endpoint):
+    try:
+        method = request.method
+        url_path = f"/{endpoint}"
+        query_string = request.query_string.decode("utf-8")
+        if query_string:
+            url_path = f"{url_path}?{query_string}"
+
+        headers = {k: v for k, v in request.headers if k.lower() not in ["host", "content-length"]}
+        
+        json_data = None
+        form_data = None
+        files = None
+
+        if request.is_json:
+            json_data = request.get_json(silent=True)
+        elif request.files:
+            files = {}
+            for key in request.files:
+                f = request.files[key]
+                files[key] = (f.filename, f.read(), f.content_type or "application/octet-stream")
+            form_data = request.form.to_dict()
+        elif request.form:
+            form_data = request.form.to_dict()
+
+        resp = make_backend_request(
+            method,
+            url_path,
+            json=json_data,
+            data=form_data,
+            files=files,
+            headers=headers,
+            timeout=30
+        )
+
+        out_headers = {}
+        if "Content-Type" in resp.headers:
+            out_headers["Content-Type"] = resp.headers["Content-Type"]
+        if "Content-Disposition" in resp.headers:
+            out_headers["Content-Disposition"] = resp.headers["Content-Disposition"]
+
+        return make_response(resp.content, resp.status_code, out_headers)
+    except Exception as e:
+        return jsonify({"detail": f"Proxy error on /{endpoint}: {e}"}), 500
+
 
 
 
@@ -1093,4 +1280,7 @@ def page_not_found(e):
 # ===========================
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 5000))
+    debug = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1")
+    app.run(host=host, port=port, debug=debug)

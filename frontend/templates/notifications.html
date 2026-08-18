@@ -80,7 +80,7 @@
 {% block js %}
 <script>
     const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
-    const API_BASE = "http://127.0.0.1:8000";
+    const API_BASE = "/api";
     let allNotifications = [];
     let currentFilter = "all";
 

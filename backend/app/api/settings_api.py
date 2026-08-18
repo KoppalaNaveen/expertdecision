@@ -26,7 +26,8 @@ from app.models.support_ticket import SupportTicket
 from app.schemas.settings_schema import (
     SystemSettingUpdate, SystemSettingResponse, ChangePasswordRequest, DeleteAccountRequest, TestEmailRequest
 )
-from app.services.email_service import _send_smtp_mail
+from app.services.email_service import _send_smtp_mail, send_password_changed_email, send_account_deleted_email, get_recipient_email
+from app.services.notification_service import NotificationService
 from app.core.security import verify_password, hash_password
 from app.models.category import Category
 from app.models.backup_record import BackupRecord
@@ -170,12 +171,11 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
         print(f"Password change notification error: {notif_err}")
 
     # 2. Automated Security Email via Original Gmail (Async post-commit)
-    if user.email:
-        import threading
-        from app.services.email_service import send_password_changed_email
+    target_email = get_recipient_email(user)
+    if target_email:
         threading.Thread(
             target=send_password_changed_email,
-            args=(user.email, user.full_name),
+            args=(target_email, user.full_name),
             daemon=True
         ).start()
 
@@ -202,19 +202,17 @@ def delete_account(req: DeleteAccountRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Incorrect password. Account deletion aborted.")
 
     user_name = user.full_name
-    user_email = user.email
+    target_email = get_recipient_email(user)
 
     success, err_msg = UserRepository.delete_user(db, user.id)
     if not success:
         raise HTTPException(status_code=500, detail=err_msg or "Failed to delete account.")
 
     # Send account deletion email after successful database deletion
-    if user_email:
-        import threading
-        from app.services.email_service import send_account_deleted_email
+    if target_email:
         threading.Thread(
             target=send_account_deleted_email,
-            args=(user_email, user_name),
+            args=(target_email, user_name),
             daemon=True
         ).start()
 

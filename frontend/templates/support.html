@@ -368,9 +368,9 @@
 
             <!-- Full Width Chat Input Form -->
             <form onsubmit="handleAiChatSubmit(event)" class="w-100 mt-2 pt-3 border-top">
-                <div class="input-group input-group-lg shadow-sm">
-                    <input type="text" id="aiChatInputText" class="form-control text-sm px-3" placeholder="Ask AI anything about decisions, approvals, workflows, or account..." required style="height: 48px;">
-                    <button type="submit" id="btnSendAiChat" class="btn btn-primary fw-bold px-4 text-sm d-inline-flex align-items-center gap-2" style="height: 48px;">
+                <div class="input-group input-group-lg shadow-sm rounded-3 overflow-hidden border bg-white align-items-center">
+                    <textarea id="aiChatInputText" class="form-control text-sm px-3 py-2.5 border-0" rows="1" placeholder="Ask AI anything about decisions, approvals, workflows, or account..." required style="resize: none; max-height: 120px; overflow-y: auto; height: 48px;"></textarea>
+                    <button type="submit" id="btnSendAiChat" class="btn btn-primary fw-bold px-4 text-sm d-inline-flex align-items-center gap-2 rounded-end" style="height: 48px; border: none;">
                         <i class="bi bi-send-fill"></i> Send
                     </button>
                 </div>
@@ -547,7 +547,7 @@
 const USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10) || 1;
 const USER_NAME = "{{ session.get('full_name', 'User') }}";
 const IS_ADMIN = "{{ 'true' if ('admin' in (session.get('role_name') or 'Employee')|string|lower) else 'false' }}" === "true";
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "/api";
 
 let supportTicketsCache = [];
 let conversationHistory = [];
@@ -774,7 +774,7 @@ async function loadMySupportTickets() {
         const endpoint = IS_ADMIN ? `${API_URL}/support/all` : `${API_URL}/support/my-tickets/${USER_ID}`;
         let res = await fetch(endpoint).catch(() => null);
         if (!res || !res.ok) {
-            res = await fetch(`http://127.0.0.1:8000/support/my-tickets/${USER_ID}`).catch(() => null);
+            res = await fetch(`/api/support/my-tickets/${USER_ID}`).catch(() => null);
         }
 
         if (!res || !res.ok) {
@@ -919,5 +919,27 @@ function escapeHtml(text) {
     if (!text) return '';
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const aiInput = document.getElementById('aiChatInputText');
+    if (aiInput) {
+        aiInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                    // Shift + Enter: Line break
+                    return;
+                } else {
+                    // Enter without Shift: Send message
+                    e.preventDefault();
+                    handleAiChatSubmit(e);
+                }
+            }
+        });
+        aiInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(Math.max(this.scrollHeight, 48), 120) + 'px';
+        });
+    }
+});
 </script>
 {% endblock %}

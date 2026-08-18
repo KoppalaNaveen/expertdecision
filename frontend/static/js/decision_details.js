@@ -14,7 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
 async function fetchDecisionDetails() {
     try {
         const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
-        const response = await fetch(`${API_URL}/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        let response = await fetch(`/api/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
+            response = await fetch(`${API_URL}/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        }
         if (!response.ok) throw new Error("Failed to load decision");
         
         currentDecision = await response.json();
@@ -28,7 +31,10 @@ async function fetchDecisionDetails() {
 async function fetchDecisionDetailsSilent() {
     try {
         const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
-        const response = await fetch(`${API_URL}/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        let response = await fetch(`/api/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
+            response = await fetch(`${API_URL}/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        }
         if (!response.ok) return;
         const newData = await response.json();
         
@@ -306,36 +312,99 @@ async function fetchAlternatives() {
 }
 
 function renderAlternativesTable() {
+    const listContainer = document.getElementById("alternativesEvaluatorList");
     const tbody = document.getElementById("alternativesTableBody");
-    tbody.innerHTML = "";
 
-    if (currentAlternatives.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">No alternatives added yet.</td></tr>`;
-        return;
+    if (listContainer) {
+        listContainer.innerHTML = "";
+        if (!currentAlternatives || currentAlternatives.length === 0) {
+            listContainer.innerHTML = `<div class="text-center py-4 text-muted">No alternatives added yet.</div>`;
+        } else {
+            currentAlternatives.forEach((alt, idx) => {
+                let riskBadge = "bg-secondary-subtle text-secondary";
+                if (alt.risk_level === "Low") riskBadge = "bg-success-subtle text-success border border-success-subtle";
+                if (alt.risk_level === "Medium") riskBadge = "bg-warning-subtle text-warning-emphasis border border-warning-subtle";
+                if (alt.risk_level === "High") riskBadge = "bg-danger-subtle text-danger border border-danger-subtle";
+
+                const score = (alt.feasibility_score !== null && alt.feasibility_score !== undefined) ? Number(alt.feasibility_score) : 5;
+                const scorePercent = Math.min(Math.max(score * 10, 0), 100);
+                let scoreColor = "bg-primary";
+                if (score >= 8) scoreColor = "bg-success";
+                else if (score < 5) scoreColor = "bg-warning";
+
+                const costDisplay = (alt.cost !== null && alt.cost !== undefined) ? `$${Number(alt.cost).toLocaleString()}` : '$0.00';
+
+                listContainer.innerHTML += `
+                    <div class="border rounded-3 p-3 mb-3 bg-light bg-opacity-50">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary bg-opacity-10 text-primary rounded-circle p-2" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;">
+                                    ${idx + 1}
+                                </span>
+                                <h6 class="fw-bold text-dark mb-0">${alt.title}</h6>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <button class="btn btn-sm btn-outline-primary border-0" onclick="openAlternativeModal(${alt.id})" title="Edit Option"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger border-0" onclick="deleteAlternative(${alt.id})" title="Delete Option"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </div>
+                        <p class="text-muted text-sm mb-3">${alt.description || 'No description provided.'}</p>
+                        
+                        <div class="row g-3 text-xs align-items-center">
+                            <div class="col-md-4">
+                                <span class="text-muted d-block mb-1">Estimated Cost</span>
+                                <span class="fw-bold text-dark fs-6">${costDisplay}</span>
+                            </div>
+                            <div class="col-md-4">
+                                <span class="text-muted d-block mb-1">Risk Level</span>
+                                <span class="badge ${riskBadge} rounded-pill">${alt.risk_level || 'Medium'}</span>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-muted">Feasibility</span>
+                                    <span class="fw-bold text-dark">${score} / 10</span>
+                                </div>
+                                <div class="alt-progress-bar">
+                                    <div class="alt-progress-fill ${scoreColor}" style="width: ${scorePercent}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
     }
 
-    currentAlternatives.forEach(alt => {
-        let riskBadge = "bg-secondary";
-        if (alt.risk_level === "Low") riskBadge = "bg-success";
-        if (alt.risk_level === "Medium") riskBadge = "bg-warning text-dark";
-        if (alt.risk_level === "High") riskBadge = "bg-danger";
+    if (tbody) {
+        tbody.innerHTML = "";
+        if (!currentAlternatives || currentAlternatives.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">No alternatives added yet.</td></tr>`;
+            return;
+        }
 
-        tbody.innerHTML += `
-            <tr>
-                <td class="ps-4">
-                    <div class="fw-bold text-primary">${alt.title}</div>
-                    <div class="small text-muted text-truncate" style="max-width:200px;">${alt.description || 'N/A'}</div>
-                </td>
-                <td>$${alt.cost || '0.00'}</td>
-                <td><span class="badge ${riskBadge}">${alt.risk_level || 'N/A'}</span></td>
-                <td><span class="badge bg-info text-dark">${alt.feasibility_score || '-'} / 10</span></td>
-                <td class="text-end pe-4">
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="openAlternativeModal(${alt.id})"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAlternative(${alt.id})"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>
-        `;
-    });
+        currentAlternatives.forEach(alt => {
+            let riskBadge = "bg-secondary";
+            if (alt.risk_level === "Low") riskBadge = "bg-success";
+            if (alt.risk_level === "Medium") riskBadge = "bg-warning text-dark";
+            if (alt.risk_level === "High") riskBadge = "bg-danger";
+
+            tbody.innerHTML += `
+                <tr>
+                    <td class="ps-4">
+                        <div class="fw-bold text-primary">${alt.title}</div>
+                        <div class="small text-muted text-truncate" style="max-width:200px;">${alt.description || 'N/A'}</div>
+                    </td>
+                    <td>$${alt.cost || '0.00'}</td>
+                    <td><span class="badge ${riskBadge}">${alt.risk_level || 'N/A'}</span></td>
+                    <td><span class="badge bg-info text-dark">${alt.feasibility_score || '-'} / 10</span></td>
+                    <td class="text-end pe-4">
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="openAlternativeModal(${alt.id})"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteAlternative(${alt.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
 }
 
 function openAlternativeModal(id = null) {

@@ -51,29 +51,57 @@ def restore_decision_version(decision_id: int, version_number: int, user_id: int
 
 @router.put("/{decision_id}", response_model=DecisionResponse)
 def update_decision(decision_id: int, decision: DecisionUpdate, user_id: int = None, db: Session = Depends(get_db)):
+    from app.models.user import User
     db_decision = DecisionService.get_decision_by_id(db, decision_id)
     if not db_decision:
         raise HTTPException(status_code=404, detail="Decision not found")
-    updater_id = user_id or decision.created_by
-    if updater_id and int(db_decision.created_by) != int(updater_id):
-        raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.")
+    
+    updater_id = user_id or getattr(decision, "created_by", None)
+    if updater_id:
+        updater_user = db.query(User).filter(User.id == updater_id).first()
+        is_admin = updater_user and updater_user.role and "admin" in updater_user.role.role_name.lower()
+        creator_user = db.query(User).filter(User.id == db_decision.created_by).first()
+        is_owner = (int(db_decision.created_by) == int(updater_id)) or (
+            updater_user and creator_user and (
+                (updater_user.email and updater_user.email == creator_user.email) or
+                (updater_user.full_name and updater_user.full_name == creator_user.full_name)
+            )
+        )
+        if not is_owner and not is_admin:
+            raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner or an administrator can edit this decision.")
+    
     status_clean = (db_decision.status or "").strip().lower()
-    if status_clean not in ["draft", "rejected"]:
-        raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.")
+    if status_clean in ["archived"]:
+        raise HTTPException(status_code=400, detail="Archived decisions cannot be edited directly.")
+    
     updated_decision = DecisionService.update_decision(db, decision_id, decision)
     return updated_decision
 
 @router.put("/{decision_id}/full", response_model=DecisionResponse)
 def update_decision_full(decision_id: int, decision: DecisionFullCreate, user_id: int = None, db: Session = Depends(get_db)):
+    from app.models.user import User
     db_decision = DecisionService.get_decision_by_id(db, decision_id)
     if not db_decision:
         raise HTTPException(status_code=404, detail="Decision not found")
+    
     updater_id = user_id or decision.created_by
-    if updater_id and int(db_decision.created_by) != int(updater_id):
-        raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.")
+    if updater_id:
+        updater_user = db.query(User).filter(User.id == updater_id).first()
+        is_admin = updater_user and updater_user.role and "admin" in updater_user.role.role_name.lower()
+        creator_user = db.query(User).filter(User.id == db_decision.created_by).first()
+        is_owner = (int(db_decision.created_by) == int(updater_id)) or (
+            updater_user and creator_user and (
+                (updater_user.email and updater_user.email == creator_user.email) or
+                (updater_user.full_name and updater_user.full_name == creator_user.full_name)
+            )
+        )
+        if not is_owner and not is_admin:
+            raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner or an administrator can edit this decision.")
+            
     status_clean = (db_decision.status or "").strip().lower()
-    if status_clean not in ["draft", "rejected"]:
-        raise HTTPException(status_code=403, detail="Access Denied: Only the decision owner can edit a decision while it is in Draft or Rejected status.")
+    if status_clean in ["archived"]:
+        raise HTTPException(status_code=400, detail="Archived decisions cannot be edited directly.")
+        
     updated_decision = DecisionService.update_decision_full(db, decision_id, decision)
     return updated_decision
 

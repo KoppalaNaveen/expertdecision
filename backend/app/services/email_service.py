@@ -108,56 +108,53 @@ def send_id_email(to_email: str, employee_id: str):
         return False
 
 
-def send_account_approved_email(to_email: str, employee_id: str, full_name: str = ""):
+def get_recipient_email(user) -> str:
     """
-    Sends account approval confirmation email to the user when an Administrator approves their account.
+    Safely extracts the human-readable registered email address for a User object.
+    Prefers email_original if available, or email if it contains '@'.
+    """
+    if not user:
+        return None
+    orig = getattr(user, 'email_original', None)
+    if orig and '@' in str(orig):
+        return str(orig).strip().lower()
+    em = getattr(user, 'email', None)
+    if em and '@' in str(em):
+        return str(em).strip().lower()
+    return None
+
+
+def send_account_approved_email(to_email: str, employee_id: str, full_name: str = "") -> bool:
+    """
+    Automated Account Email -> Sent when an Administrator approves a pending account.
     """
     name_str = f" {full_name}" if full_name else ""
-    print(f"[EMAIL LOG] Account Approved Email for {to_email} ({employee_id})")
-
-    if not SMTP_EMAIL or not SMTP_APP_PASSWORD or "your_" in SMTP_EMAIL.lower() or "your_" in SMTP_APP_PASSWORD.lower():
-        return True
-
-    subject = "EDRP Account Approved - You Can Now Login"
+    subject = "Your EDRP account has been approved"
     body_html = f"""
+    <!DOCTYPE html>
     <html>
-    <head></head>
-    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;">
-        <p>Hello{name_str},</p>
-        <p>Great news! Your account on the <strong>Expert Decision Replay Platform (EDRP)</strong> has been approved by the Administrator.</p>
-        <p>Your account has been verified and you can now log in using your credentials:</p>
-        <ul>
-            <li><strong>Employee ID / Login ID:</strong> {employee_id}</li>
-        </ul>
-        <p>You may now log in to the platform at any time using your Employee ID and password.</p>
-        <br>
-        <p>Best regards,<br><strong>The EDRP Administrator & Support Team</strong></p>
+    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6;">
+        <div style="max-width: 580px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <div style="background: #16a34a; color: #ffffff; padding: 20px;">
+                <h2 style="margin: 0; font-size: 18px;">Account Approved</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p>Hello{name_str},</p>
+                <p>Your account on the <strong>Expert Decision Replay Platform (EDRP)</strong> has been approved by the Administrator.</p>
+                <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+                    <div><strong>Approval Status:</strong> Approved & Verified</div>
+                    <div style="margin-top: 4px;"><strong>Employee ID / Login ID:</strong> {employee_id}</div>
+                </div>
+                <p>You can now sign in to the platform using your Employee ID and password.</p>
+                <br>
+                <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>EDRP Administration & Support Team</strong></p>
+            </div>
+        </div>
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nGreat news! Your account on the Expert Decision Replay Platform (EDRP) has been approved by the Administrator.\n\nYour account has been verified and you can now log in using your credentials:\nEmployee ID / Login ID: {employee_id}\n\nYou may now log in to the platform at any time using your Employee ID and password.\n\nBest regards,<br>The EDRP Administrator & Support Team"
-
-    import email.utils
-    msg = MIMEMultipart("alternative")
-    msg['From'] = email.utils.formataddr(('EDRP Support', SMTP_EMAIL))
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg['Date'] = email.utils.formatdate(localtime=True)
-    msg['Auto-Submitted'] = 'auto-generated'
-
-    msg.attach(MIMEText(body_text, 'plain'))
-    msg.attach(MIMEText(body_html, 'html'))
-
-    try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5)
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except Exception as e:
-        print(f"Failed to send account approved email to {to_email}: {e}")
-        return False
+    body_text = f"Hello{name_str},\n\nYour EDRP account has been approved by the Administrator.\nEmployee ID / Login ID: {employee_id}\n\nYou can now sign in to the platform using your credentials.\n\nRegards,\nEDRP Administration & Support Team"
+    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Support")
 
 
 def _dispatch_original_gmail(to_email: str, subject: str, body_html: str, body_text: str, sender_label: str = "EDRP Security") -> bool:
@@ -236,10 +233,12 @@ def send_critical_security_email(to_email: str, recipient_name: str, subject: st
     return _dispatch_original_gmail(clean_email, full_subject, body_html, body_text, "EDRP Security")
 
 
-def send_password_changed_email(to_email: str, recipient_name: str) -> bool:
+def send_password_changed_email(to_email: str, recipient_name: str, change_time: str = None) -> bool:
     """
     Automated Security Email -> Sent after successful password update.
     """
+    from datetime import datetime, timezone
+    time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = "Your EDRP account password was changed"
     body_html = f"""
@@ -254,10 +253,11 @@ def send_password_changed_email(to_email: str, recipient_name: str) -> bool:
                 <p>Hello{name_str},</p>
                 <p>Your EDRP account password was changed successfully.</p>
                 <div style="background: #f0f9ff; border-left: 4px solid #0284c7; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
-                    If you made this change, no further action is required.
+                    <div><strong>Status:</strong> Password successfully updated</div>
+                    <div style="margin-top: 4px;"><strong>Date & Time:</strong> {time_str}</div>
                 </div>
                 <p style="color: #dc2626; font-size: 13px;">
-                    <strong>Warning:</strong> If you did not change your password, please contact the Administrator immediately to secure your account.
+                    <strong>Security Warning:</strong> If you did not perform this change, please immediately contact your Administrator or EDRP Support via the Support Center to secure your account.
                 </p>
                 <br>
                 <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>EDRP Security Team</strong></p>
@@ -266,7 +266,7 @@ def send_password_changed_email(to_email: str, recipient_name: str) -> bool:
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nYour EDRP account password was changed successfully.\n\nIf you made this change, no further action is required.\n\nIf you did not change your password, please contact the Administrator immediately.\n\nRegards,\nEDRP Security Team"
+    body_text = f"Hello{name_str},\n\nYour EDRP account password was changed successfully.\nDate/Time: {time_str}\n\nIf you did not perform this change, please contact your Administrator or Support immediately.\n\nRegards,\nEDRP Security Team"
     return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Security")
 
 
@@ -277,7 +277,7 @@ def send_password_reset_confirmation_email(to_email: str, recipient_name: str, r
     from datetime import datetime, timezone
     time_str = reset_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
-    subject = "Your EDRP account password was reset"
+    subject = "Your EDRP password was reset"
     body_html = f"""
     <!DOCTYPE html>
     <html>
@@ -288,13 +288,13 @@ def send_password_reset_confirmation_email(to_email: str, recipient_name: str, r
             </div>
             <div style="padding: 24px;">
                 <p>Hello{name_str},</p>
-                <p>Your EDRP account password reset was completed successfully.</p>
-                <p><strong>Timestamp:</strong> {time_str}</p>
+                <p>Your EDRP password reset was completed successfully.</p>
                 <div style="background: #f0f9ff; border-left: 4px solid #0284c7; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
-                    You can now sign in using your new credentials.
+                    <div><strong>Status:</strong> Password reset complete</div>
+                    <div style="margin-top: 4px;"><strong>Date & Time:</strong> {time_str}</div>
                 </div>
                 <p style="color: #dc2626; font-size: 13px;">
-                    <strong>Security Alert:</strong> If you did not request or perform this password reset, please contact your Administrator immediately.
+                    <strong>Security Warning:</strong> If you did not request or perform this password reset, please contact your Administrator immediately.
                 </p>
                 <br>
                 <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>EDRP Security Team</strong></p>
@@ -303,11 +303,11 @@ def send_password_reset_confirmation_email(to_email: str, recipient_name: str, r
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nYour EDRP account password reset was completed successfully.\nDate/Time: {time_str}\n\nIf you did not perform this action, please contact your Administrator immediately.\n\nRegards,\nEDRP Security Team"
+    body_text = f"Hello{name_str},\n\nYour EDRP password was reset successfully.\nDate/Time: {time_str}\n\nIf you did not perform this action, please contact your Administrator immediately.\n\nRegards,\nEDRP Security Team"
     return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Security")
 
 
-def send_new_login_email(to_email: str, recipient_name: str, login_time: str = None, device_info: str = "Web Browser / Desktop") -> bool:
+def send_new_login_email(to_email: str, recipient_name: str, login_time: str = None, device_info: str = "Web Browser Session", ip_address: str = None) -> bool:
     """
     Automated Security Email -> Sent upon successful login detection.
     """
@@ -315,6 +315,9 @@ def send_new_login_email(to_email: str, recipient_name: str, login_time: str = N
     time_str = login_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = "New login detected on your EDRP account"
+    ip_line = f"<div><strong>IP Address:</strong> {ip_address}</div>" if ip_address else ""
+    ip_text = f"IP Address: {ip_address}\n" if ip_address else ""
+
     body_html = f"""
     <!DOCTYPE html>
     <html>
@@ -329,7 +332,8 @@ def send_new_login_email(to_email: str, recipient_name: str, login_time: str = N
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; margin: 16px 0;">
                     <div><strong>Date & Time:</strong> {time_str}</div>
                     <div><strong>Application:</strong> Expert Decision Replay Platform (EDRP)</div>
-                    <div><strong>Session:</strong> {device_info}</div>
+                    <div><strong>Session / Platform:</strong> {device_info}</div>
+                    {ip_line}
                 </div>
                 <p style="font-size: 12px; color: #64748b;">If this was you, no action is needed. If you did not recognize this login, please change your password immediately.</p>
                 <br>
@@ -339,16 +343,19 @@ def send_new_login_email(to_email: str, recipient_name: str, login_time: str = N
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nA new login was detected on your EDRP account.\nTime: {time_str}\nPlatform: EDRP\nSession: {device_info}\n\nIf this was not you, change your password immediately.\n\nRegards,\nEDRP Security Team"
+    body_text = f"Hello{name_str},\n\nA new login was detected on your EDRP account.\nTime: {time_str}\nPlatform: EDRP\nSession: {device_info}\n{ip_text}\nIf this was not you, change your password immediately.\n\nRegards,\nEDRP Security Team"
     return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Security")
 
 
-def send_account_rejected_email(to_email: str, recipient_name: str, reason: str = "Administrative review") -> bool:
+def send_account_rejected_email(to_email: str, recipient_name: str, reason: str = None) -> bool:
     """
     Automated Account Email -> Sent when an Administrator rejects a pending account.
     """
     name_str = f" {recipient_name}" if recipient_name else ""
-    subject = "Your EDRP account registration status"
+    subject = "Your EDRP account request was rejected"
+    reason_html = f"<div><strong>Reason:</strong> {reason}</div>" if reason else ""
+    reason_text = f"\nReason: {reason}" if reason else ""
+
     body_html = f"""
     <!DOCTYPE html>
     <html>
@@ -359,10 +366,10 @@ def send_account_rejected_email(to_email: str, recipient_name: str, reason: str 
             </div>
             <div style="padding: 24px;">
                 <p>Hello{name_str},</p>
-                <p>Your registration request for the <strong>Expert Decision Replay Platform (EDRP)</strong> was not approved at this time.</p>
+                <p>Your registration request for the <strong>Expert Decision Replay Platform (EDRP)</strong> was not approved.</p>
                 <div style="background: #fff1f2; border-left: 4px solid #e11d48; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
-                    <strong>Decision:</strong> Registration Rejected<br>
-                    <strong>Reason:</strong> {reason}
+                    <div><strong>Decision:</strong> Account Request Rejected</div>
+                    {reason_html}
                 </div>
                 <p style="font-size: 12px; color: #64748b;">If you believe this is an error or need clarification, please contact your Organization Administrator.</p>
                 <br>
@@ -372,14 +379,16 @@ def send_account_rejected_email(to_email: str, recipient_name: str, reason: str 
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nYour account registration for EDRP was not approved.\nReason: {reason}\n\nPlease contact your Organization Administrator for assistance.\n\nRegards,\nEDRP Administration Team"
+    body_text = f"Hello{name_str},\n\nYour EDRP account request was rejected.{reason_text}\n\nPlease contact your Organization Administrator for assistance.\n\nRegards,\nEDRP Administration Team"
     return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Administration")
 
 
-def send_account_deleted_email(to_email: str, recipient_name: str) -> bool:
+def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time: str = None) -> bool:
     """
     Automated Account Email -> Sent when an account is permanently deleted.
     """
+    from datetime import datetime, timezone
+    time_str = deletion_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = "Your EDRP account has been deleted"
     body_html = f"""
@@ -394,9 +403,10 @@ def send_account_deleted_email(to_email: str, recipient_name: str) -> bool:
                 <p>Hello{name_str},</p>
                 <p>This email confirms that your account on the <strong>Expert Decision Replay Platform (EDRP)</strong> has been permanently deleted.</p>
                 <div style="background: #f1f5f9; border-left: 4px solid #475569; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
-                    All associated personal records and profile data have been permanently removed.
+                    <div><strong>Status:</strong> Account Permanently Deleted</div>
+                    <div style="margin-top: 4px;"><strong>Date & Time:</strong> {time_str}</div>
                 </div>
-                <p style="font-size: 12px; color: #64748b;">Thank you for your time with us. If you have any further questions, please contact Support.</p>
+                <p style="font-size: 12px; color: #64748b;">All associated personal records and profile data have been permanently removed. If you have any questions, please contact Support.</p>
                 <br>
                 <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>The EDRP Team</strong></p>
             </div>
@@ -404,14 +414,16 @@ def send_account_deleted_email(to_email: str, recipient_name: str) -> bool:
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nYour account on the Expert Decision Replay Platform has been permanently deleted.\nAll personal data has been removed.\n\nRegards,\nThe EDRP Team"
+    body_text = f"Hello{name_str},\n\nYour account on the Expert Decision Replay Platform has been permanently deleted.\nDate/Time: {time_str}\n\nRegards,\nThe EDRP Team"
     return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Team")
 
 
-def send_role_changed_email(to_email: str, recipient_name: str, prev_role: str, new_role: str) -> bool:
+def send_role_changed_email(to_email: str, recipient_name: str, prev_role: str, new_role: str, change_time: str = None) -> bool:
     """
     Automated Account Email -> Sent when an Administrator changes a user's role.
     """
+    from datetime import datetime, timezone
+    time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = "Your EDRP account role has been updated"
     body_html = f"""
@@ -428,6 +440,7 @@ def send_role_changed_email(to_email: str, recipient_name: str, prev_role: str, 
                 <div style="background: #f5f3ff; border: 1px solid #ddd6fe; padding: 14px; border-radius: 8px; margin: 16px 0;">
                     <div><strong>Previous Role:</strong> {prev_role}</div>
                     <div style="margin-top: 6px;"><strong>New Role:</strong> <span style="color: #7c3aed; font-weight: bold;">{new_role}</span></div>
+                    <div style="margin-top: 6px; font-size: 12px; color: #64748b;"><strong>Date & Time:</strong> {time_str}</div>
                 </div>
                 <p style="font-size: 12px; color: #64748b;">Your workspace access and permissions will automatically reflect this update on your next sign-in.</p>
                 <br>
@@ -437,14 +450,16 @@ def send_role_changed_email(to_email: str, recipient_name: str, prev_role: str, 
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nYour EDRP account role has been updated:\nPrevious Role: {prev_role}\nNew Role: {new_role}\n\nRegards,\nEDRP Administration Team"
+    body_text = f"Hello{name_str},\n\nYour EDRP account role has been updated.\nPrevious Role: {prev_role}\nNew Role: {new_role}\nDate/Time: {time_str}\n\nRegards,\nEDRP Administration Team"
     return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Administration")
 
 
-def send_account_status_email(to_email: str, recipient_name: str, is_active: bool) -> bool:
+def send_account_status_email(to_email: str, recipient_name: str, is_active: bool, change_time: str = None) -> bool:
     """
     Automated Account Email -> Sent when an Administrator activates or deactivates an account.
     """
+    from datetime import datetime, timezone
+    time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
     status_label = "Activated" if is_active else "Deactivated"
     subject = f"Your EDRP account has been {status_label.lower()}"
@@ -462,7 +477,9 @@ def send_account_status_email(to_email: str, recipient_name: str, is_active: boo
                 <p>Hello{name_str},</p>
                 <p>Your account on the <strong>Expert Decision Replay Platform</strong> has been <strong>{status_label.lower()}</strong> by an Administrator.</p>
                 <div style="background: #f8fafc; border-left: 4px solid {theme_color}; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
-                    {'You now have full access to sign in and use the platform.' if is_active else 'Your access to the platform has been temporarily suspended. Please contact your Administrator if you believe this was done in error.'}
+                    <div><strong>Status:</strong> {status_label}</div>
+                    <div style="margin-top: 4px;"><strong>Date & Time:</strong> {time_str}</div>
+                    <div style="margin-top: 6px;">{'You now have full access to sign in and use the platform according to your assigned role and permissions.' if is_active else 'Your access to the platform has been deactivated. Please contact your Administrator if you believe this was done in error.'}</div>
                 </div>
                 <br>
                 <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>EDRP Administration Team</strong></p>
@@ -471,7 +488,7 @@ def send_account_status_email(to_email: str, recipient_name: str, is_active: boo
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nYour EDRP account has been {status_label.lower()}.\n\nRegards,\nEDRP Administration Team"
+    body_text = f"Hello{name_str},\n\nYour EDRP account has been {status_label.lower()}.\nDate/Time: {time_str}\n\nRegards,\nEDRP Administration Team"
     return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Administration")
 
 

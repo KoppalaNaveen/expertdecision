@@ -34,13 +34,11 @@ async function fetchDecisions() {
         if (roleParam) queryParams.push(`role_name=${encodeURIComponent(roleParam)}`);
         let queryStr = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
 
-        let response;
-        try {
-            response = await fetch(`/api/decisions${queryStr}`);
-            if (!response.ok) {
-                response = await fetch(`${API_URL}/decisions/${queryStr}`);
-            }
-        } catch (_) {
+        let response = await fetch(`/api/decisions${queryStr}`);
+        if (!response.ok) {
+            response = await fetch(`/api/decisions/${queryStr}`);
+        }
+        if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
             response = await fetch(`${API_URL}/decisions/${queryStr}`);
         }
         if (!response || !response.ok) throw new Error("Failed to load decisions");
@@ -223,11 +221,18 @@ function renderTable() {
 async function submitDraftFromTable(id) {
     if (!confirm("Are you sure you want to submit this draft decision for review?")) return;
     try {
-        const response = await fetch(`${API_URL}/decisions/${id}/status`, {
+        let response = await fetch(`/api/decisions/${id}/status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: "Pending" })
         });
+        if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
+            response = await fetch(`${API_URL}/decisions/${id}/status`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "Pending" })
+            });
+        }
         if (!response.ok) throw new Error("Failed to submit decision");
         
         if (typeof showCenterNotification === 'function') {
@@ -285,14 +290,22 @@ async function saveDecision() {
 
     const payload = id ? { title, description } : { title, description, created_by: USER_ID };
     const method = id ? "PUT" : "POST";
-    const url = id ? `${API_URL}/decisions/${id}` : `${API_URL}/decisions/`;
+    const url = id ? `/api/decisions/${id}` : `/api/decisions/`;
 
     try {
-        const response = await fetch(url, {
+        let response = await fetch(url, {
             method: method,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
+        if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
+            const fallbackUrl = id ? `${API_URL}/decisions/${id}` : `${API_URL}/decisions/`;
+            response = await fetch(fallbackUrl, {
+                method: method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
 
         if (!response.ok) throw new Error("Failed to save decision");
 
@@ -310,7 +323,10 @@ async function deleteDecision(id) {
     try {
         const roleParam = typeof CURRENT_USER_ROLE !== 'undefined' ? encodeURIComponent(CURRENT_USER_ROLE) : '';
         const userParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
-        const response = await fetch(`${API_URL}/decisions/${id}?user_id=${userParam}&role_name=${roleParam}`, { method: "DELETE" });
+        let response = await fetch(`/api/decisions/${id}?user_id=${userParam}&role_name=${roleParam}`, { method: "DELETE" });
+        if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
+            response = await fetch(`${API_URL}/decisions/${id}?user_id=${userParam}&role_name=${roleParam}`, { method: "DELETE" });
+        }
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.detail || "Failed to delete decision");
@@ -338,11 +354,9 @@ async function openRejectionCommentsModal(decisionId) {
         }
 
         const userParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
-        let res;
-        try {
+        let res = await fetch(`/api/decisions/${decisionId}?user_id=${userParam}`);
+        if (!res.ok && typeof API_URL !== 'undefined' && API_URL) {
             res = await fetch(`${API_URL}/decisions/${decisionId}?user_id=${userParam}`);
-        } catch (fetchErr) {
-            throw new Error("Failed to fetch decision comments.");
         }
 
         if (!res.ok) {

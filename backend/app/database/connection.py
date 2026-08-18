@@ -74,12 +74,13 @@ def ensure_user_schema_columns():
                             conn.commit()
                 except Exception:
                     pass
-            try:
-                conn.execute(text("UPDATE users SET approved = TRUE, status = 'Active', email_verified = TRUE, is_active = TRUE WHERE status IS NULL OR status = '' OR status = 'Active';"))
-                conn.execute(text("UPDATE users SET email_original = email WHERE (email_original IS NULL OR email_original = '') AND email LIKE '%@%';"))
-                conn.commit()
-            except Exception:
-                pass
+            if inspector.has_table("users"):
+                try:
+                    conn.execute(text("UPDATE users SET approved = TRUE, status = 'Active', email_verified = TRUE, is_active = TRUE WHERE status IS NULL OR status = '' OR status = 'Active';"))
+                    conn.execute(text("UPDATE users SET email_original = email WHERE (email_original IS NULL OR email_original = '') AND email LIKE '%@%';"))
+                    conn.commit()
+                except Exception:
+                    pass
     except Exception as e:
         print(f"Schema migration helper note: {e}")
         try:
@@ -127,6 +128,38 @@ def ensure_user_schema_columns():
             db.close()
         except Exception as migration_err:
             print(f"Migration fallback note: {migration_err}")
+
+    # Ensure baseline roles exist if table is completely empty
+    try:
+        from app.models.role import Role
+        from app.models.category import Category
+        inspector = inspect(engine)
+        if inspector.has_table("roles") and inspector.has_table("categories"):
+            db = SessionLocal()
+            try:
+                if db.query(Role).count() == 0:
+                    roles = [
+                        Role(id=1, role_name="Administrator", description="Full platform access"),
+                        Role(id=2, role_name="Manager", description="Team management and approval"),
+                        Role(id=3, role_name="Employee", description="Create and submit decisions"),
+                        Role(id=4, role_name="Reviewer", description="Review assigned decisions")
+                    ]
+                    db.add_all(roles)
+                    db.commit()
+                    print("Initialized default system roles in database.")
+                if db.query(Category).count() == 0:
+                    categories = [
+                        Category(id=1, name="Finance"),
+                        Category(id=2, name="Technology"),
+                        Category(id=3, name="Operations"),
+                        Category(id=4, name="HR")
+                    ]
+                    db.add_all(categories)
+                    db.commit()
+            finally:
+                db.close()
+    except Exception as role_init_err:
+        print(f"Baseline roles check note: {role_init_err}")
 
 ensure_user_schema_columns()
 

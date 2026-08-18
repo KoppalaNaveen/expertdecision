@@ -1220,9 +1220,11 @@
 </div>
 
 <script>
-    const API_URL = "http://127.0.0.1:8000";
+    const API_URL = "/api";
     const DECISION_ID = parseInt("{{ decision_id }}", 10);
     const USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
+    const CURRENT_USER_ROLE = "{{ session.get('role_name', '') }}" || localStorage.getItem('role_name') || 'Employee';
+    const CURRENT_USER_NAME = "{{ session.get('full_name', '') }}" || localStorage.getItem('full_name') || '';
 </script>
-<script src="{{ url_for('static', filename='js/decision_details.js') }}?v=20260724"></script>
+<script src="{{ url_for('static', filename='js/decision_details.js') }}?v=20260818_details_v7"></script>
 {% endblock %}

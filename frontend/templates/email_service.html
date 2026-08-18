@@ -317,7 +317,7 @@ async function loadLiveUsers() {
     try {
         let res = await fetch(`${API_URL}/users/`).catch(() => null);
         if (!res || !res.ok) {
-            res = await fetch(`http://127.0.0.1:8000/users/`).catch(() => null);
+            res = await fetch(`/api/users/`).catch(() => null);
         }
 
         if (res && res.ok) {

@@ -102,38 +102,38 @@ def generate_ai_response(user_message: str, user_name: str = "User", user_id: Op
     if data_response is not None:
         return data_response
 
-    # 3. Live Google Gemini API (with RAG Context Injection)
+    # 3. Live Groq API (with RAG Context Injection)
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
+        resp = _call_groq_api(clean_msg, user_name, db_context, conversation_history, groq_key)
+        if resp:
+            return resp
+
+    # 4. Live Google Gemini API (with RAG Context Injection)
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if gemini_key:
         resp = _call_gemini_api(clean_msg, user_name, db_context, conversation_history, gemini_key)
         if resp:
             return resp
 
-    # 4. Free Grok API Wrapper (https://github.com/realasfngl/Grok-Api)
-    grok_api_url = os.getenv("GROK_API_URL") or (os.getenv("USE_FREE_GROK", "").lower() == "true" and "http://localhost:6969/ask")
-    if grok_api_url:
-        resp = _call_free_grok_wrapper_api(clean_msg, user_name, db_context, conversation_history, str(grok_api_url))
-        if resp:
-            return resp
-
-    # 5. Live Official xAI Grok API
-    xai_key = os.getenv("XAI_API_KEY") or os.getenv("GROK_API_KEY")
-    if xai_key:
-        resp = _call_xai_grok_api(clean_msg, user_name, db_context, conversation_history, xai_key)
-        if resp:
-            return resp
-
-    # 6. Live OpenAI API (with RAG Context Injection)
+    # 5. Live OpenAI API (with RAG Context Injection)
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
         resp = _call_openai_api(clean_msg, user_name, db_context, conversation_history, openai_key)
         if resp:
             return resp
 
-    # 7. Live Groq API (with RAG Context Injection)
-    groq_key = os.getenv("GROQ_API_KEY")
-    if groq_key:
-        resp = _call_groq_api(clean_msg, user_name, db_context, conversation_history, groq_key)
+    # 6. Live Official xAI Grok API
+    xai_key = os.getenv("XAI_API_KEY") or (os.getenv("GROK_API_KEY") if not os.getenv("GROK_API_KEY", "").startswith("gsk_") else None)
+    if xai_key:
+        resp = _call_xai_grok_api(clean_msg, user_name, db_context, conversation_history, xai_key)
+        if resp:
+            return resp
+
+    # 7. Free Grok API Wrapper (https://github.com/realasfngl/Grok-Api)
+    grok_api_url = os.getenv("GROK_API_URL") or (os.getenv("USE_FREE_GROK", "").lower() == "true" and "http://localhost:6969/ask")
+    if grok_api_url:
+        resp = _call_free_grok_wrapper_api(clean_msg, user_name, db_context, conversation_history, str(grok_api_url))
         if resp:
             return resp
 
@@ -367,7 +367,7 @@ def _call_groq_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], c
                 messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
 
-    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+    models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "groq/compound", "groq/compound-mini"]
     for model in models:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -375,28 +375,35 @@ def _call_groq_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], c
                 "model": model,
                 "messages": messages,
                 "temperature": 0.3,
-                "max_tokens": 800
+                "max_tokens": 1200
             }
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode("utf-8"),
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {api_key}",
+                    "Authorization": f"Bearer {api_key.strip()}",
                     "User-Agent": "EDRP-App/1.0"
                 },
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=8.0) as resp:
+            with urllib.request.urlopen(req, timeout=12.0) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     choices = data.get("choices", [])
                     if choices and "message" in choices[0]:
-                        return {
-                            "reply": choices[0]["message"].get("content", "").strip(),
-                            "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
-                            "source": f"Groq ({model})"
-                        }
+                        raw_content = choices[0]["message"].get("content", "").strip()
+                        if "<think>" in raw_content and "</think>" in raw_content:
+                            raw_content = re.sub(r"<think>.*?</think>", "", raw_content, flags=re.DOTALL).strip()
+                        elif "</think>" in raw_content:
+                            raw_content = raw_content.split("</think>")[-1].strip()
+                        
+                        if raw_content:
+                            return {
+                                "reply": raw_content,
+                                "suggested_actions": _derive_custom_suggestions(clean_msg, db_context),
+                                "source": f"Groq ({model.split('/')[-1]})"
+                            }
         except Exception as e:
             print(f"[AI SUPPORT GROQ {model}] Note: {e}")
     return None

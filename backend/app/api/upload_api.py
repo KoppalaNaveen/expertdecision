@@ -37,6 +37,12 @@ async def upload_file(
             detail=f"File size exceeds maximum allowed limit of 200 MB ({file_size} bytes received)."
         )
     
+    from app.models.user import User
+    valid_user = db.query(User).filter(User.id == user_id).first() if user_id else None
+    if not valid_user:
+        first_user = db.query(User).first()
+        user_id = first_user.id if first_user else None
+
     attachment = Attachment(
         filename=file.filename,
         file_path=file_path,

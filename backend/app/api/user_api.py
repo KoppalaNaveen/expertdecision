@@ -245,7 +245,7 @@ class UpdateUserStatusRequest(BaseModel):
 def update_user_role(user_id: int, req: UpdateUserRoleRequest, db: Session = Depends(get_db)):
     from app.models.user import User
     from app.models.role import Role
-    from app.services.email_service import send_role_changed_email
+    from app.services.email_service import send_role_changed_email, get_recipient_email
     from app.services.notification_service import NotificationService
     import threading
 
@@ -276,10 +276,11 @@ def update_user_role(user_id: int, req: UpdateUserRoleRequest, db: Session = Dep
         print(f"Role change notification error: {notif_err}")
 
     # 2. Automated Security/Account Email via Original Gmail (Async post-commit)
-    if user.email:
+    target_email = get_recipient_email(user)
+    if target_email:
         threading.Thread(
             target=send_role_changed_email,
-            args=(user.email, user.full_name, prev_role_name, new_role_name),
+            args=(target_email, user.full_name, prev_role_name, new_role_name),
             daemon=True
         ).start()
 
@@ -292,7 +293,7 @@ def update_user_role(user_id: int, req: UpdateUserRoleRequest, db: Session = Dep
 @router.put("/{user_id}/status", response_model=SuccessResponse)
 def update_user_status(user_id: int, req: UpdateUserStatusRequest, db: Session = Depends(get_db)):
     from app.models.user import User
-    from app.services.email_service import send_account_status_email
+    from app.services.email_service import send_account_status_email, get_recipient_email
     from app.services.notification_service import NotificationService
     import threading
 
@@ -319,10 +320,11 @@ def update_user_status(user_id: int, req: UpdateUserStatusRequest, db: Session =
         print(f"Status update notification error: {notif_err}")
 
     # 2. Automated Account Email via Original Gmail (Async post-commit)
-    if user.email:
+    target_email = get_recipient_email(user)
+    if target_email:
         threading.Thread(
             target=send_account_status_email,
-            args=(user.email, user.full_name, user.is_active),
+            args=(target_email, user.full_name, user.is_active),
             daemon=True
         ).start()
 

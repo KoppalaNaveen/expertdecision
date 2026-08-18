@@ -19,7 +19,8 @@ from app.services.email_service import (
     send_new_login_email,
     send_account_deleted_email,
     send_role_changed_email,
-    send_account_status_email
+    send_account_status_email,
+    get_recipient_email
 )
 from app.services.notification_service import NotificationService
 
@@ -233,16 +234,17 @@ class UserService:
         access_token = create_access_token({"sub": db_user.employee_id})
 
         # Automated Security Email: New Login Notification via Original Gmail (Async)
-        if db_user.email:
-            def _async_login_email(target_email, name):
+        target_email = get_recipient_email(db_user)
+        if target_email:
+            def _async_login_email(email_addr, name):
                 try:
                     from datetime import datetime, timezone
                     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-                    send_new_login_email(target_email, name, login_time=now_str, device_info="Web Browser Session")
+                    send_new_login_email(email_addr, name, login_time=now_str, device_info="Web Browser Session")
                 except Exception as log_err:
                     print(f"New login email dispatch note: {log_err}")
 
-            threading.Thread(target=_async_login_email, args=(db_user.email, db_user.full_name), daemon=True).start()
+            threading.Thread(target=_async_login_email, args=(target_email, db_user.full_name), daemon=True).start()
 
         UserService._log_activity(db, db_user.id, f"User login successful: {db_user.full_name} ({db_user.employee_id})", f"Role: {db_user.role.role_name if db_user.role else 'User'}")
 
@@ -293,7 +295,8 @@ class UserService:
             print(f"Approval status notification note: {notif_err}")
 
         # 2. Automated Email via Original Gmail (Async post-commit)
-        if updated_user.email:
+        user_email = get_recipient_email(updated_user)
+        if user_email:
             def _async_status_email(target_email, emp_id, name, act):
                 try:
                     if act == "approve":
@@ -305,7 +308,7 @@ class UserService:
 
             threading.Thread(
                 target=_async_status_email,
-                args=(updated_user.email, updated_user.employee_id, updated_user.full_name, action),
+                args=(user_email, updated_user.employee_id, updated_user.full_name, action),
                 daemon=True
             ).start()
 
@@ -429,14 +432,15 @@ class UserService:
             print(f"Password reset notification note: {notif_err}")
 
         # 2. Automated Security Email via Original Gmail (Async post-commit)
-        if user.email:
+        user_email = get_recipient_email(user) or (clean_email if "@" in clean_email else None)
+        if user_email:
             def _async_reset_email(target_email, name):
                 try:
                     send_password_reset_confirmation_email(target_email, name)
                 except Exception as mail_err:
                     print(f"Password reset email dispatch exception: {mail_err}")
 
-            threading.Thread(target=_async_reset_email, args=(user.email, user.full_name), daemon=True).start()
+            threading.Thread(target=_async_reset_email, args=(user_email, user.full_name), daemon=True).start()
         
         return {"message": "Password reset successfully"}
 
@@ -499,7 +503,7 @@ class UserService:
     @staticmethod
     def delete_user(db: Session, user_id: int):
         user = UserRepository.get_user_by_id(db, user_id)
-        target_email = user.email if user else None
+        target_email = get_recipient_email(user)
         target_name = user.full_name if user else "User"
 
         UserService._log_activity(db, 1, f"Administrator deleted user account ID: {user_id}", "")

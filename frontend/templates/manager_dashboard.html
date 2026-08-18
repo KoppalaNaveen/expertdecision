@@ -1010,7 +1010,7 @@
 
             const comments = prompt("Enter review comments (optional):", "Approved via Quick Actions") || "";
             try {
-                const res = await fetch("http://127.0.0.1:8000/reviews/", {
+                const res = await fetch("/api/reviews/", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1036,7 +1036,7 @@
             if (!reviewerName) return;
 
             try {
-                const res = await fetch(`http://127.0.0.1:8000/decisions/${decId}`, {
+                const res = await fetch(`/api/decisions/${decId}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1056,7 +1056,7 @@
             if (!topic) return;
 
             try {
-                const res = await fetch("http://127.0.0.1:8000/discussions/", {
+                const res = await fetch("/api/discussions/", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1104,7 +1104,7 @@
         async function quickReviewAction(decisionId, reviewerId, status) {
             const comments = prompt(`Enter comments for marking this decision as ${status} (optional):`) || "";
             try {
-                const res = await fetch("http://127.0.0.1:8000/reviews/", {
+                const res = await fetch("/api/reviews/", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({

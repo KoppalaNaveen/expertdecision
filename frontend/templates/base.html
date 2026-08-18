@@ -614,7 +614,7 @@
         lucide.createIcons();
         
         const LOGGED_USER_ID = parseInt("{{ session.get('user_id', 0) }}", 10);
-        const BACKEND_API = "http://127.0.0.1:8000";
+        const BACKEND_API = "/api";
 
         async function fetchGlobalHeaderNotifications() {
             if (!LOGGED_USER_ID) return;
@@ -1091,7 +1091,7 @@
             submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span>Processing...`;
 
             try {
-                const res = await fetch(`http://127.0.0.1:8000/reviews/`, {
+                const res = await fetch(`/api/reviews/`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -1170,7 +1170,7 @@
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 2500);
-                    const res = await fetch("http://127.0.0.1:8000/decisions/", { method: "GET", signal: controller.signal });
+                    const res = await fetch("/api/decisions/", { method: "GET", signal: controller.signal });
                     clearTimeout(timeoutId);
                     return res.ok || res.status < 500;
                 } catch (e) {
@@ -1912,12 +1912,12 @@
 
                     <!-- Custom Prompt Input Bar -->
                     <form id="aiSelectionCustomForm" onsubmit="handleAiSelectionCustomSubmit(event)" class="mb-3">
-                        <div class="input-group shadow-sm rounded-pill overflow-hidden border">
+                        <div class="input-group shadow-sm rounded-4 overflow-hidden border align-items-center bg-white">
                             <span class="input-group-text bg-white border-0 ps-3 text-muted">
                                 <i class="bi bi-chat-left-dots text-primary"></i>
                             </span>
-                            <input type="text" id="aiSelectionCustomInput" class="form-control border-0 text-xs py-2.5 px-2" placeholder="Ask anything about this selection or platform (e.g. 'Is this realistic?', 'Summarize in 2 points')...">
-                            <button class="btn btn-primary px-4 fw-semibold text-xs rounded-pill" type="submit" id="btnSendAiSelection" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none;">
+                            <textarea id="aiSelectionCustomInput" class="form-control border-0 text-xs py-2 px-2" rows="1" placeholder="Ask anything about this selection or platform (e.g. 'Give description for this title')..." style="resize: none; max-height: 120px; overflow-y: auto; height: 38px;"></textarea>
+                            <button class="btn btn-primary px-4 fw-semibold text-xs rounded-pill me-1.5 my-1" type="submit" id="btnSendAiSelection" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none; height: 32px;">
                                 <i class="bi bi-send-fill me-1"></i> Ask AI
                             </button>
                         </div>
@@ -1940,6 +1940,9 @@
                                 <i class="bi bi-check2-circle text-success me-1"></i> Verified by <strong class="text-dark" id="aiResponseSourceLabel">Groq Llama 3.3</strong>
                             </div>
                             <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 text-xs fw-semibold shadow-sm" id="btnInsertAiToForm" onclick="insertAiResponseToTargetForm(this)" style="background: linear-gradient(135deg, #2563eb, #4f46e5); border: none;">
+                                    <i class="bi bi-box-arrow-in-down-right me-1"></i> Use in Form
+                                </button>
                                 <button type="button" class="btn btn-sm btn-light border rounded-pill px-2.5 py-1 text-xs" onclick="copyAiSelectionResponse(this)">
                                     <i class="bi bi-clipboard me-1"></i> Copy
                                 </button>
@@ -1959,13 +1962,16 @@
         .edrp-ai-selection-pill {
             transition: opacity 0.15s ease, transform 0.15s ease;
             pointer-events: auto;
+            z-index: 999999 !important;
         }
         .edrp-ai-selection-pill button {
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
         }
         .edrp-ai-selection-pill button:hover {
-            transform: translateY(-2px) scale(1.03);
-            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.5) !important;
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 10px 25px -3px rgba(79, 70, 229, 0.6) !important;
         }
         .animate-pulse {
             animation: edrpPulse 1.8s infinite;
@@ -2049,6 +2055,7 @@
         // ── Contextual AI Selection Logic ──
         let currentSelectedText = "";
         let selectionModalInstance = null;
+        window.lastTargetInputForAi = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             const pill = document.getElementById('edrpAiSelectionPill');
@@ -2057,7 +2064,6 @@
                 selectionModalInstance = new bootstrap.Modal(modalEl);
                 modalEl.addEventListener('show.bs.modal', () => {
                     if (pill) pill.classList.add('d-none');
-                    try { if (window.getSelection) window.getSelection().removeAllRanges(); } catch(e) {}
                 });
                 modalEl.addEventListener('shown.bs.modal', () => {
                     if (pill) pill.classList.add('d-none');
@@ -2067,12 +2073,15 @@
                 });
             }
 
-            // Listen for text selection changes
+            // Listen for text selection changes on document and form inputs
             document.addEventListener('mouseup', handleTextSelectionEvent);
             document.addEventListener('keyup', (e) => {
-                if (e.key === 'Shift' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                    handleTextSelectionEvent();
+                if (e.key === 'Shift' || e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'a') {
+                    setTimeout(handleTextSelectionEvent, 50);
                 }
+            });
+            document.addEventListener('selectionchange', () => {
+                setTimeout(handleTextSelectionEvent, 50);
             });
 
             // Hide pill on click outside
@@ -2095,40 +2104,79 @@
             const pill = document.getElementById('edrpAiSelectionPill');
             if (!pill) return;
 
-            // Never show the floating pill if modal is already open
+            // Never show the floating pill if the AI Selection modal itself is currently active
             const modalEl = document.getElementById('edrpAiSelectionModal');
             if (modalEl && (modalEl.classList.contains('show') || modalEl.style.display === 'block')) {
                 pill.classList.add('d-none');
                 return;
             }
 
-            const selection = window.getSelection();
-            const text = selection ? selection.toString().trim() : '';
+            let text = "";
+            let rect = null;
+            let targetInput = null;
 
-            // Require at least 3 characters and ignore when user is actively inside modal or form controls
-            if (text.length >= 3) {
-                try {
-                    const range = selection.getRangeAt(0);
-                    let parent = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
-                    if (parent && (parent.closest('#edrpAiSelectionModal') || parent.closest('.modal') || parent.closest('#edrpAiSelectionPill') || parent.closest('#edrpAiFloatingOrb'))) {
-                        pill.classList.add('d-none');
-                        return;
+            // 1. Check if user selected text inside an input or textarea
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.id !== 'aiSelectionCustomInput') {
+                const start = activeEl.selectionStart;
+                const end = activeEl.selectionEnd;
+                if (typeof start === 'number' && typeof end === 'number' && end > start) {
+                    text = activeEl.value.substring(start, end).trim();
+                    if (text.length >= 2) {
+                        targetInput = activeEl;
+                        const elRect = activeEl.getBoundingClientRect();
+                        if (elRect.width > 0 && elRect.height > 0) {
+                            rect = {
+                                left: elRect.left,
+                                top: elRect.top,
+                                width: elRect.width,
+                                height: elRect.height
+                            };
+                        }
                     }
-
-                    const rect = range.getBoundingClientRect();
-                    // Check valid coordinates
-                    if (rect.width > 0 && rect.height > 0) {
-                        currentSelectedText = text;
-                        const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
-                        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
-
-                        pill.style.left = `${rect.left + scrollX + (rect.width / 2)}px`;
-                        pill.style.top = `${rect.top + scrollY - 8}px`;
-                        pill.classList.remove('d-none');
-                        return;
-                    }
-                } catch (err) {}
+                }
             }
+
+            // 2. If not found in active input, check standard window.getSelection()
+            if (!text || !rect) {
+                const selection = window.getSelection();
+                const selText = selection ? selection.toString().trim() : '';
+                if (selText.length >= 2) {
+                    try {
+                        const range = selection.getRangeAt(0);
+                        let parent = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+                        if (parent && (parent.closest('#edrpAiSelectionModal') || parent.closest('#edrpAiSelectionPill') || parent.closest('#edrpAiFloatingOrb'))) {
+                            pill.classList.add('d-none');
+                            return;
+                        }
+                        const rRect = range.getBoundingClientRect();
+                        if (rRect.width > 0 && rRect.height > 0) {
+                            text = selText;
+                            rect = rRect;
+                        }
+                    } catch (err) {}
+                }
+            }
+
+            // 3. Position and display floating "Ask AI" pill if text is highlighted
+            if (text && text.length >= 2 && rect) {
+                currentSelectedText = text;
+                if (targetInput) {
+                    window.lastTargetInputForAi = targetInput;
+                }
+                const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+                const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+                let posX = rect.left + scrollX + Math.min(rect.width / 2, 140);
+                let posY = rect.top + scrollY - 8;
+
+                pill.style.left = `${posX}px`;
+                pill.style.top = `${posY}px`;
+                pill.style.zIndex = '999999';
+                pill.classList.remove('d-none');
+                return;
+            }
+
             // If selection is cleared or invalid
             if (pill) {
                 pill.classList.add('d-none');
@@ -2140,12 +2188,7 @@
             const pill = document.getElementById('edrpAiSelectionPill');
             if (pill) pill.classList.add('d-none');
 
-            // Clear browser selection range to prevent ghost floating pill
-            try {
-                if (window.getSelection) window.getSelection().removeAllRanges();
-            } catch(e) {}
-
-            // If global trigger without selection, use active or placeholder text
+            // If global trigger without selection, check active selection or empty
             if (isGlobalTrigger && !currentSelectedText) {
                 const sel = window.getSelection() ? window.getSelection().toString().trim() : '';
                 currentSelectedText = sel || "";
@@ -2172,16 +2215,53 @@
 
             if (selectionModalInstance) {
                 selectionModalInstance.show();
+                // Automatically generate comprehensive explanation and assistance for highlighted text!
+                if (currentSelectedText && currentSelectedText.length >= 2 && !isGlobalTrigger) {
+                    setTimeout(() => {
+                        triggerAiSelectionAction('explain');
+                    }, 200);
+                }
+            }
+        }
+
+        function insertAiResponseToTargetForm(btn) {
+            const content = document.getElementById('aiSelectionResponseContent');
+            if (!content) return;
+            const rawText = content.innerText.trim();
+            if (!rawText) return;
+
+            let targetEl = window.lastTargetInputForAi;
+            if (!targetEl || !document.body.contains(targetEl)) {
+                targetEl = document.getElementById('ticketMessageTextarea') || document.getElementById('cdDescription') || document.querySelector('textarea:not(#aiSelectionCustomInput)');
+            }
+
+            if (targetEl) {
+                if (targetEl.tagName === 'INPUT' || targetEl.tagName === 'TEXTAREA') {
+                    targetEl.value = rawText;
+                    targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    targetEl.innerText = rawText;
+                }
+
+                if (selectionModalInstance) {
+                    selectionModalInstance.hide();
+                }
+                if (typeof showToast === 'function') {
+                    showToast('Success', 'AI generated content inserted into form!');
+                }
+            } else {
+                copyAiSelectionResponse(btn);
             }
         }
 
         async function triggerAiSelectionAction(actionType) {
             let promptText = "";
-            const textContext = currentSelectedText ? `Content Context:\n"${currentSelectedText}"\n\n` : "";
+            const textContext = currentSelectedText ? `Content Context / Topic:\n"${currentSelectedText}"\n\n` : "";
 
             switch (actionType) {
                 case 'explain':
-                    promptText = `${textContext}Please explain this in clear, actionable detail. Break down key terms, business implications, and why this matters for the decision workflow.`;
+                    promptText = `${textContext}Please provide detailed guidance, clear explanation, key steps, troubleshooting recommendations, and comprehensive drafting assistance regarding: "${currentSelectedText}". If relevant, draft full support/decision details that can directly resolve or answer this topic.`;
                     break;
                 case 'pros_cons':
                     promptText = `${textContext}Analyze the strategic Pros, Cons, and potential Risk Factors associated with this statement or decision alternative.`;
@@ -2282,11 +2362,42 @@
             const content = document.getElementById('aiSelectionResponseContent');
             if (!content) return;
             const textToCopy = content.innerText;
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                const origHtml = btn.innerHTML;
-                btn.innerHTML = `<i class="bi bi-check-lg text-success me-1"></i> Copied!`;
-                setTimeout(() => { btn.innerHTML = origHtml; }, 2000);
-            });
+            
+            function _markCopied() {
+                if (btn) {
+                    const origHtml = btn.innerHTML;
+                    btn.innerHTML = `<i class="bi bi-check-lg text-success me-1"></i> Copied!`;
+                    setTimeout(() => { btn.innerHTML = origHtml; }, 2000);
+                }
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    _markCopied();
+                }).catch(() => {
+                    _fallbackCopy(textToCopy);
+                });
+            } else {
+                _fallbackCopy(textToCopy);
+            }
+
+            function _fallbackCopy(text) {
+                try {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = text;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-999999px";
+                    textArea.style.top = "-999999px";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    _markCopied();
+                } catch (err) {
+                    console.warn("Fallback copy error:", err);
+                }
+            }
         }
 
         function focusAiCustomInput() {
@@ -2296,6 +2407,28 @@
                 input.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const selInput = document.getElementById('aiSelectionCustomInput');
+            if (selInput) {
+                selInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        if (e.shiftKey) {
+                            // Shift + Enter: Allow natural line break
+                            return;
+                        } else {
+                            // Enter without Shift: Send message
+                            e.preventDefault();
+                            handleAiSelectionCustomSubmit(e);
+                        }
+                    }
+                });
+                selInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(Math.max(this.scrollHeight, 38), 120) + 'px';
+                });
+            }
+        });
     </script>
 
     {% block js %}{% endblock %}

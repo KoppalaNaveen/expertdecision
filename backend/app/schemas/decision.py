@@ -7,6 +7,10 @@ class DecisionCreate(BaseModel):
     description: str
     created_by: int
     category_id: Optional[int] = None
+    priority_level: Optional[str] = None
+    department: Optional[str] = None
+    decision_date: Optional[datetime] = None
+    tags: Optional[str] = None
 
 class DecisionUpdate(BaseModel):
     title: Optional[str] = None

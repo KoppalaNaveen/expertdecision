@@ -121,7 +121,7 @@
 
 {% block js %}
 <script>
-    const API_URL = "http://127.0.0.1:8000";
+    const API_URL = "/api";
     const currentUserId = parseInt("{{ session.get('user_id', 1) }}", 10);
     const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
 

@@ -587,7 +587,7 @@
         async function quickReviewAction(decisionId, reviewerId, status) {
             const comments = prompt(`Enter comments for marking this decision as ${status} (optional):`) || "";
             try {
-                const res = await fetch("http://127.0.0.1:8000/reviews/", {
+                const res = await fetch("/api/reviews/", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
