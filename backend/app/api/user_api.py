@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -234,57 +235,34 @@ def delete_user(
 
 class UpdateUserRoleRequest(BaseModel):
     role_id: int
+    actor_role: str = "Administrator"
+    actor_name: str = "Administrator"
+
+class PromoteUserResponse(BaseModel):
+    message: str
+    user_id: int
+    full_name: str
+    prev_role: str
+    new_role: str
+    prev_employee_id: str
+    new_employee_id: str
 
 class UpdateUserStatusRequest(BaseModel):
     is_active: bool
 
 # -------------------------------
-# Update User Role
+# Promote User / Update Role (Admin Only)
 # -------------------------------
-@router.put("/{user_id}/role", response_model=SuccessResponse)
-def update_user_role(user_id: int, req: UpdateUserRoleRequest, db: Session = Depends(get_db)):
-    from app.models.user import User
-    from app.models.role import Role
-    from app.services.email_service import send_role_changed_email, get_recipient_email
-    from app.services.notification_service import NotificationService
-    import threading
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    new_role_obj = db.query(Role).filter(Role.id == req.role_id).first()
-    if not new_role_obj:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    prev_role_name = user.role.role_name if user.role else "Employee"
-    new_role_name = new_role_obj.role_name
-
-    user.role_id = req.role_id
-    db.commit()
-    db.refresh(user)
-
-    # 1. In-App Notification (Independent)
-    try:
-        NotificationService.create_notification(
-            db,
-            user_id=user.id,
-            message=f"Your user role was updated from {prev_role_name} to {new_role_name}.",
-            notification_type="Role Update"
-        )
-    except Exception as notif_err:
-        print(f"Role change notification error: {notif_err}")
-
-    # 2. Automated Security/Account Email via Original Gmail (Async post-commit)
-    target_email = get_recipient_email(user)
-    if target_email:
-        threading.Thread(
-            target=send_role_changed_email,
-            args=(target_email, user.full_name, prev_role_name, new_role_name),
-            daemon=True
-        ).start()
-
-    return {"message": f"User role updated to {new_role_name} successfully"}
+@router.put("/{user_id}/role")
+@router.post("/{user_id}/promote")
+def promote_user_role(user_id: int, req: UpdateUserRoleRequest, db: Session = Depends(get_db)):
+    return UserService.promote_user(
+        db=db,
+        user_id=user_id,
+        new_role_id=req.role_id,
+        actor_role=req.actor_role or "Administrator",
+        actor_name=req.actor_name or "Administrator"
+    )
 
 
 # -------------------------------

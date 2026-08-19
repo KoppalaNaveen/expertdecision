@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+# pyrefly: ignore [missing-import]
 from fastapi import HTTPException, status
 import random
 import time
@@ -525,3 +526,136 @@ class UserService:
             threading.Thread(target=_async_del_email, args=(target_email, target_name), daemon=True).start()
 
         return {"message": "User deleted successfully"}
+
+    @staticmethod
+    def _transform_employee_id(current_emp_id: str, new_role_prefix: str, db: Session, target_user_id: int) -> str:
+        """
+        Transforms the user's Employee ID by updating the prefix to the new role's prefix
+        while strictly preserving the numeric identifier (e.g., EMP123456 -> RW123456).
+        """
+        import re
+        raw_id = (current_emp_id or "").strip()
+        digits_match = re.search(r'\d+', raw_id)
+        if digits_match:
+            digits = digits_match.group()
+        else:
+            digits = f"{random.randint(100000, 999999)}"
+
+        new_candidate = f"{new_role_prefix}{digits}"
+        
+        # Check uniqueness against other users
+        existing = db.query(User).filter(User.employee_id == new_candidate, User.id != target_user_id).first()
+        if not existing:
+            return new_candidate
+
+        # Fallback if collision occurs
+        for _ in range(50):
+            new_digits = f"{random.randint(100000, 999999)}"
+            cand = f"{new_role_prefix}{new_digits}"
+            if not db.query(User).filter(User.employee_id == cand).first():
+                return cand
+        return f"{new_role_prefix}{int(time.time()) % 1000000:06d}"
+
+    @staticmethod
+    def promote_user(db: Session, user_id: int, new_role_id: int, actor_role: str = "Administrator", actor_name: str = "Administrator"):
+        """
+        Administrator-Only User Promotion / Role Change.
+        Updates user's role, transforms Employee ID (e.g. EMP123456 -> RW123456),
+        dispatches an email to the user's Gmail with the new login ID, and records audit logs.
+        """
+        from app.models.role import Role
+
+        # 1. Authorization check: Only Administrators can promote users
+        actor_clean = (actor_role or "").strip().lower()
+        if not any(adm in actor_clean for adm in ["admin", "administrator", "system administrator"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access Denied: Only Administrators can promote or change user roles."
+            )
+
+        # 2. Fetch target user
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        # 3. Fetch target role
+        new_role_obj = db.query(Role).filter(Role.id == new_role_id).first()
+        if not new_role_obj:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target role not found.")
+
+        prev_role_name = user.role.role_name if user.role else "Employee"
+        if user.role_id == 1 or prev_role_name.strip().lower() in ["administrator", "admin", "system administrator"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is already an Administrator (the highest role) and cannot be promoted."
+            )
+
+        if user.role_id == new_role_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"User already has the role '{new_role_obj.role_name}'."
+            )
+
+        new_role_name = new_role_obj.role_name
+
+        prev_emp_id = user.employee_id or f"EMP{random.randint(100000, 999999)}"
+        new_prefix = UserService._get_role_prefix(db, new_role_id)
+        new_emp_id = UserService._transform_employee_id(prev_emp_id, new_prefix, db, user.id)
+
+        # 4. Update user record
+        from datetime import datetime, timezone
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        user.role_id = new_role_id
+        user.employee_id = new_emp_id
+        user.updated_at = now_str
+        db.commit()
+        db.refresh(user)
+
+        # 5. In-App Notification
+        try:
+            NotificationService.create_notification(
+                db,
+                user_id=user.id,
+                message=f"Your role was updated from {prev_role_name} to {new_role_name}. Your new Login Employee ID is {new_emp_id}.",
+                notification_type="Role Update"
+            )
+        except Exception as notif_err:
+            print(f"Role promotion notification note: {notif_err}")
+
+        # 6. Automated Email via Gmail to user's real email address
+        target_email = get_recipient_email(user)
+        if target_email:
+            def _async_promote_email():
+                try:
+                    send_role_changed_email(
+                        to_email=target_email,
+                        recipient_name=user.full_name,
+                        prev_role=prev_role_name,
+                        new_role=new_role_name,
+                        prev_emp_id=prev_emp_id,
+                        new_emp_id=new_emp_id,
+                        change_time=now_str
+                    )
+                except Exception as mail_err:
+                    print(f"Role change email dispatch exception: {mail_err}")
+
+            threading.Thread(target=_async_promote_email, daemon=True).start()
+
+        # 7. Audit Log
+        UserService._log_activity(
+            db,
+            user.id,
+            f"Promoted user {user.full_name}: {prev_role_name} ({prev_emp_id}) -> {new_role_name} ({new_emp_id})",
+            f"By {actor_name} ({actor_role})"
+        )
+
+        return {
+            "message": f"User successfully promoted from {prev_role_name} to {new_role_name}. New Employee ID: {new_emp_id}",
+            "user_id": user.id,
+            "full_name": user.full_name,
+            "prev_role": prev_role_name,
+            "new_role": new_role_name,
+            "prev_employee_id": prev_emp_id,
+            "new_employee_id": new_emp_id
+        }

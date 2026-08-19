@@ -80,7 +80,15 @@ EDRP is an enterprise platform for creating, evaluating, reviewing, approving, r
 - If real platform decisions, alternatives, or reviews are provided in the [Database Context], seamlessly reference them as concrete examples.
 """
 
-def generate_ai_response(user_message: str, user_name: str = "User", user_id: Optional[int] = None, conversation_history: List[dict] = None) -> Dict[str, Any]:
+def generate_ai_response(
+    user_message: str,
+    user_name: str = "User",
+    user_id: Optional[int] = None,
+    conversation_history: List[dict] = None,
+    page_context: Optional[str] = None,
+    page_title: Optional[str] = None,
+    page_url: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Generates an intelligent AI response for the EDRP Support Center.
     Queries real platform database records (RAG), attempts live LLM APIs (Gemini, OpenAI, Groq, Claude, OpenRouter),
@@ -88,14 +96,33 @@ def generate_ai_response(user_message: str, user_name: str = "User", user_id: Op
     """
     clean_msg = (user_message or "").strip()
     if not clean_msg:
+        greeting_text = f"Hello {user_name}! I am your EDRP AI Assistant."
+        if page_title:
+            greeting_text += f" I see you are on **{page_title}**."
+        greeting_text += " How can I assist you with this page or any platform and decision queries?"
         return {
-            "reply": f"Hello {user_name}! How can I assist you with the Expert Decision Replay Platform today? Ask me any question about your decisions, problem statements, alternatives, approval workflows, or audit diffs.",
-            "suggested_actions": ["How do I create a decision?", "Show my decisions", "Explain approval workflow", "How does Decision Replay work?"],
+            "reply": greeting_text,
+            "suggested_actions": ["Explain this page", "How do I create a decision?", "Show my decisions", "Explain approval workflow"],
             "source": "EDRP AI Assistant"
         }
 
     # 1. Retrieve Real Database Context (Decisions, Alternatives, Reviews)
-    db_context = _retrieve_database_context(clean_msg, user_id)
+    db_context = _retrieve_database_context(clean_msg, user_id, page_url, page_title)
+
+    # 1b. Inject Live Page Context (Screen user is actively viewing)
+    if page_context or page_title or page_url:
+        page_info_lines = ["[Active Screen Context]"]
+        if page_title:
+            page_info_lines.append(f"Screen Title: {page_title}")
+        if page_url:
+            page_info_lines.append(f"Current URL: {page_url}")
+        if page_context:
+            page_info_lines.append(f"Visible Content on Page:\n{page_context.strip()[:3500]}")
+        page_context_str = "\n".join(page_info_lines)
+        if db_context.get('summary_text'):
+            db_context['summary_text'] = f"{page_context_str}\n\n{db_context['summary_text']}"
+        else:
+            db_context['summary_text'] = page_context_str
 
     # 2. Check if this is a direct Decision Data Query (e.g. "what problem did i add for...", "my decisions", "status of DEC-28")
     data_response = _answer_decision_data_query(clean_msg, user_name, db_context)
@@ -367,7 +394,7 @@ def _call_groq_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], c
                 messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
 
-    models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "groq/compound", "groq/compound-mini"]
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
     for model in models:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -505,14 +532,15 @@ def _call_openrouter_api(clean_msg: str, user_name: str, db_context: Dict[str, A
     return None
 
 
-def _retrieve_database_context(query: str, user_id: Optional[int] = None) -> Dict[str, Any]:
+def _retrieve_database_context(query: str, user_id: Optional[int] = None, page_url: Optional[str] = None, page_title: Optional[str] = None) -> Dict[str, Any]:
     """
-    Queries the database for decisions, alternatives, and reviews matching the query or user.
+    Queries the database for decisions, alternatives, and reviews matching the query, active URL, or user.
     """
     context = {
         "matched_decisions": [],
         "user_decisions": [],
-        "summary_text": ""
+        "summary_text": "",
+        "current_decision": None
     }
 
     try:
@@ -529,14 +557,16 @@ def _retrieve_database_context(query: str, user_id: Optional[int] = None) -> Dic
         stop_words = {
             'what', 'problem', 'did', 'i', 'add', 'for', 'this', 'title', 'is', 'the',
             'a', 'an', 'in', 'of', 'to', 'my', 'decision', 'about', 'show', 'me', 'details',
-            'tell', 'give', 'how', 'when', 'why', 'who', 'where', 'which', 'we', 'are', 'was'
+            'tell', 'give', 'how', 'when', 'why', 'who', 'where', 'which', 'we', 'are', 'was',
+            'summarize', 'summary', 'page', 'current', 'explain'
         }
 
+        search_blob = f"{query} {page_url or ''} {page_title or ''}"
         q_clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', query.lower())
         q_tokens = [w for w in q_clean.split() if w not in stop_words and len(w) > 1]
 
-        # Check explicit ID match (e.g. DEC-28, #28, 28)
-        id_match = re.search(r'\b(?:dec[-_ ]?)?(\d+)\b', query, re.IGNORECASE)
+        # Check explicit ID match (e.g. DEC-28, #28, 28, /decision/27)
+        id_match = re.search(r'\b(?:dec[-_ /]?|/decision/)?(\d+)\b', search_blob, re.IGNORECASE)
         explicit_id = int(id_match.group(1)) if id_match else None
 
         scored_decisions = []
@@ -546,22 +576,22 @@ def _retrieve_database_context(query: str, user_id: Optional[int] = None) -> Dic
             creator = db.query(User).filter(User.id == d.created_by).first()
 
             alts_titles = [a.title for a in alts]
-            alts_text = " ".join([f"{a.title} {a.description or ''}" for a in alts]).lower()
+            alts_text = " ".join([f"{a.title} {a.description or ''} {a.pros or ''} {a.cons or ''}" for a in alts]).lower()
             d_text = f"{d.title} {d.description} {d.department or ''} {d.tags or ''} {alts_text}".lower()
 
             score = 0
             if explicit_id and d.id == explicit_id:
-                score += 50
+                score += 100
 
             for t in q_tokens:
                 if t in d.title.lower():
-                    score += 6
+                    score += 8
                 elif t in d.description.lower():
-                    score += 3
+                    score += 4
                 elif t in alts_text:
-                    score += 3
+                    score += 4
                 elif t in d_text:
-                    score += 1
+                    score += 2
 
             d_info = {
                 "id": d.id,
@@ -576,9 +606,10 @@ def _retrieve_database_context(query: str, user_id: Optional[int] = None) -> Dic
                 "alternatives": [
                     {
                         "title": a.title,
-                        "cost": a.cost or 0,
+                        "description": a.description or "",
+                        "cost": float(a.cost) if a.cost is not None else 0.0,
                         "feasibility_score": a.feasibility_score or 0,
-                        "risk_level": a.risk_level or "Medium",
+                        "risk_level": a.risk_level or "Low",
                         "pros": a.pros or "",
                         "cons": a.cons or ""
                     }
@@ -597,16 +628,24 @@ def _retrieve_database_context(query: str, user_id: Optional[int] = None) -> Dic
             if user_id and d.created_by == user_id:
                 context["user_decisions"].append(d_info)
 
+            if explicit_id and d.id == explicit_id:
+                context["current_decision"] = d_info
+
             if score > 0:
                 scored_decisions.append((score, d_info))
 
         scored_decisions.sort(key=lambda x: x[0], reverse=True)
         context["matched_decisions"] = [x[1] for x in scored_decisions]
 
+        # Ensure current decision is at the very top of matched_decisions
+        if context.get("current_decision") and (not context["matched_decisions"] or context["matched_decisions"][0]["id"] != context["current_decision"]["id"]):
+            context["matched_decisions"].insert(0, context["current_decision"])
+
         # Build concise summary text for LLM RAG
         lines = []
         for d in context["matched_decisions"][:4]:
-            lines.append(f"- Decision DEC-{d['id']} ('{d['title']}'): Status={d['status']}, Creator={d['creator_name']}, Problem/Description=\"{d['description']}\", Alternatives={[a['title'] for a in d['alternatives']]}")
+            alts_str = ", ".join([f"{a['title']} (${a['cost']}, Feasibility: {a['feasibility_score']}/10, Risk: {a['risk_level']})" for a in d['alternatives']])
+            lines.append(f"- Decision DEC-{d['id']} ('{d['title']}'): Status={d['status']}, Creator={d['creator_name']}, Problem/Rationale=\"{d['description']}\", Alternatives=[{alts_str}]")
         context["summary_text"] = "\n".join(lines)
 
         db.close()
@@ -821,6 +860,234 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
 - 🔒 Clarify **append-only audit logs**, field-level diffs, and compliance exports.
 """,
             "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "Show my decisions"],
+            "source": "EDRP AI Assistant"
+        }
+
+    # --- Page Guide & Summarize Current Page ---
+    is_page_inquiry = any(k in q for k in [
+        "explain this page", "summarize the current page", "summarize this page",
+        "summarize the present page", "summarize page", "summarize",
+        "what can i do here", "page guide", "what is this page", "what actions can i perform",
+        "give full detailed", "full details of this page"
+    ])
+    if is_page_inquiry:
+        summary_raw = db_context.get('summary_text', '')
+        screen_title = "EDRP Platform"
+        current_url = ""
+        visible_text = ""
+
+        if "[Active Screen Context]" in summary_raw:
+            for line in summary_raw.splitlines():
+                if line.startswith("Screen Title:"):
+                    screen_title = line.replace("Screen Title:", "").strip()
+                elif line.startswith("Current URL:"):
+                    current_url = line.replace("Current URL:", "").strip()
+            
+            if "Visible Content on Page:" in summary_raw:
+                visible_text = summary_raw.split("Visible Content on Page:")[-1].strip()
+
+        # Check if we have an active Decision loaded from DB or URL
+        current_dec = db_context.get("current_decision")
+        if not current_dec and db_context.get("matched_decisions"):
+            # If on a decision page or title mentions decision
+            if "/decision/" in current_url.lower() or "dec-" in screen_title.lower() or "dec-" in current_url.lower():
+                current_dec = db_context["matched_decisions"][0]
+
+        # ── Case A: Decision Details Page Full Breakdown ──
+        if current_dec or "/decision/" in current_url.lower() or "dec-" in screen_title.lower() or "decision:" in visible_text.lower():
+            d = current_dec if current_dec else (db_context["matched_decisions"][0] if db_context.get("matched_decisions") else None)
+            if not d:
+                # Parse structured fields from live screen context
+                dec_id_match = re.search(r'(?:dec[-_ ]?|/decision/)(\d+)', f"{current_url} {screen_title}", re.IGNORECASE)
+                dec_id_str = dec_id_match.group(1) if dec_id_match else "Current"
+                
+                status_m = re.search(r'Status:\s*([^\n\r]+)', visible_text, re.IGNORECASE)
+                status_val = status_m.group(1).strip() if status_m else "Under Review"
+
+                desc_m = re.search(r'(?:Problem Context[^\n]*|Problem Context|Rationale):\s*\n*"?([^"\n\r]+(?:\n(?!(?:Owner|Category|Evaluated Alternatives|Approval Governance Chain):)[^\n\r]+)*)"?', visible_text, re.IGNORECASE)
+                desc_val = desc_m.group(1).strip() if desc_m else "Strategic organizational decision."
+
+                owner_m = re.search(r'Owner:\s*([^\n\r\|]+)', visible_text)
+                owner_val = owner_m.group(1).strip() if owner_m else user_name
+
+                cat_m = re.search(r'Category:\s*([^\n\r\|]+)', visible_text)
+                cat_val = cat_m.group(1).strip() if cat_m else "General"
+
+                impact_m = re.search(r'Impact Level:\s*([^\n\r\|]+)', visible_text)
+                impact_val = impact_m.group(1).strip() if impact_m else "High Impact"
+
+                # Parse alternatives from visible text
+                parsed_alts = []
+                for line in visible_text.splitlines():
+                    if line.strip().startswith("- Alternative") or "Evaluated Alternatives:" in line or ("Alignment:" in line and "Cost:" in line):
+                        parsed_alts.append({
+                            "title": line.replace("-", "").strip(),
+                            "cost": 0,
+                            "feasibility_score": 0,
+                            "risk_level": "Evaluated",
+                            "pros": "",
+                            "cons": ""
+                        })
+
+                d = {
+                    "id": dec_id_str,
+                    "title": screen_title.replace("Decision:", "").strip() or f"DEC-{dec_id_str}",
+                    "status": status_val,
+                    "description": desc_val,
+                    "department": cat_val,
+                    "priority_level": impact_val,
+                    "creator_name": owner_val,
+                    "created_at": "Active",
+                    "alternatives": parsed_alts,
+                    "reviews": []
+                }
+
+            if d:
+                status_raw = d.get('status', 'Pending')
+                status_icon = "✅" if status_raw.lower() == "approved" else ("⏳" if status_raw.lower() in ["pending", "under review"] else "⚠️")
+                
+                reply_lines = [
+                    f"### 📑 Executive Decision Summary: **{d['title']}** (`DEC-{d['id']}`)\n",
+                    f"- **Current Status**: {status_icon} **{status_raw}**",
+                    f"- **Category & Department**: {d.get('department', 'General')} · Priority: **{d.get('priority_level', 'Medium')}**",
+                    f"- **Owner & Timeline**: Submitted by **{d.get('creator_name', 'User')}** ({d.get('created_at', 'Recently')})\n",
+                    "#### 🎯 Problem Statement & Strategic Context:",
+                    f"> \"{d.get('description', 'No detailed description specified.')}\"\n"
+                ]
+
+                # Alternatives evaluation breakdown
+                alts = d.get('alternatives', [])
+                if alts:
+                    reply_lines.append(f"#### ⚖️ Evaluated Alternatives ({len(alts)} Considered):")
+                    for idx, a in enumerate(alts, 1):
+                        cost_str = f"${a['cost']:,.2f}" if isinstance(a['cost'], (int, float)) and a['cost'] > 0 else "Budget TBD"
+                        score_str = f"{a['feasibility_score']}/10" if a.get('feasibility_score') else "N/A"
+                        risk_str = a.get('risk_level', 'Medium')
+                        pros_str = f" · *Pros*: {a['pros']}" if a.get('pros') else ""
+                        cons_str = f" · *Cons*: {a['cons']}" if a.get('cons') else ""
+                        rec_tag = " ⭐ **[Recommended Option]**" if idx == 1 else ""
+                        
+                        reply_lines.append(f"{idx}. **{a['title']}**{rec_tag}")
+                        reply_lines.append(f"   - **Estimated Cost**: `{cost_str}` | **Feasibility Score**: `{score_str}` | **Risk Level**: `{risk_str}`")
+                        if a.get('description'):
+                            reply_lines.append(f"   - *Details*: {a['description']}")
+                        if pros_str or cons_str:
+                            reply_lines.append(f"   - {pros_str}{cons_str}")
+                    reply_lines.append("")
+
+                # Approval Chain breakdown
+                reviews = d.get('reviews', [])
+                reply_lines.append("#### 🛡️ Approval Governance & Review Stages:")
+                if reviews:
+                    for r in reviews:
+                        r_status = r.get('status', 'Pending')
+                        r_icon = "✅" if r_status.lower() == "approved" else ("❌" if r_status.lower() == "rejected" else "⏳")
+                        r_comm = r.get('comments', 'No comments provided')
+                        reply_lines.append(f"- {r_icon} Review Stage: **{r_status}** · Reviewer Feedback: *\"{r_comm}\"*")
+                else:
+                    reply_lines.append("- ⏳ **Review Stage**: Currently under multi-stage review. Awaiting evaluations from assigned Reviewers and Managers.")
+                reply_lines.append("")
+
+                # Actionable Next Steps
+                reply_lines.extend([
+                    "#### ⚡ Key Actions You Can Take on this Page:",
+                    "- **Evaluate & Vote**: If you are an assigned Reviewer/Manager, click **Accept** or **Reject** to log your formal decision record.",
+                    "- **Edit & Refine**: Click **Edit** to modify the problem rationale, adjust financial budgets, or upload attachments.",
+                    "- **Add Options**: Click **Add Option** to include new evaluated alternative technologies or vendors.",
+                    "- **Send Reminder**: Click **Send Reminder** to ping pending reviewers with in-app email notifications.",
+                    "- **Decision Replay**: Open **Version History** to inspect chronological snapshot diffs and audit logs."
+                ])
+
+                return {
+                    "reply": "\n".join(reply_lines),
+                    "suggested_actions": [
+                        f"What is the status of DEC-{d['id']}?",
+                        f"What are the alternatives for DEC-{d['id']}?",
+                        "How does Decision Replay work?"
+                    ],
+                    "source": "EDRP Decision Engine"
+                }
+
+        # ── Case B: Internal Email Service Full Breakdown ──
+        if "email" in screen_title.lower() or "/email" in current_url.lower():
+            reply_lines = [
+                f"### 📍 Executive Guide: **Internal Email & Communication Center** (`/email`)\n",
+                "This workspace enables secure role-governed email dispatches, audit tracking, and direct notifications across all organizational members.\n",
+                "#### ✉️ Core Email Workflows & Capabilities:",
+                "1. **Compose & Send Internal Emails**:",
+                "   - Filter recipients quickly by role (**Employee**, **Reviewer**, **Manager**, **Administrator**) or type `@` to search team members by name or Employee ID.",
+                "   - Set Subject, Urgency Priority (Low/Medium/High/Urgent), and Rich Message Body.",
+                "2. **Delivery Providers**:",
+                "   - Choose between **Original Gmail Integration** or the **Project SMTP Gateway** for delivery.",
+                "3. **Edit & Resend Sent Messages**:",
+                "   - Click **Edit** on any sent email card to load the message back into the composer, refine the content, and resend it with updated notifications.",
+                "4. **Email Deletion & Cleanup**:",
+                "   - Click **Delete** on any card to purge unnecessary correspondence with real-time stats counter updates.",
+                "5. **Real-time Live Metrics**:",
+                "   - Live telemetry monitors total **Sent**, **Delivered**, and **Read** messages in the summary cards."
+            ]
+            if visible_text:
+                reply_lines.append(f"\n**Visible Activity Snapshot:**\n*{visible_text[:300]}...*")
+
+            return {
+                "reply": "\n".join(reply_lines),
+                "suggested_actions": [
+                    "How do I filter recipients by role?",
+                    "How to edit and resend an email?",
+                    "How to check delivery status?"
+                ],
+                "source": "EDRP Email Service"
+            }
+
+        # ── Case C: User Management Full Breakdown ──
+        if "user" in screen_title.lower() or "/users" in current_url.lower():
+            reply_lines = [
+                f"### 📍 Executive Guide: **Enterprise User & Role Management** (`/users`)\n",
+                "This administrative workspace manages all member accounts, role access levels, and security states.\n",
+                "#### 👥 Key Capabilities & Operations:",
+                "1. **Role Filtering & Inspection**: Filter user directory by **Employees**, **Reviewers**, **Managers**, or **Administrators**.",
+                "2. **Promotion & Demotion**: Adjust user privileges to match organizational hierarchy and approval authority.",
+                "3. **Account Activation**: Toggle active/inactive status to instantly grant or revoke platform access.",
+                "4. **Direct Communication**: Jump directly into internal email to message any employee."
+            ]
+            if visible_text:
+                reply_lines.append(f"\n**Visible User Data:**\n*{visible_text[:300]}...*")
+
+            return {
+                "reply": "\n".join(reply_lines),
+                "suggested_actions": [
+                    "How do approval tiers work?",
+                    "What permissions does a Manager have?",
+                    "How to promote an employee to Reviewer?"
+                ],
+                "source": "EDRP User Directory"
+            }
+
+        # ── Case D: General Structured Page Summary ──
+        reply_lines = [
+            f"### 📍 Executive Summary: **{screen_title}** (`{current_url or 'Active View'}`)\n",
+            f"You are currently viewing the **{screen_title}** screen in the Expert Decision Replay Platform.\n",
+            "#### 🎯 Workspace Overview & Capabilities:",
+            "- **Strategic Decision Tracking**: View, structure, and monitor multi-tier organizational decisions.",
+            "- **Audit Trail & Governance**: Inspect field-level diffs, reviewer votes, and version replays.",
+            "- **Communication & Collaboration**: Exchange context with teammates using `@` mentions and internal emails."
+        ]
+        if visible_text:
+            reply_lines.append(f"\n#### 📊 Page Context & Visible Data:\n{visible_text[:800]}\n")
+
+        reply_lines.extend([
+            "#### 💡 Recommended Next Actions:",
+            "- You can ask me to draft problem statements, compare alternatives, or audit risks.",
+            "- Use the **Quick Actions** above for one-click analysis of this page."
+        ])
+
+        return {
+            "reply": "\n".join(reply_lines),
+            "suggested_actions": [
+                "How do I create a new decision?",
+                "Explain the approval workflow",
+                "Show my decisions"
+            ],
             "source": "EDRP AI Assistant"
         }
 

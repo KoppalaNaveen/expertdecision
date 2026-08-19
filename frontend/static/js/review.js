@@ -46,7 +46,7 @@ async function getDecisionTitle(id) {
 
 function updateStats() {
     const total    = allReviews.length;
-    const pending  = allReviews.filter(r => r.status === "Pending").length;
+    const pending  = allReviews.filter(r => r.status === "Pending" || r.status === "Queued").length;
     const approved = allReviews.filter(r => r.status === "Approved").length;
     const rejected = allReviews.filter(r => r.status === "Rejected").length;
 
@@ -82,10 +82,14 @@ function filterReviews() {
 function getFilteredReviews() {
     const query = (document.getElementById("reviewSearch")?.value || "").toLowerCase();
     return allReviews.filter(r => {
-        const matchStatus = currentFilter === "all" || r.status === currentFilter;
+        let matchStatus = false;
+        if (currentFilter === "all") matchStatus = true;
+        else if (currentFilter === "Pending") matchStatus = (r.status === "Pending" || r.status === "Queued");
+        else matchStatus = (r.status === currentFilter);
+        
         const matchSearch = !query ||
             (r.reviewer_name || "").toLowerCase().includes(query) ||
-            (`DEC-${r.decision_id}`).includes(query) ||
+            (`DEC-${r.decision_id}`).toLowerCase().includes(query) ||
             (r.comments || "").toLowerCase().includes(query) ||
             (r.approval_type || "").toLowerCase().includes(query);
         return matchStatus && matchSearch;
@@ -119,8 +123,11 @@ function renderTable() {
             } else if (r.status === "Rejected") {
                 statusBadge = "Rejected";
                 statusStyle = "background:#FEF2F2;color:#DC2626;";
+            } else if (r.status === "Queued") {
+                statusBadge = "Queued (Step 1 Pending)";
+                statusStyle = "background:#F1F5F9;color:#64748B;";
             } else {
-                statusBadge = "Pending";
+                statusBadge = "Pending Action";
                 statusStyle = "background:#FFF7ED;color:#D97706;";
             }
 

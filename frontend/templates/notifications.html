@@ -126,15 +126,24 @@
         document.getElementById('count-submission').innerText = allNotifications.filter(n => n.notification_type === 'Decision Submission' || n.notification_type === 'Decision Status').length;
         document.getElementById('count-other').innerText = allNotifications.filter(n => n.notification_type === 'Discussion' || n.notification_type === 'System Update').length;
 
-        const countToDisplay = unreadCount > 0 ? unreadCount : allNotifications.length;
         document.querySelectorAll('.sidebar-notif-count').forEach(el => {
-            if (countToDisplay > 0) {
-                el.innerText = countToDisplay > 99 ? '99+' : countToDisplay;
+            if (unreadCount > 0) {
+                el.innerText = unreadCount > 99 ? '99+' : unreadCount;
                 el.style.display = 'inline-block';
             } else {
                 el.style.display = 'none';
             }
         });
+
+        const headerBadge = document.getElementById('unread-badge');
+        if (headerBadge) {
+            if (unreadCount > 0) {
+                headerBadge.innerText = unreadCount > 99 ? '99+' : unreadCount;
+                headerBadge.style.display = 'flex';
+            } else {
+                headerBadge.style.display = 'none';
+            }
+        }
     }
 
     function extractDecisionId(msg) {
@@ -201,16 +210,21 @@
             } else if (n.notification_type === 'Support Request') {
                 iconName = 'headphones';
                 bgClass = 'bg-review';
+            } else if (n.notification_type === 'Internal Email' || n.notification_type === 'Email') {
+                iconName = 'mail';
+                bgClass = 'bg-submission';
             }
 
             const decId = extractDecisionId(n.message);
-            let viewBtn = decId ? `<a href="/decision/${decId}" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">View Decision</a>` : '';
+            let viewBtn = decId ? `<a href="/decision/${decId}" onclick="markSingleNotificationRead(${n.id})" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">View Decision</a>` : '';
             if (n.notification_type === 'Support Request' || n.message.includes('SUP-') || n.message.toLowerCase().includes('support request')) {
-                viewBtn = `<a href="/support" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">View Support Center</a>`;
+                viewBtn = `<a href="/support" onclick="markSingleNotificationRead(${n.id})" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">View Support Center</a>`;
+            } else if (n.notification_type === 'Internal Email' || n.notification_type === 'Email' || n.message.toLowerCase().includes('internal email')) {
+                viewBtn = `<a href="/email" onclick="markSingleNotificationRead(${n.id})" class="btn btn-sm btn-outline-primary fw-semibold px-3" style="font-size: 12px;">Open Email Service</a>`;
             }
 
             html += `
-                <div class="notif-card ${!n.is_read ? 'unread' : ''}">
+                <div class="notif-card ${!n.is_read ? 'unread' : ''}" ${!n.is_read ? `onclick="markSingleNotificationRead(${n.id})"` : ''} style="cursor: ${!n.is_read ? 'pointer' : 'default'};">
                     <div class="notif-icon-box ${bgClass}">
                         <i data-lucide="${iconName}" style="width: 20px; height: 20px;"></i>
                     </div>
@@ -230,6 +244,15 @@
 
         container.innerHTML = html;
         if (window.lucide) lucide.createIcons();
+    }
+
+    async function markSingleNotificationRead(notifId) {
+        try {
+            await fetch(`${API_BASE}/notifications/single/${notifId}/mark-read`, { method: 'PUT' });
+            fetchFullNotifications();
+        } catch (err) {
+            console.error("Failed to mark notification as read:", err);
+        }
     }
 
     async function markAllNotificationsRead(e) {

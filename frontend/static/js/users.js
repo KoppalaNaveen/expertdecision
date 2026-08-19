@@ -29,6 +29,13 @@ document.addEventListener("DOMContentLoaded", () => {
             submitAddUserForm(e);
         });
     }
+
+    const promoteForm = document.getElementById("promoteUserForm");
+    if (promoteForm) {
+        promoteForm.addEventListener("submit", (e) => {
+            submitPromoteUser(e);
+        });
+    }
 });
 
 async function fetchRoles() {
@@ -141,6 +148,14 @@ function renderTable() {
                 </button>`;
             }
 
+            const isTargetAdmin = roleName.toLowerCase().includes('admin') || ['administrator', 'admin', 'system administrator'].includes(roleName.toLowerCase()) || u.role_id === 1;
+
+            const promoteBtn = (isAdmin && !isTargetAdmin)
+                ? `<button class="btn btn-sm btn-outline-info px-2 ms-1" style="font-size:12px; color:#6D28D9; border-color:#DDD6FE; background:#F5F3FF;" onclick="openPromoteModal(${u.id})" title="Promote / Change User Role">
+                    <i data-lucide="shield-check" style="width:13px;height:13px;" class="me-1"></i>Promote
+                   </button>`
+                : ``;
+
             const deleteBtn = isAdmin
                 ? `<button class="btn btn-sm btn-outline-danger px-2 ms-1" style="font-size:12px;" onclick="deleteUserPermanently(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Delete account permanently">
                     <i data-lucide="trash-2" style="width:13px;height:13px;" class="me-1"></i>Delete
@@ -169,6 +184,7 @@ function renderTable() {
                 <td class="px-4">${statusBadge}</td>
                 <td class="px-4 text-end">
                     ${approveBtn}
+                    ${promoteBtn}
                     <button class="btn btn-sm btn-outline-primary px-2.5 ms-1" style="font-size:12px;" onclick="viewUserDetails(${u.id})" title="View user details">
                         <i data-lucide="eye" style="width:13px;height:13px;" class="me-1"></i>View
                     </button>
@@ -414,4 +430,194 @@ function viewUserDetails(userId) {
     }
 }
 window.viewUserDetails = viewUserDetails;
+
+// =========================================================
+// Role Promotion & ID Transformation Handlers
+// =========================================================
+
+const rolePrefixMap = {
+    1: "AD",
+    2: "MN",
+    3: "EMP",
+    4: "RW"
+};
+
+function calculateNewEmpId(oldEmpId, targetRoleId) {
+    const rawId = (oldEmpId || "").trim();
+    const digitsMatch = rawId.match(/\d+/);
+    const digits = digitsMatch ? digitsMatch[0] : "123456";
+    const prefix = rolePrefixMap[targetRoleId] || "EMP";
+    return `${prefix}${digits}`;
+}
+
+function updatePromotePreview() {
+    const userId = parseInt(document.getElementById("promoteUserId")?.value, 10);
+    const targetRoleId = parseInt(document.getElementById("promoteNewRoleId")?.value, 10);
+    const u = allUsers.find(user => user.id === userId);
+    if (!u) return;
+
+    const oldId = u.employee_id || "EMP123456";
+    const newId = calculateNewEmpId(oldId, targetRoleId);
+
+    const prevEl = document.getElementById("previewOldId");
+    const nextEl = document.getElementById("previewNewId");
+    if (prevEl) prevEl.innerText = oldId;
+    if (nextEl) nextEl.innerText = newId;
+}
+window.updatePromotePreview = updatePromotePreview;
+
+function openPromoteModal(userId) {
+    const u = allUsers.find(user => user.id === userId);
+    if (!u) {
+        alert("User details not found.");
+        return;
+    }
+
+    const currentRoleName = roleMap[u.role_id] || "Employee";
+    const isTargetAdmin = currentRoleName.toLowerCase().includes('admin') || ['administrator', 'admin', 'system administrator'].includes(currentRoleName.toLowerCase()) || u.role_id === 1;
+    if (isTargetAdmin) {
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("Administrator is already the highest role and cannot be promoted.", 'warning', 'Action Not Allowed');
+        } else {
+            alert("Administrator is already the highest role and cannot be promoted.");
+        }
+        return;
+    }
+
+    const roleClass = "role-" + currentRoleName.toLowerCase().replace(/\s/g, "");
+
+    document.getElementById("promoteUserId").value = u.id;
+    document.getElementById("promoteUserName").innerText = u.full_name;
+    
+    const roleBadge = document.getElementById("promoteCurrentRoleBadge");
+    if (roleBadge) {
+        roleBadge.innerText = currentRoleName;
+        roleBadge.className = `role-badge ${roleClass}`;
+    }
+
+    const empIdEl = document.getElementById("promoteCurrentEmpId");
+    if (empIdEl) empIdEl.innerText = u.employee_id || "N/A";
+
+    const selectEl = document.getElementById("promoteNewRoleId");
+    if (selectEl) {
+        // Suggest next role in promotion path if available
+        let nextRoleId = 4; // default reviewer
+        if (u.role_id === 3) nextRoleId = 4; // Employee -> Reviewer
+        else if (u.role_id === 4) nextRoleId = 2; // Reviewer -> Manager
+        else if (u.role_id === 2) nextRoleId = 4; // Manager -> Reviewer
+        else nextRoleId = 3;
+        selectEl.value = String(nextRoleId);
+    }
+
+    const alertBox = document.getElementById("promoteAlert");
+    if (alertBox) alertBox.classList.add("d-none");
+
+    updatePromotePreview();
+
+    const modalEl = document.getElementById("promoteUserModal");
+    if (modalEl) {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
+}
+window.openPromoteModal = openPromoteModal;
+
+let isPromotingUser = false;
+
+async function submitPromoteUser(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    if (isPromotingUser) return;
+
+    const userId = parseInt(document.getElementById("promoteUserId")?.value, 10);
+    const newRoleId = parseInt(document.getElementById("promoteNewRoleId")?.value, 10);
+    const alertBox = document.getElementById("promoteAlert");
+    const submitBtn = document.getElementById("btnPromoteSubmit");
+
+    if (!userId || !newRoleId) return;
+
+    isPromotingUser = true;
+    if (alertBox) alertBox.classList.add("d-none");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Applying Promotion...";
+    }
+
+    const payload = {
+        role_id: newRoleId,
+        actor_role: typeof CURRENT_USER_ROLE !== 'undefined' ? CURRENT_USER_ROLE : "Administrator",
+        actor_name: "Administrator"
+    };
+
+    try {
+        let res;
+        try {
+            res = await fetch(`/api/users/${userId}/promote`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (res.status === 404) {
+                res = await fetch(`/api/users/${userId}/role`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+            }
+        } catch (_) {
+            res = await fetch(`/api/users/${userId}/role`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to promote user");
+        }
+
+        const data = await res.json();
+
+        // Close modal
+        const modalEl = document.getElementById("promoteUserModal");
+        if (modalEl) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.hide();
+        }
+
+        // Cleanup any leftover modal backdrop
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+
+        const successMsg = `User "${data.full_name}" promoted to ${data.new_role}! Employee ID updated: ${data.prev_employee_id} &rarr; ${data.new_employee_id}. Mail dispatched to Gmail.`;
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(successMsg, 'success', '🚀 User Promoted Successfully');
+        } else {
+            alert(successMsg);
+        }
+
+        await fetchUsers();
+    } catch (err) {
+        console.error("Promotion error:", err);
+        if (alertBox) {
+            alertBox.innerText = err.message || "Failed to promote user";
+            alertBox.classList.remove("d-none");
+        }
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(err.message || "Failed to promote user", 'error', 'Promotion Error');
+        }
+    } finally {
+        isPromotingUser = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Apply Promotion & Send Mail";
+        }
+    }
+}
+window.submitPromoteUser = submitPromoteUser;
 

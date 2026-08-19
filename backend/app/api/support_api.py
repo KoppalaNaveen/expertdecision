@@ -39,7 +39,10 @@ def ai_support_chat(req: AiSupportChatRequest, db: Session = Depends(get_db)):
         user_message=req.message,
         user_name=user_name,
         user_id=req.user_id,
-        conversation_history=req.conversation_history
+        conversation_history=req.conversation_history,
+        page_context=req.page_context,
+        page_title=req.page_title,
+        page_url=req.page_url
     )
     return AiSupportChatResponse(
         reply=response_data["reply"],

@@ -120,7 +120,9 @@ function renderDecisionDetails() {
     // Check if current user is the FIRST pending reviewer in sequential sequence
     const pendingReviews = currentDecision.reviews ? currentDecision.reviews.filter(r => r.status === "Pending") : [];
     const firstPending = pendingReviews.length > 0 ? pendingReviews[0] : null;
-    const isUserTurn = firstPending && firstPending.reviewer_id === USER_ID;
+    const curName = (typeof CURRENT_USER_NAME !== 'undefined' ? CURRENT_USER_NAME : '').trim().toLowerCase();
+    const revName = (firstPending && firstPending.reviewer_name ? firstPending.reviewer_name : '').trim().toLowerCase();
+    const isUserTurn = firstPending && (firstPending.reviewer_id === USER_ID || (revName && curName && revName === curName) || isAdmin);
 
     const actionCard = document.getElementById("pendingReviewActionCard");
     if (isUserTurn && actionCard) {
@@ -136,7 +138,10 @@ function submitDetailReviewAction(status) {
     const title = currentDecision ? currentDecision.title : `Decision #${DECISION_ID}`;
     const creator = currentDecision ? (currentDecision.creator_name || 'Author') : 'Author';
     const category = currentDecision ? (currentDecision.category || 'General') : 'General';
-    openApprovalWorkflowModal(DECISION_ID, title, USER_ID, status, creator, category);
+    const pendingReviews = currentDecision.reviews ? currentDecision.reviews.filter(r => r.status === "Pending") : [];
+    const firstPending = pendingReviews.length > 0 ? pendingReviews[0] : null;
+    const reviewerIdToUse = firstPending ? firstPending.reviewer_id : USER_ID;
+    openApprovalWorkflowModal(DECISION_ID, title, reviewerIdToUse, status, creator, category);
 }
 
 function renderApprovalChain() {

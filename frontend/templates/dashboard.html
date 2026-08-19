@@ -615,10 +615,9 @@
             .then(r => r.json())
             .then(data => {
                 const unread = data.filter(n => !n.is_read).length;
-                const countToDisplay = unread > 0 ? unread : data.length;
                 document.querySelectorAll('.sidebar-notif-count').forEach(el => {
-                    if (countToDisplay > 0) {
-                        el.innerText = countToDisplay > 99 ? '99+' : countToDisplay;
+                    if (unread > 0) {
+                        el.innerText = unread > 99 ? '99+' : unread;
                         el.style.display = 'inline-block';
                     } else {
                         el.style.display = 'none';

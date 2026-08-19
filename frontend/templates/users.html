@@ -255,6 +255,88 @@
     </div>
 </div>
 
+<!-- Promote User Modal (Admin only) -->
+<div class="modal fade" id="promoteUserModal" tabindex="-1" aria-labelledby="promoteUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;">
+            <div class="modal-header border-bottom-0 pb-0">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:34px;height:34px;background:#EEF2FF;color:#4F46E5;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                        <i data-lucide="shield-check" style="width:18px;height:18px;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark mb-0" id="promoteUserModalLabel" style="font-size:16px;">Promote / Change User Role</h5>
+                        <p class="text-muted small mb-0" style="font-size:11px;">Update user role and automatically transform Employee ID</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="promoteUserForm">
+                <input type="hidden" id="promoteUserId">
+                <div class="modal-body py-3">
+                    <div class="p-3 mb-3" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="text-muted small" style="font-size:11px;">User:</div>
+                                <div id="promoteUserName" class="fw-bold text-dark" style="font-size:13px;">—</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted small" style="font-size:11px;">Current Role:</div>
+                                <span id="promoteCurrentRoleBadge" class="role-badge role-employee">—</span>
+                            </div>
+                            <div class="col-12 mt-2">
+                                <div class="text-muted small" style="font-size:11px;">Current Employee ID:</div>
+                                <code id="promoteCurrentEmpId" style="background:#E2E8F0;color:#0F172A;padding:2px 8px;border-radius:4px;font-size:12.5px;font-weight:700;">—</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark mb-1" style="font-size:12px;">Select New Role *</label>
+                        <select id="promoteNewRoleId" class="form-select" onchange="updatePromotePreview()" required>
+                            <option value="3">Employee (EMP Prefix)</option>
+                            <option value="4">Reviewer (RW Prefix)</option>
+                            <option value="2">Manager (MN Prefix)</option>
+                            <option value="1">Administrator (AD Prefix)</option>
+                        </select>
+                    </div>
+
+                    <!-- Live ID Transformation Preview Card -->
+                    <div class="p-3 mb-2" style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:12px;">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="small fw-bold" style="color:#6D28D9;font-size:11.5px;text-transform:uppercase;letter-spacing:0.04em;">Employee ID Transformation</span>
+                            <span class="badge bg-white text-primary border" style="font-size:10.5px;">Auto-Calculated</span>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-center gap-3 py-1">
+                            <div class="text-center">
+                                <div class="text-muted" style="font-size:10px;">Old ID</div>
+                                <code id="previewOldId" style="font-size:13px;text-decoration:line-through;color:#6B7280;background:#fff;padding:2px 8px;border-radius:4px;border:1px solid #E2E8F0;">—</code>
+                            </div>
+                            <div style="font-size:18px;color:#7C3AED;font-weight:bold;">&rarr;</div>
+                            <div class="text-center">
+                                <div class="text-muted" style="font-size:10px;font-weight:bold;color:#7C3AED;">New ID</div>
+                                <code id="previewNewId" style="font-size:15px;font-weight:800;color:#1E1B4B;background:#fff;padding:3px 10px;border-radius:6px;border:2px solid #7C3AED;">—</code>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-muted small d-flex align-items-start gap-1" style="font-size:11px;line-height:1.4;">
+                            <i data-lucide="mail" style="width:13px;height:13px;color:#7C3AED;flex-shrink:0;margin-top:1px;"></i>
+                            <span>The new Employee ID will be emailed to the user's Gmail account.</span>
+                        </div>
+                    </div>
+
+                    <div id="promoteAlert" class="alert alert-danger py-1.5 px-2 small d-none" role="alert"></div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="btnPromoteSubmit" class="btn btn-primary btn-sm px-4 fw-bold" style="background:#7C3AED;border-color:#7C3AED;">
+                        Apply Promotion &amp; Send Mail
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
     const API_URL = "/api";
     const CURRENT_USER_ROLE = "{{ session.get('role_name', 'Employee') }}";

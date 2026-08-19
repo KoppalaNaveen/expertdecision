@@ -38,6 +38,9 @@ class AiSupportChatRequest(BaseModel):
     user_name: Optional[str] = "User"
     category: Optional[str] = "General"
     conversation_history: Optional[List[dict]] = []
+    page_context: Optional[str] = None
+    page_title: Optional[str] = None
+    page_url: Optional[str] = None
 
 class AiSupportChatResponse(BaseModel):
     reply: str

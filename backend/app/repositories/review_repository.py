@@ -94,18 +94,33 @@ class ReviewRepository:
                     except Exception as e:
                         print("Notification error:", e)
                 else:
-                    # Find next pending reviewer in sequence (e.g. Manager)
-                    next_rev = next((r for r in all_revs if r.status == "Pending"), None)
+                    # Promote next queued reviewer in sequence (e.g. Manager) to Pending
+                    next_rev = next((r for r in all_revs if r.status == "Queued"), None)
                     if next_rev:
+                        next_rev.status = "Pending"
+                        db.commit()
+                        db.refresh(next_rev)
                         try:
                             NotificationService.create_notification(
                                 db,
                                 user_id=next_rev.reviewer_id,
-                                message=f"Pending review for decision 'DEC-{dec.id}: {dec.title}' approved by previous reviewer and awaiting your decision.",
+                                message=f"Review step approved by reviewer. Decision 'DEC-{dec.id}: {dec.title}' is now awaiting your Manager approval.",
                                 notification_type="Review Request"
                             )
                         except Exception as e:
                             print("Notification error:", e)
+                    else:
+                        pending_rev = next((r for r in all_revs if r.status == "Pending"), None)
+                        if pending_rev:
+                            try:
+                                NotificationService.create_notification(
+                                    db,
+                                    user_id=pending_rev.reviewer_id,
+                                    message=f"Pending review for decision 'DEC-{dec.id}: {dec.title}' approved by previous reviewer and awaiting your decision.",
+                                    notification_type="Review Request"
+                                )
+                            except Exception as e:
+                                print("Notification error:", e)
 
         # Trigger live notifications for action
         try:
@@ -118,9 +133,24 @@ class ReviewRepository:
     @staticmethod
     def get_all_reviews(db: Session, user_id: int = None):
         from app.models.decision import Decision
+        from app.models.user import User
         query = db.query(Review)
         if user_id:
-            query = query.join(Decision, Review.decision_id == Decision.id).filter(Decision.created_by == user_id)
+            user = db.query(User).filter(User.id == user_id).first()
+            if user:
+                is_admin = user.role and "admin" in user.role.role_name.lower()
+                if not is_admin:
+                    target_uids = [user.id]
+                    if user.email:
+                        linked_emails = db.query(User.id).filter(User.email == user.email).all()
+                        target_uids.extend([l[0] for l in linked_emails])
+                    if user.full_name:
+                        linked_names = db.query(User.id).filter(User.full_name == user.full_name).all()
+                        target_uids.extend([l[0] for l in linked_names])
+                    target_uids = list(set(target_uids))
+                    query = query.filter(Review.reviewer_id.in_(target_uids))
+            else:
+                query = query.filter(Review.reviewer_id == user_id)
         return query.order_by(Review.id.desc()).all()
 
     @staticmethod

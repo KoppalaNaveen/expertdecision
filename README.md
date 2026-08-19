@@ -1,83 +1,61 @@
-# Expert Decision Replay Platform (EDRP) — Milestone 3
+# Expert Decision Replay Platform (EDRP)
 
-## Milestone 3 Executive Summary
+## Project Overview
 
-
-Milestone 3 completes the core enterprise requirements of the **Expert Decision Replay Platform (EDRP)**, delivering:
-1. **Append-Only Structured Audit Logging** with field-level before/after diff tracking and database-level immutability triggers.
-2. **Configurable Multi-Tier Approval Chains** supporting dynamic routing, sequential reviewer evaluations, and SLA notifications.
-3. **Interactive Decision Replay & Versioning Engine** providing point-in-time snapshotting and visual historical playback.
-4. **Reviewer Workspace & Role-Tailored Dashboards** for Administrators, Managers, Reviewers, and Employees.
-5. **Security Hardening & Access Control** with PostgreSQL Row-Level Security (RLS), least-privilege database roles, 6-digit SMTP OTP onboarding, and 72-hour persistent sessions.
-6. **Enterprise Settings & Support Ticketing System** for platform configuration, SMTP controls, and user issue resolution.
+The Expert Decision Replay Platform (EDRP) is an enterprise-grade decision intelligence and audit management platform. It captures, evaluates, reviews, and replays organizational decisions so institutional knowledge is preserved, auditable, and accessible across teams.
 
 ---
 
-## Key Modules Implemented in Milestone 3
+## Key Project Milestones
 
-### 1. Structured & Append-Only Audit Logging System
-An enterprise-grade audit trail designed for regulatory compliance (SOC 2, ISO 27001) that tracks every state change across the platform:
-- **Structured Log Model (`AuditLog`)**: Captures actor ID, action type, entity type, entity ID, JSON diffs, client IP address, User-Agent, and timestamps.
-- **Field-Level Diff Engine (`diff.py`)**: Computes granular per-field differences between previous and updated states (`before`/`after`).
-- **Database Immutability Triggers**: PostgreSQL triggers block any `UPDATE` or `DELETE` operations on the `audit_logs` table to guarantee an append-only, tamper-proof record.
-- **Decision Audit Trail Timeline API**: Aggregates decision versions, reviewer assessments, comments, uploads, and audit records into a single unified timeline.
-- **Live Polling Audit Viewer**: Real-time 5-second polling interface with multi-criteria filtering (Entity, Actor, Action, Date Range) and one-click CSV export.
-
----
-
-### 2. Configurable Multi-Tier Approval Chains
-A dynamic workflow engine for routing and approving strategic decisions:
-- **Dynamic Approval Chain Configs**: Admin-configurable multi-step approval workflows based on decision category and budget threshold rules.
-- **Reviewer Evaluation States**:
-  - **Approve**: Advances decision to next approval stage or finalizes to `Approved`.
-  - **Reject**: Terminated with mandatory justification comment; alerts creator.
-  - **Request Revision**: Reverts decision status to `Draft`; creator updates and resubmits, creating version `v2`.
-- **Reviewer Assignment & Notifications**: Reviewers assigned directly via UI; automated alerts dispatched via in-app notifications and background SMTP emails.
+### Milestone 1: Core Architecture, Database Design & Secure Authentication
+- Designed and initialized the complete relational database schema supporting users, roles, teams, decisions, alternatives, reviews, replays, attachments, discussion threads, meeting notes, notifications, activity logs, support tickets, and system settings.
+- Built a secure authentication system using cryptographic password hashing, access token management, and persistent multi-day sessions.
+- Developed a multi-step user onboarding workflow featuring real-time 6-digit email verification codes before account activation.
+- Created automated role-based identifier generation assigning unique prefixed IDs for Administrators, Managers, Reviewers, and Employees.
+- Implemented an administrative verification pipeline where newly registered accounts undergo review and approval before gaining system access.
+- Structured the complete backend API ecosystem and established modular services and repository layers.
 
 ---
 
-### 3. Interactive Decision Replay & Versioning Engine
-Preserves the complete evolution of organizational decisions:
-- **Automated Version Snapshots**: Stores complete JSON state snapshots whenever a decision is submitted, reviewed, or modified.
-- **Visual Replay Viewer**: Step-by-step playback interface allowing stakeholders to inspect who contributed, what alternatives were evaluated, what meeting notes were captured, and why final consensus was reached.
+### Milestone 2: Decision Lifecycle, Alternative Analysis & Team Collaboration
+- Developed the complete end-to-end decision lifecycle covering Draft, Under Review, Approved, Rejected, and Archived states.
+- Built the Alternative Analysis engine allowing creators to compare multiple competing options with detailed pros, cons, financial estimates, risk ratings, feasibility scores, and designated recommendations.
+- Implemented document attachment and file upload capabilities supporting technical specifications, architectural diagrams, and project sheets.
+- Added meeting notes recording and collaborative discussion threads directly linked to decisions.
+- Created the centralized Knowledge Repository offering multi-parameter search, category filtering, tag navigation, and instant retrieval.
+- Developed an in-app notification center with real-time status alerts, unread counts, and priority-level badges.
 
 ---
 
-### 4. Reviewer Workspace & Role-Tailored Dashboards
-Specialized interfaces for all 4 user roles:
-- **Reviewer Dashboard**: Pending review queue, side-by-side alternative comparison, and fast-action approval/rejection modal.
-- **Admin Dashboard**: Org-wide decision analytics, pending user approval queue, user directory, system settings, and global audit log.
-- **Manager Dashboard**: Team decisions, financial impact totals, member activity overview, and escalation handling.
-- **Employee Dashboard**: Personal decision tracker, draft resume panel, assigned reviews, and notification feed.
+### Milestone 3: Audit Trail, Replay Engine, Multi-Tier Approvals & Role Dashboards
+- Engineered an append-only audit logging architecture capturing actor identity, action type, entity details, IP addresses, client environments, and timestamps.
+- Implemented granular before-and-after change detection to track every modification across all platform entities.
+- Built configurable multi-tier approval chains supporting sequential reviewer assessments, change requests, rejection explanations, and final sign-offs.
+- Created the interactive Decision Replay Engine that takes snapshot versions of decisions and allows stakeholders to visually step through the entire history.
+- Designed 4 dedicated, role-tailored workspaces:
+  - Administrator Workspace for user approvals, platform health, global audit trails, and security settings.
+  - Manager Workspace for team-level decisions, financial impact tracking, and escalation routing.
+  - Reviewer Workspace for evaluation queues, alternative comparisons, and one-click review actions.
+  - Employee Workspace for drafting decisions, tracking submissions, and managing assigned tasks.
+- Added administrative system settings and an in-app support ticketing system for issue tracking and resolution.
 
 ---
 
-### 5. Enterprise Security & Hardened Onboarding
-- **Multi-Step OTP Registration**: Cryptographic 6-digit OTP dispatched via SMTP email before password setup.
-- **Auto-Generated Role-Prefixed IDs**: Automatic identifier assignment (`AD-xxx`, `MN-xxx`, `RW-xxx`, `EMP-xxx`).
-- **Admin Verification Queue**: Newly registered accounts remain in `Pending Approval` until verified by an Administrator.
-- **Row-Level Security (RLS)**: PostgreSQL RLS policies restrict audit log access to authorized roles.
-- **Least-Privilege Database Role**: Application connections utilize `edrp_app` restricted to `SELECT` and `INSERT` on audit tables.
-- **Persistent Sessions**: 72-hour persistent login with JWT tokens and Flask session security.
-- **Telemetry Capture**: Client IP addresses and browser User-Agent strings stored in every audit log entry.
+### Milestone 4: AI Decision Intelligence, Search & Advanced Notification System
+- Integrated an AI Knowledge Assistant powered by retrieval-augmented intelligence to analyze historical decisions and answer organizational queries.
+- Built automated AI decision summaries, risk factor evaluations, and recommendation insights.
+- Implemented an automated email notification system delivering branded HTML notifications for account approvals, role changes, status updates, password changes, and decision review outcomes.
+- Added an intelligent deliverability filter that automatically detects and prevents delivery attempts to simulated or test addresses, eliminating bounce-back notices.
+- Built system analytics covering decision completion rates, review turnaround times, approval trends, and team productivity metrics.
+- Developed automated backup management and administrative data export features.
 
 ---
 
-### 6. Enterprise Collaboration, Settings & Support Ticketing
-- **Discussion Threads & Comments**: Threaded commenting and collaboration tied directly to decisions.
-- **Meeting Notes**: Capture offline meeting minutes, attendee lists, and trade-off summaries.
-- **System Settings Console**: Administrative control over SMTP credentials, maintenance mode, and session policies.
-- **Support Ticketing System**: In-app support request submission with real-time status tracking (Open, In Progress, Resolved).
+## Core Capabilities Summary
 
----
-
-## Milestone 3 Deliverables Summary
-
-| Component | Quantity | Details |
-|---|:---:|---|
-| **Database Tables** | **18** | PostgreSQL 15 schema with RLS, triggers, JSONB, and foreign keys |
-| **API Routers** | **20** | FastAPI endpoints on Port 8000 with OpenAPI / Swagger documentation |
-| **UI Templates** | **36** | Jinja2 templates styled with Glassmorphism dark theme |
-| **ORM Models** | **19** | SQLAlchemy models with cascade rules and relationships |
-| **Business Services** | **17** | Decoupled business logic services and repositories |
-| **Frontend JS Modules** | **14** | Asynchronous ES6+ modules with Fetch API |
+- Structured Decision Capture: Standardized templates ensuring all necessary context, risks, and alternatives are documented upfront.
+- Historical Replay & Versioning: Complete visibility into how decisions evolved over time and why specific choices were made.
+- Enterprise Security & Compliance: Granular role-based access control, tamper-evident audit logs, and secure authentication flows.
+- Intelligent Knowledge Retrieval: Instant lookup of past organizational decisions with AI-assisted querying.
+- Multi-Channel Alerts: Coordinated in-app notifications and email updates keeping all stakeholders aligned.

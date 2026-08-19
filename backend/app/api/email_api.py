@@ -168,3 +168,120 @@ def mark_email_read(email_id: int, db: Session = Depends(get_db)):
     email.status = "Read"
     db.commit()
     return {"message": "Email marked as read"}
+
+@router.put("/update/{email_id}", response_model=InternalEmailResponse)
+@router.put("/{email_id}", response_model=InternalEmailResponse)
+def update_and_resend_email(email_id: int, req: InternalEmailCreate, db: Session = Depends(get_db)):
+    email = db.query(InternalEmail).filter(InternalEmail.id == email_id).first()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    sender = db.query(User).filter(User.id == req.sender_id).first()
+    if not sender:
+        raise HTTPException(status_code=404, detail="Sender user not found")
+
+    delivery_method = (req.delivery_method or "gmail").lower().strip()
+    if delivery_method not in ["gmail", "smtp"]:
+        delivery_method = "gmail"
+
+    email.recipient_type = req.recipient_type or "Employee"
+    email.recipient_names = req.recipient_names.strip()
+    email.subject = req.subject.strip()
+    email.priority = req.priority or "Medium"
+    email.message = req.message.strip()
+    email.attachment_name = req.attachment_name
+    email.status = "Delivered"
+    email.created_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(email)
+
+    # Activity log
+    try:
+        log = ActivityLog(
+            user_id=req.sender_id,
+            action=f"Edited & resent email #{email_id} to {email.recipient_names[:30]}",
+            details=f"Subject: {email.subject[:40]} | Method: {delivery_method}"
+        )
+        db.add(log)
+        db.commit()
+    except Exception as e:
+        print(f"Error logging email activity: {e}")
+
+    # In-App Notifications to recipients
+    matched_recipient_emails = []
+    try:
+        all_users = db.query(User).all()
+        for u in all_users:
+            if u.id != req.sender_id:
+                rec_text = req.recipient_names.lower()
+                name_match = u.full_name and u.full_name.lower() in rec_text
+                id_match = u.employee_id and u.employee_id.lower() in rec_text
+                email_match = u.email and u.email.lower() in rec_text
+                orig_email_match = getattr(u, 'email_original', None) and u.email_original.lower() in rec_text
+                
+                if name_match or id_match or email_match or orig_email_match or req.recipient_type == "All":
+                    if u.email:
+                        matched_recipient_emails.append(u.email)
+                    NotificationService.create_notification(
+                        db,
+                        user_id=u.id,
+                        message=f"You received an internal email from {sender.full_name}: '{email.subject}'",
+                        notification_type="Internal Email"
+                    )
+    except Exception as notif_err:
+        print(f"Error notifying email recipients on update: {notif_err}")
+
+    for word in req.recipient_names.replace(",", " ").replace(";", " ").split():
+        clean_word = word.strip()
+        if "@" in clean_word and "." in clean_word and clean_word not in matched_recipient_emails:
+            matched_recipient_emails.append(clean_word)
+
+    if matched_recipient_emails:
+        target_emails = list(set(matched_recipient_emails))
+        sender_name = sender.full_name or "EDRP User"
+        subj = email.subject
+        msg_body = email.message
+        prio = email.priority
+
+        def _async_dispatch_email():
+            for dest_email in target_emails:
+                try:
+                    send_smtp_service_email(
+                        to_email=dest_email,
+                        sender_name=sender_name,
+                        subject=subj,
+                        message=msg_body,
+                        priority=prio,
+                        delivery_method=delivery_method
+                    )
+                except Exception as mail_err:
+                    print(f"Email delivery error ({delivery_method}) to {dest_email}: {mail_err}")
+
+        threading.Thread(target=_async_dispatch_email, daemon=True).start()
+
+    res = InternalEmailResponse.from_orm(email)
+    res.sender_name = sender.full_name
+    res.sender_role = sender.role.role_name if sender.role else "Employee"
+    res.sender_initials = "".join([p[0].upper() for p in sender.full_name.split()])[:2] if sender.full_name else "U"
+    return res
+
+@router.delete("/delete/{email_id}")
+@router.delete("/{email_id}")
+def delete_email(email_id: int, db: Session = Depends(get_db)):
+    email = db.query(InternalEmail).filter(InternalEmail.id == email_id).first()
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    try:
+        log = ActivityLog(
+            user_id=email.sender_id,
+            action=f"Deleted email #{email_id}",
+            details=f"Subject: {email.subject[:40]}"
+        )
+        db.add(log)
+    except Exception:
+        pass
+
+    db.delete(email)
+    db.commit()
+    return {"message": "Email deleted successfully"}

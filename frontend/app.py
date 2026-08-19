@@ -54,7 +54,17 @@ def disable_client_caching(response):
     return response
 
 # FastAPI Backend URL (Server-side Flask to FastAPI communication)
-API_URL = os.getenv("BACKEND_URL", os.getenv("API_URL", "http://127.0.0.1:8000")).rstrip("/")
+def _resolve_backend_url():
+    env_url = os.getenv("BACKEND_URL", os.getenv("API_URL", "http://127.0.0.1:8000")).rstrip("/")
+    if "://backend" in env_url:
+        import socket
+        try:
+            socket.gethostbyname("backend")
+        except Exception:
+            return "http://127.0.0.1:8000"
+    return env_url
+
+API_URL = _resolve_backend_url()
 
 def make_backend_request(method, path, **kwargs):
     """
@@ -67,7 +77,7 @@ def make_backend_request(method, path, **kwargs):
     seen = set()
     unique_urls = []
     for u in urls:
-        if u not in seen:
+        if u and u not in seen:
             seen.add(u)
             unique_urls.append(u)
 
@@ -117,8 +127,8 @@ def inject_global_stats():
         
     try:
         headers = {"Authorization": f"Bearer {token}"}
-        response = http_session.get(f"{API_URL}/dashboard/{user_id}", headers=headers, timeout=0.6)
-        if response.status_code == 200:
+        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=0.6)
+        if response is not None and response.status_code == 200:
             data = response.json()
             fresh = {
                 "unread_notifications_count": data.get("unread_notifications_count", 0),
@@ -195,7 +205,7 @@ def login():
             session["initials"] = (parts[0][0] + (parts[-1][0] if len(parts) > 1 else "")).upper()
 
             try:
-                requests.post(f"{API_URL}/audit/log", json={
+                make_backend_request("POST", "/audit/log", json={
                     "user_id": token["user_id"],
                     "action": f"User login successful: {full_name}",
                     "details": f"Role: {session['role_name']}"
@@ -379,8 +389,8 @@ def pending_approvals():
         return redirect(url_for("dashboard"))
 
     try:
-        response = requests.get(f"{API_URL}/users/pending", timeout=5)
-        pending_users = response.json() if response.status_code == 200 else []
+        response = make_backend_request("GET", "/users/pending", timeout=5)
+        pending_users = response.json() if (response is not None and response.status_code == 200) else []
     except Exception:
         pending_users = []
 
@@ -391,8 +401,10 @@ def pending_approvals():
 def api_check_employee_id():
     data = request.json
     try:
-        response = requests.post(f"{API_URL}/users/check-employee-id", json=data, timeout=5)
-        return jsonify(response.json()), response.status_code
+        response = make_backend_request("POST", "/users/check-employee-id", json=data, timeout=5)
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Error checking Employee ID"}), 500
     except Exception:
         return jsonify({"detail": "Error checking Employee ID"}), 500
 
@@ -407,8 +419,16 @@ def api_delete_user(user_id):
         return jsonify({"detail": "Access Denied: Only Administrators can delete accounts."}), 403
 
     try:
-        response = requests.delete(f"{API_URL}/users/{user_id}", timeout=30)
-        return jsonify(response.json()), response.status_code
+        headers = {}
+        if "token" in session:
+            headers["Authorization"] = f"Bearer {session['token']}"
+        response = make_backend_request("DELETE", f"/users/{user_id}", headers=headers, timeout=30)
+        if response is not None:
+            try:
+                return jsonify(response.json()), response.status_code
+            except Exception:
+                return jsonify({"detail": response.text or "Deleted"}), response.status_code
+        return jsonify({"detail": "Backend connection error. Ensure FastAPI server is running."}), 500
     except Exception as e:
         return jsonify({"detail": f"Error deleting user: {e}"}), 500
 
@@ -423,10 +443,13 @@ def api_delete_support_ticket(ticket_id):
         return jsonify({"detail": "Access Denied: Only Administrators can delete support tickets."}), 403
 
     try:
-        response = http_session.delete(f"{API_URL}/support/{ticket_id}", timeout=5)
-        if response.status_code == 404:
-            response = http_session.delete(f"{API_URL}/support/delete/{ticket_id}", timeout=5)
-        return jsonify(response.json()), response.status_code
+        headers = {"Authorization": f"Bearer {session['token']}"}
+        response = make_backend_request("DELETE", f"/support/{ticket_id}", headers=headers, timeout=5)
+        if response is not None and response.status_code == 404:
+            response = make_backend_request("DELETE", f"/support/delete/{ticket_id}", headers=headers, timeout=5)
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Error deleting support ticket"}), 500
     except Exception as e:
         return jsonify({"detail": f"Error deleting support ticket: {e}"}), 500
 
@@ -443,8 +466,8 @@ def api_support_ai_chat():
 
     # 1. Primary: Forward to FastAPI backend (which runs live Groq LLM with hot reload)
     try:
-        response = http_session.post(f"{API_URL}/support/ai-chat", json=data, timeout=15)
-        if response.status_code == 200:
+        response = make_backend_request("POST", "/support/ai-chat", json=data, timeout=15)
+        if response is not None and response.status_code == 200:
             return jsonify(response.json()), 200
     except Exception as e:
         print(f"AI chat backend forward note: {e}")
@@ -667,13 +690,18 @@ def api_pending_approval_action():
     if role not in ("Administrator", "Admin"):
         return jsonify({"detail": "Forbidden: Admin access required"}), 403
 
-    data = request.json
+    data = request.json or {}
     data["actor_name"] = session.get("full_name", "Administrator")
-    endpoint = f"{API_URL}/users/{data.get('action')}"
+    action = data.get('action')
     
     try:
-        response = requests.post(endpoint, json=data, timeout=5)
-        return jsonify(response.json()), response.status_code
+        headers = {}
+        if "token" in session:
+            headers["Authorization"] = f"Bearer {session['token']}"
+        response = make_backend_request("POST", f"/users/{action}", json=data, headers=headers, timeout=10)
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Error processing approval action"}), 500
     except Exception:
         return jsonify({"detail": "Error processing approval action"}), 500
 
@@ -733,15 +761,16 @@ def admin_create_user_proxy():
         return jsonify({"detail": "Unauthorized. Please log in as Admin."}), 401
     data = request.json
     try:
-        response = requests.post(
-            f"{API_URL}/users/admin_create",
-            json=data,
-            timeout=10
-        )
-        try:
-            return jsonify(response.json()), response.status_code
-        except Exception:
-            return jsonify({"detail": response.text or "Error creating user"}), response.status_code
+        headers = {}
+        if "token" in session:
+            headers["Authorization"] = f"Bearer {session['token']}"
+        response = make_backend_request("POST", "/users/admin_create", json=data, headers=headers, timeout=10)
+        if response is not None:
+            try:
+                return jsonify(response.json()), response.status_code
+            except Exception:
+                return jsonify({"detail": response.text or "Error creating user"}), response.status_code
+        return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
     except requests.exceptions.RequestException as e:
         return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
     except ValueError:
@@ -779,10 +808,10 @@ def api_decisions():
         if "token" in session:
             headers["Authorization"] = f"Bearer {session['token']}"
 
-        response = requests.get(f"{API_URL}/decisions/", params=params, headers=headers, timeout=5)
-        if response.status_code == 200:
+        response = make_backend_request("GET", "/decisions/", params=params, headers=headers, timeout=5)
+        if response is not None and response.status_code == 200:
             return jsonify(response.json()), 200
-        return jsonify([]), response.status_code
+        return jsonify([]), response.status_code if response is not None else 500
     except Exception as e:
         print(f"Error fetching decisions in frontend proxy: {e}")
         return jsonify([]), 500
@@ -797,8 +826,10 @@ def get_notifications(user_id):
         return jsonify({"detail": "Unauthorized"}), 401
     headers = {"Authorization": f"Bearer {session['token']}"}
     try:
-        response = requests.get(f"{API_URL}/notifications/{user_id}", headers=headers, timeout=5)
-        return jsonify(response.json()), response.status_code
+        response = make_backend_request("GET", f"/notifications/{user_id}", headers=headers, timeout=5)
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify([]), 200
     except Exception as e:
         return jsonify([]), 200
 
@@ -808,8 +839,10 @@ def mark_all_read(user_id):
         return jsonify({"detail": "Unauthorized"}), 401
     headers = {"Authorization": f"Bearer {session['token']}"}
     try:
-        response = requests.put(f"{API_URL}/notifications/{user_id}/mark-all-read", headers=headers, timeout=5)
-        return jsonify(response.json()), response.status_code
+        response = make_backend_request("PUT", f"/notifications/{user_id}/mark-all-read", headers=headers, timeout=5)
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Error"}), 500
     except Exception as e:
         return jsonify({"detail": "Error"}), 500
 
@@ -819,8 +852,10 @@ def clear_all_notifications(user_id):
         return jsonify({"detail": "Unauthorized"}), 401
     headers = {"Authorization": f"Bearer {session['token']}"}
     try:
-        response = requests.delete(f"{API_URL}/notifications/{user_id}/clear-all", headers=headers, timeout=5)
-        return jsonify(response.json()), response.status_code
+        response = make_backend_request("DELETE", f"/notifications/{user_id}/clear-all", headers=headers, timeout=5)
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Error"}), 500
     except Exception as e:
         return jsonify({"detail": "Error"}), 500
 
@@ -831,10 +866,10 @@ def api_get_dashboard():
     headers = {"Authorization": f"Bearer {session['token']}"}
     user_id = session["user_id"]
     try:
-        response = requests.get(f"{API_URL}/dashboard/{user_id}", headers=headers, timeout=5)
-        if response.status_code == 200:
+        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=5)
+        if response is not None and response.status_code == 200:
             return jsonify(response.json()), 200
-        return jsonify({}), response.status_code
+        return jsonify({}), response.status_code if response is not None else 500
     except Exception:
         return jsonify({}), 500
 

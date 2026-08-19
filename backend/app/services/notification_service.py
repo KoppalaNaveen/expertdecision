@@ -7,7 +7,7 @@ from app.models.decision import Decision
 from app.models.review import Review
 from typing import List, Optional
 from datetime import datetime, timezone
-from app.services.email_service import send_notification_email
+from app.services.email_service import send_notification_email, send_decision_outcome_email, get_recipient_email
 
 class NotificationService:
 
@@ -64,12 +64,12 @@ class NotificationService:
                 db.rollback()
                 print(f"Failed to create in-app notification: {e}")
 
-        # 3. Dispatch Real-Time Email Notification if enabled
+        # 3. Dispatch Real-Time Email Notification to Gmail if enabled
         if allow_email:
             try:
                 recipient = db.query(User).filter(User.id == user_id).first()
-                if recipient and recipient.email:
-                    target_email = recipient.email
+                target_email = get_recipient_email(recipient)
+                if target_email:
                     recipient_name = recipient.full_name or "User"
                     
                     def _async_email():
@@ -156,14 +156,36 @@ class NotificationService:
         
         status_text = status.capitalize()
         
-        # 1. Creator Notification
+        # 1. Creator Notification & Direct Gmail Outcome Email
         if decision.created_by != reviewer_id:
+            creator = db.query(User).filter(User.id == decision.created_by).first()
+            creator_email = get_recipient_email(creator)
+            creator_name = creator.full_name if creator else "Decision Owner"
+
             NotificationService.create_notification(
                 db,
                 user_id=decision.created_by,
                 message=f"Your decision 'DEC-{decision.id}: {decision.title}' was marked as {status_text} by {reviewer_name}.",
                 notification_type="Decision Status"
             )
+
+            # Send rich Decision Outcome email (Accepted / Rejected) to creator's Gmail
+            if creator_email:
+                def _async_decision_email():
+                    try:
+                        send_decision_outcome_email(
+                            to_email=creator_email,
+                            recipient_name=creator_name,
+                            decision_id=decision.id,
+                            decision_title=decision.title or f"DEC-{decision.id}",
+                            status=status,
+                            reviewer_name=reviewer_name,
+                            comments=comments
+                        )
+                    except Exception as e:
+                        print(f"Async decision outcome email note: {e}")
+
+                threading.Thread(target=_async_decision_email, daemon=True).start()
             
         # 2. Managers & Admins Notification
         manager_admin_roles = db.query(Role).filter(Role.role_name.in_(["Manager", "Admin", "Administrator"])).all()

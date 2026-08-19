@@ -83,6 +83,15 @@
                 <span class="text-xs text-muted">Send to members within your organization</span>
             </div>
 
+            <!-- Edit Mode Banner -->
+            <div id="editEmailBanner" class="alert alert-warning py-2 px-3 d-none d-flex justify-content-between align-items-center mb-3 rounded-3 shadow-2xs" style="font-size: 12.5px; border: 1px solid #FDE68A; background: #FFFBEB;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-pencil-square fs-6 text-warning"></i>
+                    <span><strong class="text-dark">Editing Sent Email:</strong> <span class="text-secondary">Modify details below and click <em>Update & Resend Email</em>.</span></span>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0.5 px-2.5 fw-bold text-xs rounded-pill" onclick="cancelEditEmail()">Cancel Edit</button>
+            </div>
+
             <form id="composeEmailForm" onsubmit="handleSendEmail(event)">
                 <!-- Recipient Type -->
                 <div class="mb-3">
@@ -172,8 +181,8 @@
                     <div class="d-flex align-items-center gap-2">
                         <button type="button" class="btn btn-sm btn-light border text-secondary rounded-pill px-3 text-xs" onclick="resetEmailForm()">Discard</button>
                         <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 text-xs" onclick="saveDraft()">Save Draft</button>
-                        <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold text-xs shadow-2xs">
-                            <i class="bi bi-send-fill me-1"></i> Send Email
+                        <button type="submit" id="btnSendEmailSubmit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold text-xs shadow-2xs">
+                            <span id="btnSendEmailText"><i class="bi bi-send-fill me-1"></i> Send Email</span>
                         </button>
                     </div>
                 </div>
@@ -283,7 +292,15 @@
                     Email content...
                 </div>
             </div>
-            <div class="modal-footer border-top py-2 px-4">
+            <div class="modal-footer border-top py-2 px-4 d-flex justify-content-between align-items-center">
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnModalEditEmail" class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="handleModalEdit()">
+                        <i class="bi bi-pencil-square me-1"></i> Edit & Resend
+                    </button>
+                    <button type="button" id="btnModalDeleteEmail" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="handleModalDelete()">
+                        <i class="bi bi-trash3 me-1"></i> Delete
+                    </button>
+                </div>
                 <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -312,8 +329,49 @@ function scrollToCompose() {
     document.getElementById('composeEmailCard').scrollIntoView({ behavior: 'smooth' });
 }
 
-async function loadLiveUsers() {
+function userMatchesRole(u, roleName) {
+    if (!roleName || roleName === "All") return true;
+    const target = roleName.trim().toLowerCase();
+    const uRole = (u.role_name || '').trim().toLowerCase();
+    const uEmpId = (u.employee_id || '').trim().toUpperCase();
+
+    if (target.includes('admin')) {
+        return u.role_id === 1 || uRole.includes('admin') || uEmpId.startsWith('AD');
+    }
+    if (target.includes('manager')) {
+        return u.role_id === 2 || uRole.includes('manager') || uEmpId.startsWith('MN');
+    }
+    if (target.includes('reviewer')) {
+        return u.role_id === 4 || uRole.includes('reviewer') || uEmpId.startsWith('RW');
+    }
+    if (target.includes('employee')) {
+        return u.role_id === 3 || uRole.includes('employee') || uEmpId.startsWith('EMP');
+    }
+    return uRole.includes(target);
+}
+
+function renderQuickRecipientChips() {
     const chipContainer = document.getElementById('quickRecipientChips');
+    if (!chipContainer) return;
+
+    // Filter by role and exclude self
+    const matchingUsers = liveUsersCache.filter(u => u.id !== USER_ID && userMatchesRole(u, activeRecipientType));
+
+    chipContainer.innerHTML = '';
+    if (matchingUsers.length === 0) {
+        chipContainer.innerHTML = `<span class="text-xs text-muted">No ${activeRecipientType}s found in database.</span>`;
+    } else {
+        matchingUsers.forEach(u => {
+            const displayName = u.full_name || 'User';
+            const empIdTag = u.employee_id ? ` (${u.employee_id})` : '';
+            chipContainer.innerHTML += `
+                <span class="badge bg-light text-dark border rounded-pill px-2.5 py-1 text-xs" style="cursor: pointer;" onclick="addRecipientChip('${displayName}${empIdTag}')">+ ${displayName}${empIdTag}</span>
+            `;
+        });
+    }
+}
+
+async function loadLiveUsers() {
     try {
         let res = await fetch(`${API_URL}/users/`).catch(() => null);
         if (!res || !res.ok) {
@@ -327,23 +385,7 @@ async function loadLiveUsers() {
         console.error("Error loading live users:", e);
     }
 
-    // Exclude self from quick chips
-    const otherUsers = liveUsersCache.filter(u => u.id !== USER_ID);
-
-    if (chipContainer) {
-        chipContainer.innerHTML = '';
-        if (otherUsers.length === 0) {
-            chipContainer.innerHTML = '<span class="text-xs text-muted">No other employees registered in database.</span>';
-        } else {
-            otherUsers.forEach(u => {
-                const displayName = u.full_name || 'User';
-                const empIdTag = u.employee_id ? ` (${u.employee_id})` : '';
-                chipContainer.innerHTML += `
-                    <span class="badge bg-light text-dark border rounded-pill px-2.5 py-1 text-xs" style="cursor: pointer;" onclick="addRecipientChip('${displayName}${empIdTag}')">+ ${displayName}${empIdTag}</span>
-                `;
-            });
-        }
-    }
+    renderQuickRecipientChips();
 }
 
 function toggleRecipientFilter(roleName, btn) {
@@ -356,6 +398,8 @@ function toggleRecipientFilter(roleName, btn) {
     
     const input = document.getElementById('emailToInput');
     if (input) input.placeholder = `Searching ${roleName}s... Type @ or search name/Employee ID`;
+
+    renderQuickRecipientChips();
 }
 
 function addRecipientChip(nameWithId) {
@@ -510,6 +554,10 @@ function setupEmailMentionAutocomplete(inputId, dropdownId) {
     }
 }
 
+let allEmailsCache = {};
+let editingEmailId = null;
+let currentViewingEmailId = null;
+
 async function loadInboxEmails() {
     const container = document.getElementById('inboxThreadContainer');
     if (!container) return;
@@ -531,6 +579,7 @@ async function loadInboxEmails() {
 
         container.innerHTML = '';
         emails.forEach(e => {
+            allEmailsCache[e.id] = e;
             const isOwn = e.sender_id === USER_ID;
             const author = isOwn ? `To: ${e.recipient_names}` : (e.sender_name || 'Team Member');
             const initials = e.sender_initials || 'U';
@@ -546,7 +595,17 @@ async function loadInboxEmails() {
                                 <span class="text-xs text-muted">${e.recipient_type || 'Employee'}</span>
                             </div>
                         </div>
-                        <span class="text-xs text-muted">${timeStr}</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-xs text-muted">${timeStr}</span>
+                            <div class="d-flex gap-1 ms-2">
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-2 rounded-pill fw-semibold text-xs" onclick="event.stopPropagation(); startEditEmail(${e.id})" title="Edit & Resend Email">
+                                    <i class="bi bi-pencil-square me-1"></i>Edit
+                                </button>
+                                <button type="button" class="btn btn-xs btn-outline-danger py-0.5 px-2 rounded-pill fw-semibold text-xs" onclick="event.stopPropagation(); deleteEmail(${e.id})" title="Delete Email">
+                                    <i class="bi bi-trash3 me-1"></i>Delete
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <p class="fw-semibold text-dark text-xs mb-1">${escapeHtml(e.subject)}</p>
                     <p class="text-muted text-xs mb-0 text-truncate">${escapeHtml(e.message)}</p>
@@ -575,6 +634,7 @@ async function loadSentEmails() {
 
         container.innerHTML = '';
         emails.forEach(e => {
+            allEmailsCache[e.id] = e;
             const timeStr = e.created_at ? new Date(e.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now';
             let badgeClass = "bg-primary-subtle text-primary border border-primary-subtle";
             if (e.status === 'Read') badgeClass = "bg-success-subtle text-success border border-success-subtle";
@@ -585,8 +645,14 @@ async function loadSentEmails() {
                         <span class="fw-bold text-dark text-truncate" style="max-width: 170px;">To: ${escapeHtml(e.recipient_names)}</span>
                         <span class="badge ${badgeClass} rounded-pill">${e.status}</span>
                     </div>
-                    <div class="text-muted text-truncate">${escapeHtml(e.subject)}</div>
-                    <div class="text-muted opacity-75 mt-0.5" style="font-size: 10px;">${timeStr}</div>
+                    <div class="text-muted text-truncate" style="font-size:12px;">${escapeHtml(e.subject)}</div>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <span class="text-muted opacity-75" style="font-size: 10px;">${timeStr}</span>
+                        <div class="d-flex gap-1">
+                            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 rounded-pill" style="font-size:11px;" onclick="event.stopPropagation(); startEditEmail(${e.id})" title="Edit & Resend"><i class="bi bi-pencil-square me-0.5"></i>Edit</button>
+                            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2 rounded-pill" style="font-size:11px;" onclick="event.stopPropagation(); deleteEmail(${e.id})" title="Delete"><i class="bi bi-trash3 me-0.5"></i>Delete</button>
+                        </div>
+                    </div>
                 </div>
             `;
         });
@@ -609,6 +675,123 @@ async function loadEmailStats() {
     }
 }
 
+function startEditEmail(emailId) {
+    const e = allEmailsCache[emailId];
+    if (!e) {
+        showGlobalAlert("warning", "Email not found in cache.");
+        return;
+    }
+
+    editingEmailId = emailId;
+    
+    // Set recipient type
+    const recType = e.recipient_type || 'Employee';
+    activeRecipientType = recType;
+    const btns = document.querySelectorAll('#recipientTypeContainer .recipient-type-btn');
+    btns.forEach(b => {
+        if (b.innerText.trim().toLowerCase() === recType.toLowerCase()) {
+            b.className = "btn btn-sm btn-primary recipient-type-btn";
+        } else {
+            b.className = "btn btn-sm btn-outline-secondary recipient-type-btn";
+        }
+    });
+
+    renderQuickRecipientChips();
+
+    document.getElementById('emailToInput').value = e.recipient_names || '';
+    document.getElementById('emailSubjectInput').value = e.subject || '';
+    document.getElementById('emailPrioritySelect').value = e.priority || 'Medium';
+    document.getElementById('emailMessageTextarea').value = e.message || '';
+    
+    const banner = document.getElementById('editEmailBanner');
+    if (banner) banner.classList.remove('d-none');
+
+    const submitBtn = document.getElementById('btnSendEmailSubmit');
+    const submitText = document.getElementById('btnSendEmailText');
+    if (submitBtn) {
+        if (submitText) submitText.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Update & Resend Email';
+        submitBtn.classList.remove('btn-primary');
+        submitBtn.classList.add('btn-warning', 'text-dark');
+    }
+
+    // Dismiss modal if open
+    const modalEl = document.getElementById('emailViewerModal');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+
+    scrollToCompose();
+    showGlobalAlert("info", `Editing email #${emailId} - Make your edits and click "Update & Resend Email" to dispatch.`);
+}
+
+function cancelEditEmail() {
+    editingEmailId = null;
+    resetEmailForm();
+    const banner = document.getElementById('editEmailBanner');
+    if (banner) banner.classList.add('d-none');
+
+    const submitBtn = document.getElementById('btnSendEmailSubmit');
+    const submitText = document.getElementById('btnSendEmailText');
+    if (submitBtn) {
+        if (submitText) submitText.innerHTML = '<i class="bi bi-send-fill me-1"></i> Send Email';
+        submitBtn.classList.add('btn-primary');
+        submitBtn.classList.remove('btn-warning', 'text-dark');
+    }
+}
+
+async function deleteEmail(emailId) {
+    if (!confirm("Are you sure you want to delete this email?")) return;
+    
+    try {
+        let res = await fetch(`${API_URL}/email/delete/${emailId}`, {
+            method: "DELETE"
+        }).catch(() => null);
+
+        if (!res || !res.ok) {
+            res = await fetch(`${API_URL}/email/${emailId}`, {
+                method: "DELETE"
+            }).catch(() => null);
+        }
+
+        if (!res || !res.ok) {
+            const errData = res ? await res.json().catch(() => ({})) : {};
+            throw new Error(errData.detail || "Failed to delete email");
+        }
+
+        showGlobalAlert("success", "Email deleted successfully.");
+
+        // Dismiss modal if open
+        const modalEl = document.getElementById('emailViewerModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+
+        if (editingEmailId === emailId) {
+            cancelEditEmail();
+        }
+
+        loadInboxEmails();
+        loadSentEmails();
+        loadEmailStats();
+    } catch (err) {
+        showGlobalAlert("danger", err.message || "Failed to delete email");
+    }
+}
+
+function handleModalEdit() {
+    if (currentViewingEmailId) {
+        startEditEmail(currentViewingEmailId);
+    }
+}
+
+function handleModalDelete() {
+    if (currentViewingEmailId) {
+        deleteEmail(currentViewingEmailId);
+    }
+}
+
 async function handleSendEmail(e) {
     e.preventDefault();
     const to = document.getElementById('emailToInput').value.trim();
@@ -622,9 +805,13 @@ async function handleSendEmail(e) {
         return;
     }
 
+    const isEditing = editingEmailId !== null;
+    const targetUrl = isEditing ? `${API_URL}/email/update/${editingEmailId}` : `${API_URL}/email/send`;
+    const targetMethod = isEditing ? "PUT" : "POST";
+
     try {
-        const res = await fetch(`${API_URL}/email/send`, {
-            method: "POST",
+        let res = await fetch(targetUrl, {
+            method: targetMethod,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 sender_id: USER_ID,
@@ -635,16 +822,38 @@ async function handleSendEmail(e) {
                 message: message,
                 delivery_method: deliveryMethod
             })
-        });
+        }).catch(() => null);
 
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.detail || "Failed to send email");
+        if (!res || !res.ok) {
+            if (isEditing) {
+                res = await fetch(`${API_URL}/email/${editingEmailId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sender_id: USER_ID,
+                        recipient_type: activeRecipientType,
+                        recipient_names: to,
+                        subject: subject,
+                        priority: priority,
+                        message: message,
+                        delivery_method: deliveryMethod
+                    })
+                }).catch(() => null);
+            }
+        }
+
+        if (!res || !res.ok) {
+            const errData = res ? await res.json().catch(() => ({})) : {};
+            throw new Error(errData.detail || "Failed to process email");
         }
 
         const methodName = deliveryMethod === "gmail" ? "Original Gmail" : "Project SMTP Email Service";
-        showGlobalAlert("success", `Email sent successfully via ${methodName}! Receiver notified.`);
-        resetEmailForm();
+        const successMsg = isEditing 
+            ? `Email updated & resent successfully via ${methodName}! Receiver notified.`
+            : `Email sent successfully via ${methodName}! Receiver notified.`;
+
+        showGlobalAlert("success", successMsg);
+        cancelEditEmail();
         loadInboxEmails();
         loadSentEmails();
         loadEmailStats();
@@ -664,6 +873,7 @@ function saveDraft() {
 }
 
 async function openEmailViewer(id, author, subject, body, time) {
+    currentViewingEmailId = id;
     document.getElementById('viewEmailAuthor').innerText = author;
     document.getElementById('viewEmailSubject').innerText = subject;
     document.getElementById('viewEmailBody').innerText = body;
