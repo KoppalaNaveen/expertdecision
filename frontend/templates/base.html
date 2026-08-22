@@ -3084,10 +3084,12 @@
             return html;
         }
 
-        function escapeHtmlGlobal(text) {
-            if (!text) return '';
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
+        window.escapeHtml = escapeHtml;
+        window.escapeHtmlGlobal = escapeHtml;
 
         function toggleMinimizeAiOrb() {
             const orb = document.getElementById('edrpAiFloatingOrb');

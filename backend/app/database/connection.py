@@ -72,6 +72,8 @@ def ensure_user_schema_columns():
             ("users", "email_original", "VARCHAR(100)"),
             ("comments", "meeting_note_id", "INTEGER REFERENCES meeting_notes(id)"),
             ("meeting_notes", "meeting_link", "TEXT"),
+            ("decisions", "approved_by_id", "INTEGER REFERENCES users(id)"),
+            ("decisions", "approved_at", "TIMESTAMP WITH TIME ZONE"),
         ]
         
         with engine.connect() as conn:

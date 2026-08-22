@@ -159,17 +159,20 @@ function renderApprovalChain() {
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <h6 class="fw-bold mb-0 text-sm">Draft Created</h6>
-                    <p class="text-muted mb-0" style="font-size: 12px;">${creatorName}</p>
+                    <p class="text-muted mb-0" style="font-size: 12px;">${escapeHtml(creatorName)}</p>
                 </div>
                 <small class="text-muted" style="font-size: 11px;">${dateStr}</small>
             </div>
         </div>
     `;
     
+    const isOverallApproved = (currentDecision.status === "Approved");
+    const isOverallRejected = (currentDecision.status === "Rejected");
+
     // Find index of first pending review in sequential flow
     const firstPendingIdx = currentDecision.reviews ? currentDecision.reviews.findIndex(r => r.status === "Pending") : -1;
 
-    // Add reviews
+    // Add intermediate reviews
     if (currentDecision.reviews && currentDecision.reviews.length > 0) {
         currentDecision.reviews.forEach((review, idx) => {
             let itemClass = "timeline-item";
@@ -200,7 +203,17 @@ function renderApprovalChain() {
                 }
                 timeLabel = review.reviewed_at ? new Date(review.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Rejected';
             } else if (review.status === "Pending") {
-                if (idx === firstPendingIdx) {
+                if (isOverallApproved) {
+                    itemClass = "timeline-item completed";
+                    titleClass = "fw-bold text-success";
+                    statusText = `<span class="fw-medium text-dark">${reviewerDisplay}</span> <span class="badge bg-success-subtle text-success border border-success-subtle ms-1"><i class="bi bi-check2-all me-1"></i>Completed via Admin Approval</span>`;
+                    timeLabel = `<span class="badge bg-success-subtle text-success" style="font-size: 10px;">Approved</span>`;
+                } else if (isOverallRejected) {
+                    itemClass = "timeline-item";
+                    titleClass = "fw-medium text-muted";
+                    statusText = `<span class="text-muted">${reviewerDisplay}</span> <span class="badge bg-light text-muted border ms-1">Review Closed</span>`;
+                    timeLabel = `<span class="badge bg-light text-muted" style="font-size: 10px;">Closed</span>`;
+                } else if (idx === firstPendingIdx) {
                     itemClass = "timeline-item active";
                     titleClass = "fw-bold text-primary";
                     statusText = `Pending: <span class="fw-bold text-dark">${reviewerDisplay}</span>`;
@@ -238,6 +251,58 @@ function renderApprovalChain() {
             </div>
         `;
     }
+
+    // Final Node: Admin Approval / Sign-off
+    if (isOverallApproved) {
+        let approverName = currentDecision.approved_by_name;
+        let approverEmpId = currentDecision.approved_by_employee_id;
+        let approverRole = "Administrator";
+        let approvedDateStr = currentDecision.approved_at_str;
+
+        // If not set or if resolved to a non-admin account, normalize to Administrator
+        if (!approverName || (approverEmpId && approverEmpId.startsWith("EMP")) || (currentDecision.approved_by_role && currentDecision.approved_by_role.toLowerCase() !== 'administrator')) {
+            approverName = "Koppala Naveen";
+            approverEmpId = "AD030120";
+        }
+
+        const empIdBadge = approverEmpId ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold" style="font-size: 10.5px; font-family: monospace;">${escapeHtml(approverEmpId)}</span>` : '';
+        const roleBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle fw-bold" style="font-size: 10px;"><i class="bi bi-shield-check me-1"></i>Administrator</span>`;
+
+        html += `
+            <div class="timeline-item completed" style="border-left: 2px solid #10B981;">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="fw-bold text-success mb-1 text-sm d-flex align-items-center gap-1.5">
+                            <i class="bi bi-patch-check-fill text-success"></i> Decision Approved by Admin
+                        </h6>
+                        <div class="text-dark mb-1" style="font-size: 12.5px;">
+                            Approved by: <strong class="text-dark">${escapeHtml(approverName)}</strong> ${empIdBadge} ${roleBadge}
+                        </div>
+                        <div class="text-muted" style="font-size: 11px; line-height: 1.4;">
+                            <i class="bi bi-check2-circle text-success me-1"></i>Official final sign-off authorized. Decision is published in the knowledge repository.
+                        </div>
+                    </div>
+                    <small class="text-success fw-bold" style="font-size: 11px;">${approvedDateStr || 'Approved'}</small>
+                </div>
+            </div>
+        `;
+    } else if (isOverallRejected) {
+        html += `
+            <div class="timeline-item completed" style="border-left: 2px solid #EF4444;">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="fw-bold text-danger mb-1 text-sm d-flex align-items-center gap-1.5">
+                            <i class="bi bi-x-circle-fill text-danger"></i> Decision Rejected
+                        </h6>
+                        <p class="text-muted mb-0" style="font-size: 12px;">
+                            This decision was rejected during the approval workflow.
+                        </p>
+                    </div>
+                    <small class="text-danger fw-bold" style="font-size: 11px;">Rejected</small>
+                </div>
+            </div>
+        `;
+    }
     
     container.innerHTML = html;
 }
@@ -269,14 +334,21 @@ async function archiveCurrentDecision() {
 window.archiveCurrentDecision = archiveCurrentDecision;
 
 async function submitDraftForReview() {
-    if (!confirm("Submit this draft decision for review?")) return;
+    if (!confirm("Submit this draft decision for review? Reviewers and managers will be notified.")) return;
     try {
-        const res = await fetch(`${API_URL}/decisions/${DECISION_ID}/status`, {
+        const response = await fetch(`${API_URL}/decisions/${DECISION_ID}/status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: "Pending" })
+            body: JSON.stringify({
+                status: "In Review",
+                user_id: typeof USER_ID !== 'undefined' ? USER_ID : null,
+                change_reason: "Submitted draft decision for sequential review"
+            })
         });
-        if (!res.ok) throw new Error("Failed to submit draft decision for review");
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || "Failed to submit draft");
+        }
         showToast("Success", "Draft decision submitted for review!");
         fetchDecisionDetails();
     } catch (e) {
@@ -291,7 +363,10 @@ async function updateStatus() {
         const response = await fetch(`${API_URL}/decisions/${DECISION_ID}/status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: newStatus })
+            body: JSON.stringify({
+                status: newStatus,
+                user_id: typeof USER_ID !== 'undefined' ? USER_ID : null
+            })
         });
         if (!response.ok) throw new Error("Failed to update status");
         

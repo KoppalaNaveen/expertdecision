@@ -6,17 +6,128 @@
         <h2 class="fw-bold text-dark mb-1">My Decisions</h2>
         <p class="text-muted mb-0">Manage and track all your decision records.</p>
     </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-light border shadow-sm text-secondary d-flex align-items-center">
-            <i data-lucide="filter" style="width: 16px; height: 16px;" class="me-2"></i> Filter
-        </button>
-        <button class="btn btn-light border shadow-sm text-secondary d-flex align-items-center">
-            <i data-lucide="calendar" style="width: 16px; height: 16px;" class="me-2"></i> Date Range
-        </button>
+    <div class="d-flex align-items-center gap-2 position-relative">
+        <!-- Filter Dropdown -->
+        <div class="dropdown">
+            <button class="btn btn-light border shadow-sm text-secondary d-flex align-items-center dropdown-toggle" type="button" id="filterDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                <i data-lucide="filter" style="width: 16px; height: 16px;" class="me-2"></i>
+                <span id="filterBtnLabel">Filter</span>
+                <span id="filterBadgeCount" class="badge bg-primary text-white ms-1.5 rounded-pill d-none" style="font-size: 10px;">0</span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end shadow-lg p-3 border-0 mt-2" aria-labelledby="filterDropdownBtn" style="width: 320px; border-radius: 14px; z-index: 1050;">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                    <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-funnel-fill text-primary"></i> Filter Decisions
+                    </h6>
+                    <button type="button" class="btn btn-link btn-sm text-muted p-0 text-decoration-none small" onclick="resetAdvancedFilters()">Reset All</button>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold mb-1">Category</label>
+                    <select class="form-select form-select-sm" id="filterCategory">
+                        <option value="All">All Categories</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold mb-1">Priority Level</label>
+                    <select class="form-select form-select-sm" id="filterPriority">
+                        <option value="All">All Priorities</option>
+                        <option value="Critical">Critical</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold mb-1">Department</label>
+                    <select class="form-select form-select-sm" id="filterDepartment">
+                        <option value="All">All Departments</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-semibold mb-1">Ownership</label>
+                    <select class="form-select form-select-sm" id="filterOwnership">
+                        <option value="All">All Decisions</option>
+                        <option value="mine">Created by Me</option>
+                        <option value="others">Created by Others</option>
+                    </select>
+                </div>
+                <div class="d-flex gap-2 pt-2 border-top">
+                    <button type="button" class="btn btn-light btn-sm flex-fill border text-secondary fw-semibold" onclick="resetAdvancedFilters()">Clear</button>
+                    <button type="button" class="btn btn-primary btn-sm flex-fill fw-semibold shadow-sm" onclick="applyAdvancedFilters()">Apply Filters</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Date Range Dropdown -->
+        <div class="dropdown">
+            <button class="btn btn-light border shadow-sm text-secondary d-flex align-items-center dropdown-toggle" type="button" id="dateRangeDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                <i data-lucide="calendar" style="width: 16px; height: 16px;" class="me-2"></i>
+                <span id="dateRangeLabel">Date Range</span>
+                <span id="dateRangeActiveDot" class="badge bg-primary rounded-circle p-1 ms-1.5 d-none" style="width: 6px; height: 6px;"> </span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end shadow-lg p-3 border-0 mt-2" aria-labelledby="dateRangeDropdownBtn" style="width: 290px; border-radius: 14px; z-index: 1050;">
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                    <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-calendar-event text-primary"></i> Select Date Range
+                    </h6>
+                    <button type="button" class="btn btn-link btn-sm text-muted p-0 text-decoration-none small" onclick="clearDateRange()">Clear</button>
+                </div>
+                
+                <div class="d-flex flex-column gap-1 mb-3">
+                    <button type="button" class="btn btn-sm btn-light text-start text-dark fw-medium border-0 py-1.5 px-2.5 rounded-2 d-flex justify-content-between align-items-center date-preset-btn active" data-range="all" onclick="selectDatePreset('all', 'All Time')">
+                        <span>All Time</span>
+                        <i class="bi bi-check2 text-primary preset-check"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light text-start text-dark fw-medium border-0 py-1.5 px-2.5 rounded-2 d-flex justify-content-between align-items-center date-preset-btn" data-range="today" onclick="selectDatePreset('today', 'Today')">
+                        <span>Today</span>
+                        <i class="bi bi-check2 text-primary d-none preset-check"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light text-start text-dark fw-medium border-0 py-1.5 px-2.5 rounded-2 d-flex justify-content-between align-items-center date-preset-btn" data-range="7days" onclick="selectDatePreset('7days', 'Last 7 Days')">
+                        <span>Last 7 Days</span>
+                        <i class="bi bi-check2 text-primary d-none preset-check"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light text-start text-dark fw-medium border-0 py-1.5 px-2.5 rounded-2 d-flex justify-content-between align-items-center date-preset-btn" data-range="30days" onclick="selectDatePreset('30days', 'Last 30 Days')">
+                        <span>Last 30 Days</span>
+                        <i class="bi bi-check2 text-primary d-none preset-check"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light text-start text-dark fw-medium border-0 py-1.5 px-2.5 rounded-2 d-flex justify-content-between align-items-center date-preset-btn" data-range="month" onclick="selectDatePreset('month', 'This Month')">
+                        <span>This Month</span>
+                        <i class="bi bi-check2 text-primary d-none preset-check"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light text-start text-dark fw-medium border-0 py-1.5 px-2.5 rounded-2 d-flex justify-content-between align-items-center date-preset-btn" data-range="year" onclick="selectDatePreset('year', 'This Year')">
+                        <span>This Year</span>
+                        <i class="bi bi-check2 text-primary d-none preset-check"></i>
+                    </button>
+                </div>
+
+                <div class="pt-2 border-top">
+                    <label class="form-label text-secondary small fw-bold mb-2">Custom Range</label>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label text-muted" style="font-size: 11px;">From</label>
+                            <input type="date" class="form-control form-control-sm" id="customDateFrom">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted" style="font-size: 11px;">To</label>
+                            <input type="date" class="form-control form-control-sm" id="customDateTo">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm w-100 fw-semibold shadow-sm mt-1" onclick="applyCustomDateRange()">Apply Custom Range</button>
+                </div>
+            </div>
+        </div>
+
         <a href="{{ url_for('create_decision') }}" class="btn btn-primary shadow-sm d-flex align-items-center text-decoration-none">
             <i data-lucide="plus" style="width: 16px; height: 16px;" class="me-1"></i> New Decision
-        </a>>
+        </a>
     </div>
+</div>
+
+<!-- Active Filter Pills Bar -->
+<div id="activeFiltersContainer" class="d-none mb-3 align-items-center gap-2 flex-wrap">
+    <span class="text-muted small fw-medium"><i class="bi bi-funnel me-1"></i>Active Filters:</span>
+    <div id="activeFilterPills" class="d-flex gap-1.5 flex-wrap"></div>
+    <button type="button" class="btn btn-link btn-sm text-danger p-0 text-decoration-none ms-2 small fw-semibold" onclick="clearAllFiltersAndDate()">Clear All</button>
 </div>
 
 <!-- Tabs -->
@@ -122,5 +233,5 @@
     const CURRENT_USER_ROLE = "{{ session.get('role_name', '') }}" || localStorage.getItem('role_name') || 'Employee';
     const CURRENT_USER_NAME = "{{ session.get('full_name', '') }}" || localStorage.getItem('full_name') || '';
 </script>
-<script src="{{ url_for('static', filename='js/decision.js') }}?v=20260818_mydecisions_v3"></script>
+<script src="{{ url_for('static', filename='js/decision.js') }}?v=20260822_filter_daterange_v2"></script>
 {% endblock %}

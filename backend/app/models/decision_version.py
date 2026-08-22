@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database.base import Base
 
 class DecisionVersion(Base):
@@ -20,6 +21,21 @@ class DecisionVersion(Base):
     tags = Column(String(200), nullable=True)
     
     changed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changed_by_user = relationship("User", foreign_keys=[changed_by])
     change_reason = Column(String(500), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def changed_by_name(self):
+        return self.changed_by_user.full_name if self.changed_by_user else None
+
+    @property
+    def changed_by_employee_id(self):
+        return self.changed_by_user.employee_id if self.changed_by_user else None
+
+    @property
+    def changed_by_role(self):
+        if self.changed_by_user and getattr(self.changed_by_user, 'role', None):
+            return self.changed_by_user.role.role_name
+        return None

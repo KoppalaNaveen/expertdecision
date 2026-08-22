@@ -476,14 +476,32 @@ class DecisionRepository:
 
     @staticmethod
     def update_status(db: Session, decision_id: int, status: str, changed_by: int = None, change_reason: str = None):
+        from datetime import datetime, timezone
+        from app.models.user import User
+        from app.services.notification_service import NotificationService
+        from app.services.audit_service import AuditService
+
         db_decision = DecisionRepository.get_decision_by_id(db, decision_id)
         if db_decision:
             db_decision.status = status
+            
+            approver_user = None
+            if changed_by:
+                approver_user = db.query(User).filter(User.id == changed_by).first()
+
+            if status == "Approved":
+                db_decision.approved_by_id = changed_by or db_decision.created_by
+                db_decision.approved_at = datetime.now(timezone.utc)
+                if approver_user and not change_reason:
+                    role_str = approver_user.role.role_name if approver_user.role else "Administrator"
+                    emp_id_str = approver_user.employee_id or f"EMP-{approver_user.id}"
+                    change_reason = f"Decision approved by {role_str} {approver_user.full_name} ({emp_id_str})"
             
             # Record version snapshot on status change
             latest_version = db.query(DecisionVersion).filter(DecisionVersion.decision_id == decision_id).order_by(DecisionVersion.version_number.desc()).first()
             next_version_num = (latest_version.version_number + 1) if latest_version else 1
             
+            resolved_reason = change_reason or f"Status updated to {status}"
             new_version = DecisionVersion(
                 decision_id=db_decision.id,
                 version_number=next_version_num,
@@ -496,20 +514,34 @@ class DecisionRepository:
                 decision_date=db_decision.decision_date,
                 tags=db_decision.tags,
                 changed_by=changed_by or db_decision.created_by,
-                change_reason=change_reason or f"Status updated to {status}"
+                change_reason=resolved_reason
             )
             db.add(new_version)
 
             user_who_changed = changed_by or db_decision.created_by
-            act_log = ActivityLog(
+            AuditService.log_event(
+                db,
                 user_id=user_who_changed,
                 action=f"Updated status of DEC-{db_decision.id} to {status}",
-                details=change_reason or f"Status updated to {status}"
+                details=resolved_reason
             )
-            db.add(act_log)
 
             db.commit()
             db.refresh(db_decision)
+
+            # Notifications
+            try:
+                if status == "Approved":
+                    actor_name = approver_user.full_name if approver_user else "Administrator"
+                    NotificationService.create_notification(
+                        db,
+                        user_id=db_decision.created_by,
+                        message=f"Your decision 'DEC-{db_decision.id}: {db_decision.title}' was approved by {actor_name}.",
+                        notification_type="Decision Status"
+                    )
+            except Exception as notif_err:
+                print("Status notification error:", notif_err)
+
         return db_decision
 
     @staticmethod

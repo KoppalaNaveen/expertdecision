@@ -116,9 +116,10 @@ def update_status(decision_id: int, status_update: DecisionStatusUpdate, user_id
     db_decision = DecisionService.get_decision_by_id(db, decision_id)
     if not db_decision:
         raise HTTPException(status_code=404, detail="Decision not found")
-    if user_id and db_decision.created_by != user_id and status_update.status in ["Pending", "Submitted", "Draft"]:
+    actor_id = user_id or getattr(status_update, 'user_id', None)
+    if actor_id and db_decision.created_by != actor_id and status_update.status in ["Pending", "Submitted", "Draft"]:
         raise HTTPException(status_code=403, detail="Only the owner of this decision can edit or submit it.")
-    updated_decision = DecisionService.update_status(db, decision_id, status_update)
+    updated_decision = DecisionService.update_status(db, decision_id, status_update, changed_by=actor_id)
     return updated_decision
 
 @router.delete("/{decision_id}")

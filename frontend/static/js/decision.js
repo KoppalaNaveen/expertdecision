@@ -1,7 +1,32 @@
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
 let allDecisions = [];
 let currentStatusFilter = 'All';
 let currentPage = 1;
 const rowsPerPage = 5;
+
+let filterState = {
+    category: 'All',
+    priority: 'All',
+    department: 'All',
+    ownership: 'All'
+};
+
+let dateRangeState = {
+    type: 'all',
+    label: 'All Time',
+    startDate: null,
+    endDate: null
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -22,6 +47,10 @@ document.addEventListener("DOMContentLoaded", () => {
             currentPage = 1;
             renderTable();
         });
+    }
+
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
     }
 });
 
@@ -45,6 +74,7 @@ async function fetchDecisions() {
         const data = await response.json();
         allDecisions = Array.isArray(data) ? data : [];
 
+        populateFilterDropdownOptions();
         renderTable();
     } catch (error) {
         console.error("Error loading decisions:", error);
@@ -52,6 +82,284 @@ async function fetchDecisions() {
             showToast("Danger", error.message);
         }
     }
+}
+
+function populateFilterDropdownOptions() {
+    const catSelect = document.getElementById("filterCategory");
+    const deptSelect = document.getElementById("filterDepartment");
+
+    if (catSelect) {
+        const currentCatVal = catSelect.value || 'All';
+        const categories = new Set();
+        allDecisions.forEach(d => {
+            if (d.category_name && d.category_name.trim()) categories.add(d.category_name.trim());
+        });
+        
+        let catHtml = '<option value="All">All Categories</option>';
+        Array.from(categories).sort().forEach(cat => {
+            catHtml += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
+        });
+        catSelect.innerHTML = catHtml;
+        catSelect.value = categories.has(currentCatVal) ? currentCatVal : 'All';
+    }
+
+    if (deptSelect) {
+        const currentDeptVal = deptSelect.value || 'All';
+        const departments = new Set();
+        allDecisions.forEach(d => {
+            if (d.department && d.department.trim()) departments.add(d.department.trim());
+        });
+        
+        let deptHtml = '<option value="All">All Departments</option>';
+        Array.from(departments).sort().forEach(dept => {
+            deptHtml += `<option value="${escapeHtml(dept)}">${escapeHtml(dept)}</option>`;
+        });
+        deptSelect.innerHTML = deptHtml;
+        deptSelect.value = departments.has(currentDeptVal) ? currentDeptVal : 'All';
+    }
+}
+
+function applyAdvancedFilters() {
+    const catSelect = document.getElementById("filterCategory");
+    const prioSelect = document.getElementById("filterPriority");
+    const deptSelect = document.getElementById("filterDepartment");
+    const ownerSelect = document.getElementById("filterOwnership");
+
+    filterState.category = catSelect ? catSelect.value : 'All';
+    filterState.priority = prioSelect ? prioSelect.value : 'All';
+    filterState.department = deptSelect ? deptSelect.value : 'All';
+    filterState.ownership = ownerSelect ? ownerSelect.value : 'All';
+
+    let activeFilterCount = 0;
+    if (filterState.category !== 'All') activeFilterCount++;
+    if (filterState.priority !== 'All') activeFilterCount++;
+    if (filterState.department !== 'All') activeFilterCount++;
+    if (filterState.ownership !== 'All') activeFilterCount++;
+
+    const badge = document.getElementById("filterBadgeCount");
+    const filterBtn = document.getElementById("filterDropdownBtn");
+    if (badge) {
+        if (activeFilterCount > 0) {
+            badge.innerText = activeFilterCount;
+            badge.classList.remove('d-none');
+            if (filterBtn) {
+                filterBtn.classList.add('border-primary', 'text-primary', 'bg-primary-subtle');
+            }
+        } else {
+            badge.classList.add('d-none');
+            if (filterBtn) {
+                filterBtn.classList.remove('border-primary', 'text-primary', 'bg-primary-subtle');
+            }
+        }
+    }
+
+    // Close dropdown
+    const dropdownEl = document.getElementById("filterDropdownBtn");
+    if (dropdownEl && bootstrap.Dropdown.getInstance(dropdownEl)) {
+        bootstrap.Dropdown.getInstance(dropdownEl).hide();
+    }
+
+    currentPage = 1;
+    renderTable();
+}
+window.applyAdvancedFilters = applyAdvancedFilters;
+
+function resetAdvancedFilters() {
+    const catSelect = document.getElementById("filterCategory");
+    const prioSelect = document.getElementById("filterPriority");
+    const deptSelect = document.getElementById("filterDepartment");
+    const ownerSelect = document.getElementById("filterOwnership");
+
+    if (catSelect) catSelect.value = 'All';
+    if (prioSelect) prioSelect.value = 'All';
+    if (deptSelect) deptSelect.value = 'All';
+    if (ownerSelect) ownerSelect.value = 'All';
+
+    filterState = {
+        category: 'All',
+        priority: 'All',
+        department: 'All',
+        ownership: 'All'
+    };
+
+    const badge = document.getElementById("filterBadgeCount");
+    const filterBtn = document.getElementById("filterDropdownBtn");
+    if (badge) badge.classList.add('d-none');
+    if (filterBtn) {
+        filterBtn.classList.remove('border-primary', 'text-primary', 'bg-primary-subtle');
+    }
+
+    const dropdownEl = document.getElementById("filterDropdownBtn");
+    if (dropdownEl && bootstrap.Dropdown.getInstance(dropdownEl)) {
+        bootstrap.Dropdown.getInstance(dropdownEl).hide();
+    }
+
+    currentPage = 1;
+    renderTable();
+}
+window.resetAdvancedFilters = resetAdvancedFilters;
+
+function selectDatePreset(rangeKey, label) {
+    dateRangeState.type = rangeKey;
+    dateRangeState.label = label;
+    dateRangeState.startDate = null;
+    dateRangeState.endDate = null;
+
+    // Update active style on preset buttons
+    document.querySelectorAll('.date-preset-btn').forEach(btn => {
+        const isMatch = btn.getAttribute('data-range') === rangeKey;
+        btn.classList.toggle('active', isMatch);
+        btn.classList.toggle('bg-primary-subtle', isMatch);
+        btn.classList.toggle('text-primary', isMatch);
+        const checkIcon = btn.querySelector('.preset-check');
+        if (checkIcon) {
+            checkIcon.classList.toggle('d-none', !isMatch);
+        }
+    });
+
+    // Clear custom input fields
+    const fromInput = document.getElementById('customDateFrom');
+    const toInput = document.getElementById('customDateTo');
+    if (fromInput) fromInput.value = '';
+    if (toInput) toInput.value = '';
+
+    updateDateRangeButtonUI();
+
+    const dropdownEl = document.getElementById("dateRangeDropdownBtn");
+    if (dropdownEl && bootstrap.Dropdown.getInstance(dropdownEl)) {
+        bootstrap.Dropdown.getInstance(dropdownEl).hide();
+    }
+
+    currentPage = 1;
+    renderTable();
+}
+window.selectDatePreset = selectDatePreset;
+
+function applyCustomDateRange() {
+    const fromInput = document.getElementById('customDateFrom');
+    const toInput = document.getElementById('customDateTo');
+    const fromVal = fromInput ? fromInput.value : '';
+    const toVal = toInput ? toInput.value : '';
+
+    if (!fromVal && !toVal) {
+        if (typeof showToast === 'function') {
+            showToast("Warning", "Please select at least a From or To date.");
+        }
+        return;
+    }
+
+    dateRangeState.type = 'custom';
+    dateRangeState.startDate = fromVal || null;
+    dateRangeState.endDate = toVal || null;
+
+    let customLabel = '';
+    if (fromVal && toVal) {
+        customLabel = `${fromVal} to ${toVal}`;
+    } else if (fromVal) {
+        customLabel = `Since ${fromVal}`;
+    } else {
+        customLabel = `Until ${toVal}`;
+    }
+    dateRangeState.label = customLabel;
+
+    // Deselect preset buttons
+    document.querySelectorAll('.date-preset-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-primary-subtle', 'text-primary');
+        const checkIcon = btn.querySelector('.preset-check');
+        if (checkIcon) checkIcon.classList.add('d-none');
+    });
+
+    updateDateRangeButtonUI();
+
+    const dropdownEl = document.getElementById("dateRangeDropdownBtn");
+    if (dropdownEl && bootstrap.Dropdown.getInstance(dropdownEl)) {
+        bootstrap.Dropdown.getInstance(dropdownEl).hide();
+    }
+
+    currentPage = 1;
+    renderTable();
+}
+window.applyCustomDateRange = applyCustomDateRange;
+
+function clearDateRange() {
+    selectDatePreset('all', 'Date Range');
+}
+window.clearDateRange = clearDateRange;
+
+function clearAllFiltersAndDate() {
+    resetAdvancedFilters();
+    clearDateRange();
+}
+window.clearAllFiltersAndDate = clearAllFiltersAndDate;
+
+function updateDateRangeButtonUI() {
+    const labelEl = document.getElementById("dateRangeLabel");
+    const activeDot = document.getElementById("dateRangeActiveDot");
+    const dateBtn = document.getElementById("dateRangeDropdownBtn");
+
+    if (dateRangeState.type !== 'all') {
+        if (labelEl) labelEl.innerText = dateRangeState.label;
+        if (activeDot) activeDot.classList.remove('d-none');
+        if (dateBtn) {
+            dateBtn.classList.add('border-primary', 'text-primary', 'bg-primary-subtle');
+        }
+    } else {
+        if (labelEl) labelEl.innerText = "Date Range";
+        if (activeDot) activeDot.classList.add('d-none');
+        if (dateBtn) {
+            dateBtn.classList.remove('border-primary', 'text-primary', 'bg-primary-subtle');
+        }
+    }
+}
+
+function isDateWithinRange(itemDateVal, rangeState) {
+    if (!rangeState || rangeState.type === 'all') return true;
+    if (!itemDateVal) return false;
+
+    const itemDate = new Date(itemDateVal);
+    if (isNaN(itemDate.getTime())) return true;
+
+    const now = new Date();
+    
+    if (rangeState.type === 'today') {
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        return itemDate >= startOfDay && itemDate <= endOfDay;
+    }
+    
+    if (rangeState.type === '7days') {
+        const past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return itemDate >= past7 && itemDate <= now;
+    }
+    
+    if (rangeState.type === '30days') {
+        const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        return itemDate >= past30 && itemDate <= now;
+    }
+    
+    if (rangeState.type === 'month') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+        return itemDate >= startOfMonth && itemDate <= now;
+    }
+    
+    if (rangeState.type === 'year') {
+        const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+        return itemDate >= startOfYear && itemDate <= now;
+    }
+    
+    if (rangeState.type === 'custom') {
+        if (rangeState.startDate) {
+            const start = new Date(rangeState.startDate + 'T00:00:00');
+            if (itemDate < start) return false;
+        }
+        if (rangeState.endDate) {
+            const end = new Date(rangeState.endDate + 'T23:59:59.999');
+            if (itemDate > end) return false;
+        }
+        return true;
+    }
+    
+    return true;
 }
 
 function updateTabCounts() {
@@ -127,15 +435,22 @@ function setFilter(status, btnElement) {
 
 function renderTable() {
     updateTabCounts();
+    updateActiveFilterChips();
+
     const tbody = document.getElementById("decisionsTableBody");
     const searchInput = document.getElementById("searchInput");
-    const searchQuery = searchInput ? searchInput.value.toLowerCase() : "";
+    const searchQuery = searchInput ? searchInput.value.toLowerCase().trim() : "";
     
     let filtered = allDecisions.filter(d => {
-        const matchesSearch = 
+        // Search text
+        const matchesSearch = !searchQuery || 
             (d.title && d.title.toLowerCase().includes(searchQuery)) || 
-            (d.description && d.description.toLowerCase().includes(searchQuery));
+            (d.description && d.description.toLowerCase().includes(searchQuery)) ||
+            (String(d.id).includes(searchQuery)) ||
+            (d.creator_name && d.creator_name.toLowerCase().includes(searchQuery)) ||
+            (d.tags && d.tags.toLowerCase().includes(searchQuery));
         
+        // Status Tab
         const stLower = (d.status || '').trim().toLowerCase();
         const filterLower = (currentStatusFilter || 'All').trim().toLowerCase();
 
@@ -147,8 +462,37 @@ function renderTable() {
         } else {
             matchesStatus = (stLower === filterLower);
         }
+
+        // Category Filter
+        let matchesCategory = true;
+        if (filterState.category && filterState.category !== 'All') {
+            matchesCategory = (d.category_name && d.category_name.trim().toLowerCase() === filterState.category.trim().toLowerCase());
+        }
+
+        // Priority Filter
+        let matchesPriority = true;
+        if (filterState.priority && filterState.priority !== 'All') {
+            matchesPriority = (d.priority_level && d.priority_level.trim().toLowerCase() === filterState.priority.trim().toLowerCase());
+        }
+
+        // Department Filter
+        let matchesDepartment = true;
+        if (filterState.department && filterState.department !== 'All') {
+            matchesDepartment = (d.department && d.department.trim().toLowerCase() === filterState.department.trim().toLowerCase());
+        }
+
+        // Ownership Filter
+        let matchesOwnership = true;
+        if (filterState.ownership === 'mine') {
+            matchesOwnership = (typeof USER_ID !== 'undefined' && USER_ID && Number(d.created_by) === Number(USER_ID));
+        } else if (filterState.ownership === 'others') {
+            matchesOwnership = (typeof USER_ID !== 'undefined' && USER_ID && Number(d.created_by) !== Number(USER_ID));
+        }
+
+        // Date Range Filter
+        let matchesDate = isDateWithinRange(d.created_at || d.decision_date, dateRangeState);
         
-        return matchesSearch && matchesStatus;
+        return matchesSearch && matchesStatus && matchesCategory && matchesPriority && matchesDepartment && matchesOwnership && matchesDate;
     });
 
     const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
@@ -217,6 +561,97 @@ function renderTable() {
     document.getElementById("btnPrev").disabled = currentPage === 1;
     document.getElementById("btnNext").disabled = currentPage === totalPages;
 }
+
+function updateActiveFilterChips() {
+    const container = document.getElementById("activeFiltersContainer");
+    const pills = document.getElementById("activeFilterPills");
+    if (!container || !pills) return;
+
+    let chipsHtml = '';
+    let hasActive = false;
+
+    if (filterState.category && filterState.category !== 'All') {
+        hasActive = true;
+        chipsHtml += `
+            <span class="badge bg-white text-dark border d-flex align-items-center gap-1.5 py-1 px-2.5 shadow-xs" style="font-size: 11.5px; border-radius: 6px;">
+                Category: <strong class="ms-1">${escapeHtml(filterState.category)}</strong>
+                <button type="button" class="btn-close p-0 ms-1.5" style="font-size: 7.5px;" onclick="clearSingleFilter('category')" title="Remove Category Filter"></button>
+            </span>
+        `;
+    }
+
+    if (filterState.priority && filterState.priority !== 'All') {
+        hasActive = true;
+        chipsHtml += `
+            <span class="badge bg-white text-dark border d-flex align-items-center gap-1.5 py-1 px-2.5 shadow-xs" style="font-size: 11.5px; border-radius: 6px;">
+                Priority: <strong class="ms-1">${escapeHtml(filterState.priority)}</strong>
+                <button type="button" class="btn-close p-0 ms-1.5" style="font-size: 7.5px;" onclick="clearSingleFilter('priority')" title="Remove Priority Filter"></button>
+            </span>
+        `;
+    }
+
+    if (filterState.department && filterState.department !== 'All') {
+        hasActive = true;
+        chipsHtml += `
+            <span class="badge bg-white text-dark border d-flex align-items-center gap-1.5 py-1 px-2.5 shadow-xs" style="font-size: 11.5px; border-radius: 6px;">
+                Dept: <strong class="ms-1">${escapeHtml(filterState.department)}</strong>
+                <button type="button" class="btn-close p-0 ms-1.5" style="font-size: 7.5px;" onclick="clearSingleFilter('department')" title="Remove Department Filter"></button>
+            </span>
+        `;
+    }
+
+    if (filterState.ownership && filterState.ownership !== 'All') {
+        hasActive = true;
+        const ownerLabel = filterState.ownership === 'mine' ? 'Created by Me' : 'Created by Others';
+        chipsHtml += `
+            <span class="badge bg-white text-dark border d-flex align-items-center gap-1.5 py-1 px-2.5 shadow-xs" style="font-size: 11.5px; border-radius: 6px;">
+                Owner: <strong class="ms-1">${escapeHtml(ownerLabel)}</strong>
+                <button type="button" class="btn-close p-0 ms-1.5" style="font-size: 7.5px;" onclick="clearSingleFilter('ownership')" title="Remove Ownership Filter"></button>
+            </span>
+        `;
+    }
+
+    if (dateRangeState.type !== 'all') {
+        hasActive = true;
+        chipsHtml += `
+            <span class="badge bg-white text-dark border d-flex align-items-center gap-1.5 py-1 px-2.5 shadow-xs" style="font-size: 11.5px; border-radius: 6px;">
+                <i class="bi bi-calendar-check text-primary me-1"></i> Date: <strong class="ms-1">${escapeHtml(dateRangeState.label)}</strong>
+                <button type="button" class="btn-close p-0 ms-1.5" style="font-size: 7.5px;" onclick="clearDateRange()" title="Remove Date Filter"></button>
+            </span>
+        `;
+    }
+
+    pills.innerHTML = chipsHtml;
+    if (hasActive) {
+        container.classList.remove('d-none');
+        container.classList.add('d-flex');
+    } else {
+        container.classList.remove('d-flex');
+        container.classList.add('d-none');
+    }
+}
+
+function clearSingleFilter(key) {
+    if (key === 'category') {
+        filterState.category = 'All';
+        const el = document.getElementById("filterCategory");
+        if (el) el.value = 'All';
+    } else if (key === 'priority') {
+        filterState.priority = 'All';
+        const el = document.getElementById("filterPriority");
+        if (el) el.value = 'All';
+    } else if (key === 'department') {
+        filterState.department = 'All';
+        const el = document.getElementById("filterDepartment");
+        if (el) el.value = 'All';
+    } else if (key === 'ownership') {
+        filterState.ownership = 'All';
+        const el = document.getElementById("filterOwnership");
+        if (el) el.value = 'All';
+    }
+    applyAdvancedFilters();
+}
+window.clearSingleFilter = clearSingleFilter;
 
 async function submitDraftFromTable(id) {
     if (!confirm("Are you sure you want to submit this draft decision for review?")) return;

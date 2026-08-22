@@ -29,8 +29,10 @@ class DecisionService:
         return DecisionRepository.update_decision_full(db, decision_id, full_decision)
 
     @staticmethod
-    def update_status(db: Session, decision_id: int, status_update: DecisionStatusUpdate):
-        return DecisionRepository.update_status(db, decision_id, status_update.status)
+    def update_status(db: Session, decision_id: int, status_update: DecisionStatusUpdate, changed_by: int = None, change_reason: str = None):
+        user_to_use = changed_by or getattr(status_update, 'user_id', None)
+        reason_to_use = change_reason or getattr(status_update, 'change_reason', None)
+        return DecisionRepository.update_status(db, decision_id, status_update.status, changed_by=user_to_use, change_reason=reason_to_use)
 
     @staticmethod
     def delete_decision(db: Session, decision_id: int, user_id: int = None, role_name: str = None):

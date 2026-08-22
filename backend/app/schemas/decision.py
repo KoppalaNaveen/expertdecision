@@ -20,6 +20,8 @@ class DecisionUpdate(BaseModel):
 
 class DecisionStatusUpdate(BaseModel):
     status: str
+    user_id: Optional[int] = None
+    change_reason: Optional[str] = None
 
 class DecisionResponse(BaseModel):
     id: int
@@ -28,10 +30,20 @@ class DecisionResponse(BaseModel):
     status: str
     category_id: Optional[int] = None
     category_name: Optional[str] = None
+    priority_level: Optional[str] = None
+    department: Optional[str] = None
+    decision_date: Optional[datetime] = None
+    tags: Optional[str] = None
     created_by: int
     creator_name: Optional[str] = None
     creator_initials: Optional[str] = None
     created_at: datetime
+    approved_by_id: Optional[int] = None
+    approved_by_name: Optional[str] = None
+    approved_by_employee_id: Optional[str] = None
+    approved_by_role: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    approved_at_str: Optional[str] = None
 
     model_config = {
         "from_attributes": True
@@ -79,6 +91,9 @@ class DecisionVersionResponse(BaseModel):
     decision_date: Optional[datetime] = None
     tags: Optional[str] = None
     changed_by: Optional[int] = None
+    changed_by_name: Optional[str] = None
+    changed_by_employee_id: Optional[str] = None
+    changed_by_role: Optional[str] = None
     change_reason: Optional[str] = None
     created_at: datetime
 
@@ -192,9 +207,10 @@ class DecisionRationaleUpdate(BaseModel):
     user_id: int
 
 from app.schemas.review import ReviewResponse
+from app.schemas.alternative import AlternativeResponse
 
 class DecisionFullResponse(DecisionResponse):
-    alternatives: List[BaseModel] = []
+    alternatives: List[AlternativeResponse] = []
     reviews: List[ReviewResponse] = []
     attachments: List[AttachmentResponse] = []
     threads: List[DiscussionThreadResponse] = []
