@@ -108,120 +108,121 @@ class UserRepository:
 
     @staticmethod
     def delete_user(db: Session, user_id: int):
-        from sqlalchemy import text
+        from sqlalchemy import text, inspect
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return (False, "User not found")
 
         try:
-            from app.models.activity_log import ActivityLog
-            from app.models.notification import Notification
-            from app.models.review import Review
-            from app.models.replay import Replay
-            from app.models.decision import Decision
-            from app.models.user import VerificationCode
-            from app.models.support_ticket import SupportTicket
-            from app.models.comment import DiscussionThread, Comment
-            from app.models.alternative import Alternative
-            from app.models.meeting_note import MeetingNote
-            from app.models.attachment import Attachment
-            from app.models.decision_version import DecisionVersion
-            from app.models.email_verification import EmailVerification
+            inspector = inspect(db.get_bind())
+            existing_tables = set(inspector.get_table_names())
 
-            # Delete related logs, notifications, tickets, verification codes & discussions
-            db.query(ActivityLog).filter(ActivityLog.user_id == user_id).delete(synchronize_session=False)
-            db.query(Notification).filter(Notification.user_id == user_id).delete(synchronize_session=False)
-            db.query(Review).filter(Review.reviewer_id == user_id).delete(synchronize_session=False)
-            db.query(Replay).filter(Replay.performed_by == user_id).delete(synchronize_session=False)
-            if user.email:
-                clean_e = user.email.strip().lower() if user.email else ""
-                db.query(VerificationCode).filter((VerificationCode.email == user.email) | (VerificationCode.email == getattr(user, 'email_hash', user.email))).delete(synchronize_session=False)
-                db.query(EmailVerification).filter(EmailVerification.email == clean_e).delete(synchronize_session=False)
+            def safe_exec(sql: str, params: dict):
+                try:
+                    db.execute(text(sql), params)
+                except Exception as _e:
+                    # Ignore missing tables / columns gracefully
+                    pass
 
-            db.query(SupportTicket).filter(SupportTicket.user_id == user_id).delete(synchronize_session=False)
+            clean_email = user.email.strip().lower() if user.email else ""
+            clean_orig = getattr(user, 'email_original', '') or ""
+            clean_hash = getattr(user, 'email_hash', '') or ""
+            email_params = {"e": clean_email, "eh": clean_hash, "eo": clean_orig, "uid": user_id}
+
+            # 1. Clean up activity logs
+            if "activity_logs" in existing_tables:
+                safe_exec("DELETE FROM activity_logs WHERE user_id = :uid", email_params)
+            if "audit_logs" in existing_tables:
+                safe_exec("DELETE FROM audit_logs WHERE actor_id = :uid", email_params)
+
+            # 2. Clean up notifications, support tickets, internal emails, and backup records
+            if "notifications" in existing_tables:
+                safe_exec("DELETE FROM notifications WHERE user_id = :uid", email_params)
+            if "support_tickets" in existing_tables:
+                safe_exec("DELETE FROM support_tickets WHERE user_id = :uid", email_params)
+            if "internal_emails" in existing_tables:
+                safe_exec("DELETE FROM internal_emails WHERE sender_id = :uid", email_params)
+            if "backup_records" in existing_tables:
+                safe_exec("DELETE FROM backup_records WHERE user_id = :uid", email_params)
+
+            # 3. Clean up reviews and replays performed by user
+            if "reviews" in existing_tables:
+                safe_exec("DELETE FROM reviews WHERE reviewer_id = :uid", email_params)
+            if "replays" in existing_tables:
+                safe_exec("DELETE FROM replays WHERE performed_by = :uid", email_params)
+
+            # 4. Clean up email verification records
+            if "verification_codes" in existing_tables:
+                safe_exec("DELETE FROM verification_codes WHERE email = :e OR email = :eh OR email = :eo", email_params)
+            if "email_verifications" in existing_tables:
+                safe_exec("DELETE FROM email_verifications WHERE email = :e OR email = :eh OR email = :eo", email_params)
+
+            # 5. Nullify user references in configs, meeting notes, attachments, versions & decisions
+            if "approval_chain_configs" in existing_tables:
+                safe_exec("UPDATE approval_chain_configs SET created_by = NULL WHERE created_by = :uid", email_params)
+            if "meeting_notes" in existing_tables:
+                safe_exec("UPDATE meeting_notes SET created_by = NULL WHERE created_by = :uid", email_params)
+                safe_exec("UPDATE meeting_notes SET updated_by = NULL WHERE updated_by = :uid", email_params)
+            if "attachments" in existing_tables:
+                safe_exec("UPDATE attachments SET uploaded_by = NULL WHERE uploaded_by = :uid", email_params)
+            if "decision_versions" in existing_tables:
+                safe_exec("UPDATE decision_versions SET changed_by = NULL WHERE changed_by = :uid", email_params)
+            if "decisions" in existing_tables:
+                safe_exec("UPDATE decisions SET rationale_updated_by = NULL WHERE rationale_updated_by = :uid", email_params)
+            if "discussion_threads" in existing_tables:
+                safe_exec("UPDATE discussion_threads SET pinned_by = NULL WHERE pinned_by = :uid", email_params)
+
+            # 6. Nullify self-referential comment replies & delete comments by user
+            if "comments" in existing_tables:
+                safe_exec("UPDATE comments SET reply_to_id = NULL WHERE reply_to_id IN (SELECT id FROM comments WHERE user_id = :uid)", email_params)
+                safe_exec("DELETE FROM comments WHERE user_id = :uid", email_params)
+
+            # 7. Clean up discussion threads created by user
+            if "discussion_threads" in existing_tables:
+                if "comments" in existing_tables:
+                    safe_exec("DELETE FROM comments WHERE thread_id IN (SELECT id FROM discussion_threads WHERE created_by = :uid)", email_params)
+                safe_exec("DELETE FROM discussion_threads WHERE created_by = :uid", email_params)
+
+            # 8. Clean up decisions created by user and their cascaded dependencies
+            if "decisions" in existing_tables:
+                try:
+                    user_decision_ids = [d[0] for d in db.execute(text("SELECT id FROM decisions WHERE created_by = :uid"), email_params).fetchall()]
+                    if user_decision_ids:
+                        if "alternatives" in existing_tables:
+                            safe_exec("DELETE FROM alternatives WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
+                        if "reviews" in existing_tables:
+                            safe_exec("DELETE FROM reviews WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
+                        if "replays" in existing_tables:
+                            safe_exec("DELETE FROM replays WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
+                        if "comments" in existing_tables and "discussion_threads" in existing_tables:
+                            safe_exec("DELETE FROM comments WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid))", email_params)
+                        if "discussion_threads" in existing_tables:
+                            safe_exec("DELETE FROM discussion_threads WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
+                        if "meeting_notes" in existing_tables:
+                            safe_exec("DELETE FROM meeting_notes WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
+                        if "attachments" in existing_tables:
+                            safe_exec("DELETE FROM attachments WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
+                        if "decision_versions" in existing_tables:
+                            safe_exec("DELETE FROM decision_versions WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
+                        safe_exec("DELETE FROM decisions WHERE created_by = :uid", email_params)
+                except Exception:
+                    pass
+
+            # 9. Delete the user
+            db.execute(text("DELETE FROM users WHERE id = :uid"), email_params)
+            db.commit()
+
+            # Invalidate dashboard in-memory caches
             try:
-                from app.models.backup_record import BackupRecord
-                db.query(BackupRecord).filter(BackupRecord.user_id == user_id).delete(synchronize_session=False)
+                from app.repositories.dashboard_repository import _DASHBOARD_CACHE
+                _DASHBOARD_CACHE.clear()
             except Exception:
                 pass
 
-            # Nullify self-referential replies on comments created by user
-            user_comment_ids = [c.id for c in db.query(Comment.id).filter(Comment.user_id == user_id).all()]
-            if user_comment_ids:
-                db.query(Comment).filter(Comment.reply_to_id.in_(user_comment_ids)).update({"reply_to_id": None}, synchronize_session=False)
-            db.query(Comment).filter(Comment.user_id == user_id).delete(synchronize_session=False)
-
-            # Clean up discussion threads created by user and their comments
-            user_threads = [t.id for t in db.query(DiscussionThread.id).filter(DiscussionThread.created_by == user_id).all()]
-            if user_threads:
-                db.query(Comment).filter(Comment.thread_id.in_(user_threads)).delete(synchronize_session=False)
-                db.query(DiscussionThread).filter(DiscussionThread.id.in_(user_threads)).delete(synchronize_session=False)
-
-            # Nullify references in decision, discussion, meeting note & attachment tables
-            db.query(Decision).filter(Decision.rationale_updated_by == user_id).update({"rationale_updated_by": None}, synchronize_session=False)
-            db.query(DiscussionThread).filter(DiscussionThread.pinned_by == user_id).update({"pinned_by": None}, synchronize_session=False)
-            db.query(MeetingNote).filter(MeetingNote.created_by == user_id).update({"created_by": None}, synchronize_session=False)
-            db.query(MeetingNote).filter(MeetingNote.updated_by == user_id).update({"updated_by": None}, synchronize_session=False)
-            db.query(Attachment).filter(Attachment.uploaded_by == user_id).update({"uploaded_by": None}, synchronize_session=False)
-            db.query(DecisionVersion).filter(DecisionVersion.changed_by == user_id).update({"changed_by": None}, synchronize_session=False)
-
-            # Clean up decisions created by user and their child dependencies
-            user_decisions = db.query(Decision.id).filter(Decision.created_by == user_id).all()
-            dec_ids = [d[0] for d in user_decisions]
-            if dec_ids:
-                db.query(Alternative).filter(Alternative.decision_id.in_(dec_ids)).delete(synchronize_session=False)
-                db.query(Review).filter(Review.decision_id.in_(dec_ids)).delete(synchronize_session=False)
-                db.query(Replay).filter(Replay.decision_id.in_(dec_ids)).delete(synchronize_session=False)
-                
-                # Delete discussion threads, meeting notes, attachments for these decisions
-                dec_threads = [t.id for t in db.query(DiscussionThread.id).filter(DiscussionThread.decision_id.in_(dec_ids)).all()]
-                if dec_threads:
-                    db.query(Comment).filter(Comment.thread_id.in_(dec_threads)).delete(synchronize_session=False)
-                    db.query(DiscussionThread).filter(DiscussionThread.id.in_(dec_threads)).delete(synchronize_session=False)
-
-                db.query(MeetingNote).filter(MeetingNote.decision_id.in_(dec_ids)).delete(synchronize_session=False)
-                db.query(Attachment).filter(Attachment.decision_id.in_(dec_ids)).delete(synchronize_session=False)
-                db.query(DecisionVersion).filter(DecisionVersion.decision_id.in_(dec_ids)).delete(synchronize_session=False)
-                db.query(Decision).filter(Decision.id.in_(dec_ids)).delete(synchronize_session=False)
-
-            db.delete(user)
-            db.commit()
             return (True, None)
-        except Exception as primary_err:
+        except Exception as err:
             db.rollback()
-            try:
-                db.execute(text("DELETE FROM activity_logs WHERE user_id = :uid"), {"uid": user_id})
-                db.execute(text("DELETE FROM notifications WHERE user_id = :uid"), {"uid": user_id})
-                db.execute(text("DELETE FROM reviews WHERE reviewer_id = :uid"), {"uid": user_id})
-                db.execute(text("DELETE FROM replays WHERE performed_by = :uid"), {"uid": user_id})
-                db.execute(text("DELETE FROM support_tickets WHERE user_id = :uid"), {"uid": user_id})
-                db.execute(text("UPDATE comments SET reply_to_id = NULL WHERE reply_to_id IN (SELECT id FROM comments WHERE user_id = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM comments WHERE user_id = :uid"), {"uid": user_id})
-                db.execute(text("DELETE FROM comments WHERE thread_id IN (SELECT id FROM discussion_threads WHERE created_by = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM discussion_threads WHERE created_by = :uid"), {"uid": user_id})
-                db.execute(text("UPDATE decisions SET rationale_updated_by = NULL WHERE rationale_updated_by = :uid"), {"uid": user_id})
-                db.execute(text("UPDATE discussion_threads SET pinned_by = NULL WHERE pinned_by = :uid"), {"uid": user_id})
-                db.execute(text("UPDATE meeting_notes SET created_by = NULL WHERE created_by = :uid"), {"uid": user_id})
-                db.execute(text("UPDATE meeting_notes SET updated_by = NULL WHERE updated_by = :uid"), {"uid": user_id})
-                db.execute(text("UPDATE attachments SET uploaded_by = NULL WHERE uploaded_by = :uid"), {"uid": user_id})
-                db.execute(text("UPDATE decision_versions SET changed_by = NULL WHERE changed_by = :uid"), {"uid": user_id})
-
-                db.execute(text("DELETE FROM alternatives WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM reviews WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM replays WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM comments WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid))"), {"uid": user_id})
-                db.execute(text("DELETE FROM discussion_threads WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM meeting_notes WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM attachments WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM decision_versions WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)"), {"uid": user_id})
-                db.execute(text("DELETE FROM decisions WHERE created_by = :uid"), {"uid": user_id})
-
-                db.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": user_id})
-                db.commit()
-                return (True, None)
-            except Exception as secondary_err:
-                db.rollback()
-                return (False, f"Delete failed: {str(primary_err)} | {str(secondary_err)}")
+            return (False, f"Delete failed: {str(err)}")
 
     @staticmethod
     def get_all_users(db: Session):

@@ -28,12 +28,16 @@ router = APIRouter(
 def ai_support_chat(req: AiSupportChatRequest, db: Session = Depends(get_db)):
     """
     Intelligent AI Support Assistant for EDRP with live LLM integrations and fallback knowledge engine.
+    Supports standard platform helpdesk mode and Knowledge Repository RAG mode.
     """
     user_name = req.user_name or "User"
     if req.user_id:
         user = db.query(User).filter(User.id == req.user_id).first()
         if user and user.full_name:
             user_name = user.full_name
+
+    use_kr = req.use_knowledge_repository or (req.mode == "knowledge_repository")
+    effective_mode = "knowledge_repository" if use_kr else (req.mode or "standard")
 
     response_data = generate_ai_response(
         user_message=req.message,
@@ -42,12 +46,15 @@ def ai_support_chat(req: AiSupportChatRequest, db: Session = Depends(get_db)):
         conversation_history=req.conversation_history,
         page_context=req.page_context,
         page_title=req.page_title,
-        page_url=req.page_url
+        page_url=req.page_url,
+        mode=effective_mode,
+        use_knowledge_repository=use_kr
     )
     return AiSupportChatResponse(
         reply=response_data["reply"],
         suggested_actions=response_data.get("suggested_actions", []),
-        source=response_data.get("source", "EDRP AI Assistant")
+        source=response_data.get("source", "EDRP AI Assistant"),
+        is_knowledge_repository=response_data.get("is_knowledge_repository", use_kr)
     )
 
 

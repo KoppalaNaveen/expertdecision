@@ -103,35 +103,23 @@ class NotificationService:
             notification_type="Decision Submission"
         )
         
-        # 2. Assigned Reviewers Notification (Sequential: Notify 1st assigned reviewer)
+        # 2. Specifically Assigned Reviewer(s) for this decision (Notify 1st assigned reviewer)
         reviews = db.query(Review).filter(Review.decision_id == decision.id).order_by(Review.id.asc()).all()
-        reviewer_ids = {r.reviewer_id for r in reviews if r.reviewer_id != created_by_id}
+        reviewer_ids = set()
         
         if reviews:
             # First reviewer in sequence
             first_review = reviews[0]
-            if first_review.reviewer_id != created_by_id:
+            if first_review.reviewer_id and first_review.reviewer_id != created_by_id:
+                reviewer_ids.add(first_review.reviewer_id)
                 NotificationService.create_notification(
                     db,
                     user_id=first_review.reviewer_id,
                     message=f"Pending review for decision 'DEC-{decision.id}: {decision.title}' submitted by {creator_name}.",
                     notification_type="Review Request"
                 )
-        
-        # 3. Managers Notification (Users with Manager role who are not reviewers)
-        manager_role = db.query(Role).filter(Role.role_name == "Manager").first()
-        if manager_role:
-            managers = db.query(User).filter(User.role_id == manager_role.id, User.id != created_by_id).all()
-            for mgr in managers:
-                if mgr.id not in reviewer_ids:
-                    NotificationService.create_notification(
-                        db,
-                        user_id=mgr.id,
-                        message=f"New team decision 'DEC-{decision.id}: {decision.title}' submitted by {creator_name}.",
-                        notification_type="Decision Submission"
-                    )
 
-        # 4. Administrators Notification (Users with Admin / Administrator role)
+        # 3. Administrators Notification ONLY (Platform-wide audit oversight)
         admin_roles = db.query(Role).filter(Role.role_name.in_(["Admin", "Administrator"])).all()
         admin_role_ids = [r.id for r in admin_roles]
         if admin_role_ids:
@@ -155,9 +143,11 @@ class NotificationService:
         reviewer_name = reviewer.full_name if reviewer else f"Reviewer #{reviewer_id}"
         
         status_text = status.capitalize()
+        notified_uids = {reviewer_id}
         
         # 1. Creator Notification & Direct Gmail Outcome Email
         if decision.created_by != reviewer_id:
+            notified_uids.add(decision.created_by)
             creator = db.query(User).filter(User.id == decision.created_by).first()
             creator_email = get_recipient_email(creator)
             creator_name = creator.full_name if creator else "Decision Owner"
@@ -186,19 +176,32 @@ class NotificationService:
                         print(f"Async decision outcome email note: {e}")
 
                 threading.Thread(target=_async_decision_email, daemon=True).start()
-            
-        # 2. Managers & Admins Notification
-        manager_admin_roles = db.query(Role).filter(Role.role_name.in_(["Manager", "Admin", "Administrator"])).all()
-        role_ids = [r.id for r in manager_admin_roles]
-        if role_ids:
-            supervisors = db.query(User).filter(User.role_id.in_(role_ids), User.id != reviewer_id, User.id != decision.created_by).all()
-            for sup in supervisors:
-                NotificationService.create_notification(
-                    db,
-                    user_id=sup.id,
-                    message=f"Decision 'DEC-{decision.id}: {decision.title}' status updated to {status_text} by {reviewer_name}.",
-                    notification_type="Review Update"
-                )
+
+        # 2. Next specifically assigned reviewer in the sequential review chain for this decision
+        reviews = db.query(Review).filter(Review.decision_id == decision.id).order_by(Review.id.asc()).all()
+        next_pending_rev = next((r for r in reviews if r.status == "Pending" and r.reviewer_id not in notified_uids), None)
+        if next_pending_rev and next_pending_rev.reviewer_id:
+            notified_uids.add(next_pending_rev.reviewer_id)
+            NotificationService.create_notification(
+                db,
+                user_id=next_pending_rev.reviewer_id,
+                message=f"Review step approved by previous reviewer. Decision 'DEC-{decision.id}: {decision.title}' is now awaiting your review/approval.",
+                notification_type="Review Request"
+            )
+
+        # 3. Administrators ONLY (Platform-wide audit oversight)
+        admin_roles = db.query(Role).filter(Role.role_name.in_(["Admin", "Administrator"])).all()
+        admin_role_ids = [r.id for r in admin_roles]
+        if admin_role_ids:
+            admins = db.query(User).filter(User.role_id.in_(admin_role_ids)).all()
+            for admin in admins:
+                if admin.id not in notified_uids:
+                    NotificationService.create_notification(
+                        db,
+                        user_id=admin.id,
+                        message=f"Decision 'DEC-{decision.id}: {decision.title}' status updated to {status_text} by {reviewer_name}.",
+                        notification_type="Review Update"
+                    )
 
     @staticmethod
     def notify_discussion(db: Session, decision_id: int, sender_id: int, content: str):

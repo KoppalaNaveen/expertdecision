@@ -270,7 +270,7 @@
                 const res = await fetch('/api/pending-approvals/action', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId, action: action })
+                    body: JSON.stringify({ user_id: parseInt(userId, 10), action: action, actor_name: "Administrator" })
                 });
 
                 const data = await res.json();

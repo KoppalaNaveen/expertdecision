@@ -6,13 +6,18 @@ from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-from sqlalchemy import text
+from sqlalchemy import text, inspect
+
+
+def _get_local_sqlite_url():
+    default_sqlite_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "edrp.db"))
+    return f"sqlite:///{default_sqlite_path}"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Optimized Connection Pool for Remote PostgreSQL (Supabase) / Local SQLite
 if not DATABASE_URL or "sqlite" in DATABASE_URL:
-    DATABASE_URL = DATABASE_URL or "sqlite:///./edrp.db"
+    DATABASE_URL = _get_local_sqlite_url() if (not DATABASE_URL or DATABASE_URL == "sqlite:///./edrp.db") else DATABASE_URL
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
     try:
@@ -30,8 +35,9 @@ else:
         engine = test_engine
     except Exception as db_err:
         print(f"Notice: Remote database unreachable ({db_err}). Switching to local SQLite database.")
-        DATABASE_URL = "sqlite:///./edrp.db"
+        DATABASE_URL = _get_local_sqlite_url()
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -42,9 +48,13 @@ SessionLocal = sessionmaker(
 from app.database.base import Base
 from app import models
 
-from sqlalchemy import inspect
+_SCHEMA_INITIALIZED = False
 
 def ensure_user_schema_columns():
+    global _SCHEMA_INITIALIZED
+    if _SCHEMA_INITIALIZED:
+        return
+    _SCHEMA_INITIALIZED = True
     try:
         inspector = inspect(engine)
         columns_to_add = [
@@ -52,6 +62,7 @@ def ensure_user_schema_columns():
             ("users", "approved", "BOOLEAN DEFAULT FALSE"),
             ("users", "status", "VARCHAR(50) DEFAULT 'Pending Approval'"),
             ("users", "approved_by", "VARCHAR(100)"),
+
             ("users", "approved_at", "VARCHAR(50)"),
             ("users", "rejected_by", "VARCHAR(100)"),
             ("users", "rejected_at", "VARCHAR(50)"),

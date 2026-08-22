@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 
 
 class RecentDecision(BaseModel):
@@ -8,7 +8,13 @@ class RecentDecision(BaseModel):
     status: str
     department: Optional[str] = None
     approver_name: Optional[str] = None
+    creator_name: Optional[str] = None
+    requester_name: Optional[str] = None
+    reviewer_name: Optional[str] = None
+    category_name: Optional[str] = None
     created_at_str: Optional[str] = None
+    updated_at_str: Optional[str] = None
+    time_ago: Optional[str] = None
     priority: Optional[str] = "Medium"
 
     class Config:
@@ -20,10 +26,14 @@ class RecentReview(BaseModel):
     decision_id: int
     decision_title: Optional[str] = None
     status: str
-    comments: str | None = None
+    comments: Optional[str] = None
     time_ago: Optional[str] = None
     task_type: Optional[str] = None
     is_owner: Optional[bool] = None
+    author_name: Optional[str] = None
+    author_initials: Optional[str] = None
+    department: Optional[str] = None
+    priority: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -32,7 +42,7 @@ class RecentReview(BaseModel):
 class RecentReplay(BaseModel):
     id: int
     decision_id: int
-    action: str
+    action: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -54,17 +64,23 @@ class AuditLogEntry(BaseModel):
     action: str
     module: Optional[str] = None
     time_ago: Optional[str] = None
+    created_at_str: Optional[str] = None
     severity: Optional[str] = "Info"
+    icon: Optional[str] = "activity"
+    icon_color: Optional[str] = "#2563EB"
+    bg_color: Optional[str] = "#EFF6FF"
 
     class Config:
         from_attributes = True
 
 
 class ApprovalFlowStat(BaseModel):
-    stage: str
-    count: int
-    pct: int
-    color: str
+    stage: Optional[str] = "General"
+    label: Optional[str] = None
+    count: Optional[int] = 0
+    pct: Optional[int] = 0
+    percentage: Optional[int] = 0
+    color: Optional[str] = "#3B82F6"
 
     class Config:
         from_attributes = True
@@ -74,12 +90,15 @@ class DashboardResponse(BaseModel):
     user: str
     role: str
     team: str
+    designation: Optional[str] = "Team Member"
+    employee_id: Optional[str] = None
 
     # Core stats
     total_decisions: int
     pending_reviews: int
     total_replays: int
     unread_notifications_count: Optional[int] = 0
+    recent_notifications: Optional[List[dict]] = []
 
     # Admin-specific stats
     total_users: Optional[int] = 0
@@ -94,6 +113,7 @@ class DashboardResponse(BaseModel):
     recent_decisions: List[RecentDecision] = []
     recent_reviews: List[RecentReview] = []
     recent_replays: List[RecentReplay] = []
+    recent_discussions: Optional[List[dict]] = []
 
     # Admin extras
     recent_users: Optional[List[RecentUser]] = []

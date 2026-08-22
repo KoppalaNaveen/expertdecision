@@ -1,19 +1,360 @@
-.card{
+/* =========================================================
+   team.css – Production-Level Enterprise Team Management UI
+   ========================================================= */
 
-border-radius:12px;
-
+/* KPI Stat Cards */
+.team-stat-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.team-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+    border-color: #CBD5E1;
+}
+.team-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.stat-icon-blue {
+    background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+    color: #4F46E5;
+}
+.stat-icon-emerald {
+    background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
+    color: #059669;
+}
+.stat-icon-amber {
+    background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
+    color: #D97706;
+}
+.stat-icon-cyan {
+    background: linear-gradient(135deg, #ECFEFF, #CFFAFE);
+    color: #0891B2;
 }
 
-.table th{
-
-background:#198754;
-
-color:white;
-
+/* Main Teams Table Container */
+.team-table-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
 }
 
-.btn{
+.team-table-header {
+    background: #FFFFFF;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
 
-border-radius:8px;
+.team-table thead th {
+    background: #F8FAFC !important;
+    color: #64748B !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 12px 16px !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+}
 
+.team-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+.team-table tbody tr:hover {
+    background-color: #F8FAFC !important;
+}
+
+.team-table td {
+    padding: 16px !important;
+    vertical-align: middle !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+}
+
+/* Employee Pill Component inside Table */
+.member-pill-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.member-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 20px;
+    padding: 3px 10px 3px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1E293B;
+    transition: all 0.15s ease;
+}
+.member-pill:hover {
+    background: #F1F5F9;
+    border-color: #CBD5E1;
+}
+
+.member-pill-id {
+    background: #2563EB;
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: monospace;
+    padding: 1px 6px;
+    border-radius: 12px;
+    letter-spacing: 0.02em;
+}
+
+.member-pill-id.manager {
+    background: #0D9488;
+}
+.member-pill-id.admin {
+    background: #7C3AED;
+}
+.member-pill-id.reviewer {
+    background: #D97706;
+}
+
+.member-pill-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Employee Item Card inside Add/Edit Modal */
+.emp-select-card {
+    transition: all 0.15s ease;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    background: #FFFFFF;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+.emp-select-card:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+    transform: translateX(2px);
+}
+.emp-select-card.selected {
+    background: #EFF6FF;
+    border-color: #3B82F6;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.12);
+}
+
+.emp-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4F46E5, #7C3AED);
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.emp-checkbox-wrapper {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 2px solid #CBD5E1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    background: #FFFFFF;
+}
+.emp-select-card.selected .emp-checkbox-wrapper {
+    background: #2563EB;
+    border-color: #2563EB;
+    color: #FFFFFF;
+}
+
+/* Selected Members Tray (Horizontal scroll chips) */
+.selected-tray-container {
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    border-radius: 10px;
+    padding: 8px 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 110px;
+    overflow-y: auto;
+}
+
+.selected-tray-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #FFFFFF;
+    border: 1px solid #BFDBFE;
+    border-radius: 20px;
+    padding: 3px 10px 3px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1E40AF;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.selected-tray-chip .btn-remove-chip {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #DBEAFE;
+    color: #1E40AF;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+    padding: 0;
+    line-height: 1;
+}
+.selected-tray-chip .btn-remove-chip:hover {
+    background: #EF4444;
+    color: #FFFFFF;
+}
+
+/* Filter pills in modal */
+.filter-tab-pill {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.filter-tab-pill:hover {
+    background: #F1F5F9;
+    color: #1E293B;
+}
+.filter-tab-pill.active {
+    background: #2563EB;
+    color: #FFFFFF;
+    border-color: #2563EB;
+}
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #F1F5F9;
+    border-radius: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
+
+/* -------------------------------------------------------------
+   Inline Team Members Dropdown / Expandable Drawer
+   ------------------------------------------------------------- */
+.team-dropdown-btn {
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    font-size: 11.5px !important;
+    background: #F8FAFC !important;
+    color: #1E293B !important;
+    border-color: #E2E8F0 !important;
+}
+.team-dropdown-btn:hover {
+    background: #EEF2FF !important;
+    color: #4F46E5 !important;
+    border-color: #C7D2FE !important;
+}
+.team-dropdown-btn.open {
+    background: #EEF2FF !important;
+    color: #4F46E5 !important;
+    border-color: #6366F1 !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+}
+.team-dropdown-btn .dropdown-arrow-icon {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.team-dropdown-btn.open .dropdown-arrow-icon {
+    transform: rotate(180deg);
+}
+
+/* Expandable Drawer Row */
+.team-members-drawer-row {
+    background: #F8FAFC !important;
+    transition: all 0.25s ease-in-out;
+}
+.team-drawer-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+.drawer-member-card {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 9px;
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.15s ease;
+}
+.drawer-member-card:hover {
+    background: #FFFFFF;
+    border-color: #CBD5E1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transform: translateY(-1px);
+}
+
+.drawer-member-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4F46E5, #7C3AED);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
 }

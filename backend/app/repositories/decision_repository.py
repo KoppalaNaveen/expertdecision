@@ -319,12 +319,16 @@ class DecisionRepository:
         return db_decision
 
     @staticmethod
-    def get_all_decisions(db: Session, user_id: int = None, role_name: str = None):
+    def get_all_decisions(db: Session, user_id: int = None, role_name: str = None, status: str = None, scope: str = None):
         from sqlalchemy.orm import joinedload
         from app.models.user import User
         from app.models.review import Review
 
         query = db.query(Decision).options(joinedload(Decision.creator), joinedload(Decision.category))
+
+        # Knowledge Repository: all authenticated users can view all Approved decisions across the organization
+        if scope == "repository" or status == "Approved":
+            return query.filter(Decision.status == "Approved").order_by(Decision.id.desc()).all()
 
         if user_id:
             current_role = role_name
@@ -404,7 +408,10 @@ class DecisionRepository:
             if user and user.role:
                 role_lower = user.role.role_name.strip().lower()
 
-                if role_lower in ["employee", "emp"]:
+                # Approved decisions in institutional knowledge repository can be accessed by all authenticated users
+                if db_decision.status == "Approved":
+                    pass
+                elif role_lower in ["employee", "emp"]:
                     if db_decision.created_by not in target_uids:
                         return None  # Unauthorized for this employee
                 elif role_lower in ["reviewer", "rw"]:
@@ -540,6 +547,8 @@ class DecisionRepository:
 
         for v in versions:
             u = user_map.get(v.changed_by)
+            user_emp_id = (u.employee_id if (u and u.employee_id) else (f"USR-{u.id}" if u else (f"USR-{v.changed_by}" if v.changed_by else "System")))
+            user_role = (u.role.role_name if (u and u.role and u.role.role_name) else "User") if u else "System"
             timeline.append({
                 "id": f"v_{v.id}",
                 "decision_id": v.decision_id,
@@ -553,6 +562,10 @@ class DecisionRepository:
                 "decision_date": str(v.decision_date) if v.decision_date else None,
                 "tags": v.tags,
                 "changed_by": v.changed_by,
+                "changed_by_id": user_emp_id,
+                "changed_by_role": user_role,
+                "employee_id": user_emp_id,
+                "role_name": user_role,
                 "changed_by_name": u.full_name if u else (f"User #{v.changed_by}" if v.changed_by else "System"),
                 "changed_by_initials": (u.full_name.split()[0][0] + (u.full_name.split()[-1][0] if len(u.full_name.split()) > 1 else "")).upper() if (u and u.full_name) else "U",
                 "change_reason": v.change_reason or "Version Snapshot Updated",
@@ -562,7 +575,9 @@ class DecisionRepository:
 
         for l in logs:
             u = user_map.get(l.user_id)
-            user_name = u.full_name if u else f"User #{l.user_id}"
+            user_name = u.full_name if u else (f"User #{l.user_id}" if l.user_id else "System")
+            user_emp_id = (u.employee_id if (u and u.employee_id) else (f"USR-{u.id}" if u else (f"USR-{l.user_id}" if l.user_id else "System")))
+            user_role = (u.role.role_name if (u and u.role and u.role.role_name) else "User") if u else "System"
             
             act_text = (l.action or "")
             det_text = (l.details or "")
@@ -607,6 +622,10 @@ class DecisionRepository:
                 "decision_date": None,
                 "tags": None,
                 "changed_by": l.user_id,
+                "changed_by_id": user_emp_id,
+                "changed_by_role": user_role,
+                "employee_id": user_emp_id,
+                "role_name": user_role,
                 "changed_by_name": user_name,
                 "changed_by_initials": (u.full_name.split()[0][0] + (u.full_name.split()[-1][0] if len(u.full_name.split()) > 1 else "")).upper() if (u and u.full_name) else "U",
                 "change_reason": l.details or l.action,
@@ -620,6 +639,8 @@ class DecisionRepository:
         for r in reviews:
             u = user_map.get(r.reviewer_id)
             timestamp = getattr(r, "reviewed_at", None)
+            user_emp_id = (u.employee_id if (u and u.employee_id) else (f"USR-{u.id}" if u else (f"USR-{r.reviewer_id}" if r.reviewer_id else "N/A")))
+            user_role = (u.role.role_name if (u and u.role and u.role.role_name) else "Reviewer") if u else "Reviewer"
             timeline.append({
                 "id": f"rev_{r.id}",
                 "decision_id": decision_id,
@@ -633,6 +654,10 @@ class DecisionRepository:
                 "decision_date": None,
                 "tags": None,
                 "changed_by": r.reviewer_id,
+                "changed_by_id": user_emp_id,
+                "changed_by_role": user_role,
+                "employee_id": user_emp_id,
+                "role_name": user_role,
                 "changed_by_name": u.full_name if u else f"User #{r.reviewer_id}",
                 "changed_by_initials": (u.full_name.split()[0][0] + (u.full_name.split()[-1][0] if len(u.full_name.split()) > 1 else "")).upper() if (u and u.full_name) else "U",
                 "change_reason": f"Reviewer action: {r.status}. Comments: {r.comments or 'None'}",
@@ -652,7 +677,10 @@ class DecisionRepository:
         return timeline
 
     @staticmethod
-    def restore_decision_version(db: Session, decision_id: int, version_number: int, user_id: int = 1):
+    def restore_decision_version(db: Session, decision_id: int, version_number: int, user_id: int = None):
+        from app.models.user import User
+        from app.models.activity_log import ActivityLog
+
         db_decision = DecisionRepository.get_decision_by_id(db, decision_id)
         version_obj = db.query(DecisionVersion).filter(
             DecisionVersion.decision_id == decision_id,
@@ -661,6 +689,12 @@ class DecisionRepository:
 
         if not db_decision or not version_obj:
             return None
+
+        # Resolve valid user ID for foreign key constraint
+        valid_user = db.query(User).filter(User.id == user_id).first() if user_id else None
+        valid_user_id = valid_user.id if valid_user else (
+            db_decision.created_by if db.query(User).filter(User.id == db_decision.created_by).first() else None
+        )
 
         db_decision.title = version_obj.title
         db_decision.description = version_obj.description
@@ -691,10 +725,22 @@ class DecisionRepository:
             department=db_decision.department,
             decision_date=db_decision.decision_date,
             tags=db_decision.tags,
-            changed_by=user_id,
+            changed_by=valid_user_id,
             change_reason=f"Restored from Version v{version_number}"
         )
         db.add(restored_version)
+
+        if valid_user_id:
+            try:
+                act_log = ActivityLog(
+                    user_id=valid_user_id,
+                    action=f"Restored decision DEC-{db_decision.id} to Version {version_number}",
+                    details=f"Decision restored to snapshot of Version {version_number}"
+                )
+                db.add(act_log)
+            except Exception:
+                pass
+
         db.commit()
         db.refresh(db_decision)
         return db_decision

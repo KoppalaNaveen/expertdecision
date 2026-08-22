@@ -14,8 +14,11 @@ const roleMap = {
     4: "Reviewer"
 };
 
+let allTeamsList = [];
+
+
 document.addEventListener("DOMContentLoaded", () => {
-    Promise.all([fetchUsers(), fetchRoles()]);
+    Promise.all([fetchUsers(), fetchRoles(), fetchTeams()]);
 
     const btnSubmit = document.getElementById("btnAddUserSubmit");
     if (btnSubmit) {
@@ -30,6 +33,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    const editForm = document.getElementById("editUserForm");
+    if (editForm) {
+        editForm.addEventListener("submit", (e) => {
+            submitEditUserForm(e);
+        });
+    }
+
     const promoteForm = document.getElementById("promoteUserForm");
     if (promoteForm) {
         promoteForm.addEventListener("submit", (e) => {
@@ -37,6 +47,24 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
+
+async function fetchTeams() {
+    try {
+        const res = await fetch(`${API_URL}/teams/`);
+        if (!res.ok) return;
+        allTeamsList = await res.json();
+        const select = document.getElementById("addTeamId");
+        if (select && Array.isArray(allTeamsList) && allTeamsList.length > 0) {
+            select.innerHTML = `<option value="">-- Unassigned --</option>` + 
+                allTeamsList.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
+        }
+        const editSelect = document.getElementById("editTeamId");
+        if (editSelect && Array.isArray(allTeamsList) && allTeamsList.length > 0) {
+            editSelect.innerHTML = `<option value="">-- Unassigned --</option>` + 
+                allTeamsList.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
+        }
+    } catch (_) {}
+}
 
 async function fetchRoles() {
     try {
@@ -48,20 +76,35 @@ async function fetchRoles() {
         if (select && roles.length > 0) {
             select.innerHTML = roles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
         }
+        const editRoleSelect = document.getElementById("editRoleId");
+        if (editRoleSelect && roles.length > 0) {
+            editRoleSelect.innerHTML = roles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
+        }
         if (allUsers.length > 0) {
             renderTable();
         }
     } catch (_) {}
 }
 
+
 async function fetchUsers() {
     try {
         const res = await fetch(`${API_URL}/users/`);
         if (!res.ok) throw new Error("Failed to load users");
-        allUsers = await res.json();
+
+        const rawUsers = await res.json();
+        const seenIds = new Set();
+        allUsers = [];
+        (Array.isArray(rawUsers) ? rawUsers : []).forEach(u => {
+            if (!u || !u.id || seenIds.has(u.id)) return;
+            seenIds.add(u.id);
+            allUsers.push(u);
+        });
+
         updateStats();
         renderTable();
     } catch (err) {
+
         document.getElementById("usersTableBody").innerHTML =
             `<tr><td colspan="7" class="text-center py-5 text-danger">
                 <i data-lucide="alert-circle" style="width:18px;height:18px;" class="me-2"></i>${err.message}
@@ -125,72 +168,93 @@ function renderTable() {
             const roleClass  = "role-" + roleName.toLowerCase().replace(/\s/g, "");
             let statusBadge = "";
             if (u.status === "Pending Approval" || u.approved === false) {
-                statusBadge = `<span class="badge" style="background:#FEF3C7;color:#D97706;font-size:11px;font-weight:700;"><i data-lucide="clock" style="width:11px;height:11px;" class="me-1"></i>Pending Approval</span>`;
+                statusBadge = `<span class="status-pill status-pending" title="Pending Approval"><span class="status-dot"></span>Pending</span>`;
             } else if (u.status === "Rejected") {
-                statusBadge = `<span class="badge" style="background:#FEF2F2;color:#DC2626;font-size:11px;font-weight:700;">Rejected</span>`;
+                statusBadge = `<span class="status-pill status-inactive" title="Rejected"><span class="status-dot"></span>Rejected</span>`;
             } else if (u.is_active) {
-                statusBadge = `<span class="badge" style="background:#ECFDF5;color:#059669;font-size:11px;font-weight:700;">Active</span>`;
+                statusBadge = `<span class="status-pill status-active" title="Active Account"><span class="status-dot"></span>Active</span>`;
             } else {
-                statusBadge = `<span class="badge" style="background:#FEF2F2;color:#DC2626;font-size:11px;font-weight:700;">Inactive</span>`;
+                statusBadge = `<span class="status-pill status-inactive" title="Inactive Account"><span class="status-dot"></span>Inactive</span>`;
             }
             
             const userEmail = (u.email_original || u.display_email || u.email || '').trim();
             const displayEmailStr = userEmail.includes('@') ? userEmail : `${u.full_name.toLowerCase().replace(/\s+/g, '.')}@corp.com`;
             const emailHtml = `<div class="text-muted d-flex align-items-center gap-1 mt-0.5" style="font-size:11px;" title="${displayEmailStr}">
-                <i data-lucide="mail" style="width:12px;height:12px;color:#64748B;"></i>
-                <span style="color:#475569;font-size:11.5px;font-weight:500;">${displayEmailStr}</span>
+                <i data-lucide="mail" style="width:11px;height:11px;color:#94A3B8;"></i>
+                <span style="color:#64748B;font-size:11px;font-weight:500;" class="text-truncate">${displayEmailStr}</span>
             </div>`;
 
             let approveBtn = "";
             if (isAdmin && (u.status === "Pending Approval" || u.approved === false)) {
-                approveBtn = `<button class="btn btn-sm btn-success px-2 ms-1" style="font-size:12px; font-weight:700;" onclick="approveUserDirectly(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Approve Account">
-                    <i data-lucide="check-circle" style="width:13px;height:13px;" class="me-1"></i>Approve
+                approveBtn = `<button class="btn btn-sm btn-success px-2 py-1" onclick="approveUserDirectly(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Approve Account">
+                    <i data-lucide="check-circle" style="width:11px;height:11px;"></i>Approve
                 </button>`;
             }
 
             const isTargetAdmin = roleName.toLowerCase().includes('admin') || ['administrator', 'admin', 'system administrator'].includes(roleName.toLowerCase()) || u.role_id === 1;
 
             const promoteBtn = (isAdmin && !isTargetAdmin)
-                ? `<button class="btn btn-sm btn-outline-info px-2 ms-1" style="font-size:12px; color:#6D28D9; border-color:#DDD6FE; background:#F5F3FF;" onclick="openPromoteModal(${u.id})" title="Promote / Change User Role">
-                    <i data-lucide="shield-check" style="width:13px;height:13px;" class="me-1"></i>Promote
+                ? `<button class="btn btn-sm btn-outline-info px-2 py-1" style="color:#6D28D9; border-color:#DDD6FE; background:#F5F3FF;" onclick="openPromoteModal(${u.id})" title="Promote / Change Role">
+                    <i data-lucide="shield-check" style="width:11px;height:11px;"></i>Promote
+                   </button>`
+                : ``;
+
+            const viewBtn = `<button class="btn btn-sm btn-outline-primary px-2 py-1" onclick="viewUserDetails(${u.id})" title="View Details">
+                <i data-lucide="eye" style="width:11px;height:11px;"></i>View
+            </button>`;
+
+            const editBtn = isAdmin
+                ? `<button class="btn btn-sm btn-outline-success px-2 py-1" onclick="openEditUserModal(${u.id})" title="Edit Credentials & Profile">
+                    <i data-lucide="edit-3" style="width:11px;height:11px;"></i>Edit
                    </button>`
                 : ``;
 
             const deleteBtn = isAdmin
-                ? `<button class="btn btn-sm btn-outline-danger px-2 ms-1" style="font-size:12px;" onclick="deleteUserPermanently(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Delete account permanently">
-                    <i data-lucide="trash-2" style="width:13px;height:13px;" class="me-1"></i>Delete
+                ? `<button class="btn btn-sm btn-outline-danger px-2 py-1" onclick="deleteUserPermanently(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Delete User">
+                    <i data-lucide="trash-2" style="width:11px;height:11px;"></i>Delete
                    </button>`
                 : ``;
 
             return `
             <tr>
-                <td class="px-4 py-3">
-                    <div class="d-flex align-items-center gap-3">
+                <td class="ps-3 pe-2 py-2">
+                    <div class="d-flex align-items-center gap-2.5">
                         <div class="user-avatar-sm">${initials}</div>
-                        <div>
-                            <div class="fw-semibold text-dark">${u.full_name}</div>
+                        <div style="min-width:0;">
+                            <div class="fw-bold text-dark text-truncate" style="font-size:12.5px;" title="${u.full_name}">${u.full_name}</div>
                             ${emailHtml}
                         </div>
                     </div>
                 </td>
-                <td class="px-4">
-                    <code style="background:#F1F5F9;color:#0F172A;padding:2px 8px;border-radius:4px;font-size:12px;">${u.employee_id || '—'}</code>
+                <td class="px-2 py-2">
+                    <span class="emp-id-badge">${u.employee_id || '—'}</span>
                 </td>
-                <td class="px-4">
+                <td class="px-2 py-2">
                     <span class="role-badge ${roleClass}">${roleName}</span>
                 </td>
-                <td class="px-4 text-muted" style="font-size:13px;">${u.designation || '—'}</td>
-                <td class="px-4 text-muted" style="font-size:13px;">${u.phone || '—'}</td>
-                <td class="px-4">${statusBadge}</td>
-                <td class="px-4 text-end">
-                    ${approveBtn}
-                    ${promoteBtn}
-                    <button class="btn btn-sm btn-outline-primary px-2.5 ms-1" style="font-size:12px;" onclick="viewUserDetails(${u.id})" title="View user details">
-                        <i data-lucide="eye" style="width:13px;height:13px;" class="me-1"></i>View
-                    </button>
-                    ${deleteBtn}
+                <td class="px-2 py-2">
+                    <span class="badge bg-light text-dark border px-2 py-1" style="font-size:10.5px; font-weight:600;" title="${u.team_name || 'Not Assigned'}">
+                        <i data-lucide="users" style="width:10.5px;height:10.5px;" class="me-1 text-primary"></i>${u.team_name || 'Not Assigned'}
+                    </span>
+                </td>
+                <td class="px-2 py-2 text-muted text-truncate" style="font-size:11.5px;" title="${u.designation || ''}">${u.designation || '—'}</td>
+                <td class="px-2 py-2 text-muted" style="font-size:11.5px; white-space: nowrap;">${u.phone || '—'}</td>
+                <td class="px-2 py-2 text-center">${statusBadge}</td>
+                <td class="pe-3 ps-2 py-2 text-end" style="white-space: nowrap;">
+                    <div class="action-btn-group">
+                        ${approveBtn}
+                        ${promoteBtn}
+                        ${viewBtn}
+                        ${editBtn}
+                        ${deleteBtn}
+                    </div>
                 </td>
             </tr>`;
+
+
+
+
+
         }).join("");
         if (window.lucide) lucide.createIcons();
     }
@@ -274,16 +338,20 @@ async function submitAddUserForm(event) {
         else role_id = 3;
     }
 
+    const teamVal = document.getElementById("addTeamId")?.value;
+    const team_id = teamVal ? parseInt(teamVal) : null;
+
     const payload = {
         full_name: document.getElementById("addFullName").value.trim(),
         email: document.getElementById("addEmail").value.trim(),
         password: document.getElementById("addPassword").value,
         role_id: role_id,
-        team_id: 1,
+        team_id: team_id,
         employee_id: document.getElementById("addEmployeeId").value.trim() || null,
         designation: document.getElementById("addDesignation").value.trim() || null,
         phone: document.getElementById("addPhone").value.trim() || null
     };
+
 
     try {
         let res;
@@ -378,12 +446,16 @@ async function approveUserDirectly(userId, userName) {
 }
 window.approveUserDirectly = approveUserDirectly;
 
+let currentlyViewingUserId = null;
+
 function viewUserDetails(userId) {
+    currentlyViewingUserId = userId;
     const u = allUsers.find(user => user.id === userId);
     if (!u) {
         alert("User details not found.");
         return;
     }
+
 
     const roleName = roleMap[u.role_id] || "User";
     const initials = u.full_name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase();
@@ -411,6 +483,9 @@ function viewUserDetails(userId) {
     const readableEmail = userEmailVal.includes('@') ? userEmailVal : `${u.full_name.toLowerCase().replace(/\s+/g, '.')}@corp.com`;
     if (emailEl) emailEl.innerHTML = `<div class="d-flex align-items-center justify-content-between"><span class="fw-semibold text-dark" style="font-size:12.5px;">${readableEmail}</span><span class="badge bg-light text-primary border ms-2" style="font-size:10px;"><i data-lucide="mail" style="width:11px;height:11px;" class="me-1"></i>Verified Email</span></div>`;
     
+    const teamEl = document.getElementById("viewTeam");
+    if (teamEl) teamEl.innerText = u.team_name || "Not Assigned";
+
     const desigEl = document.getElementById("viewDesignation");
     if (desigEl) desigEl.innerText = u.designation || "N/A";
     
@@ -620,4 +695,355 @@ async function submitPromoteUser(e) {
     }
 }
 window.submitPromoteUser = submitPromoteUser;
+
+// =========================================================
+// Edit User Credentials & Access Handlers (Admin Only)
+// =========================================================
+
+function openEditUserFromView() {
+    if (!currentlyViewingUserId) return;
+    const viewModalEl = document.getElementById("viewUserModal");
+    if (viewModalEl) {
+        const viewModal = bootstrap.Modal.getInstance(viewModalEl);
+        if (viewModal) viewModal.hide();
+    }
+    openEditUserModal(currentlyViewingUserId);
+}
+window.openEditUserFromView = openEditUserFromView;
+
+function openEditUserModal(userId) {
+    const u = allUsers.find(user => user.id === userId);
+    if (!u) {
+        alert("User details not found.");
+        return;
+    }
+
+    const alertBox = document.getElementById("editUserAlert");
+    if (alertBox) alertBox.classList.add("d-none");
+
+    const idInput = document.getElementById("editUserId");
+    if (idInput) idInput.value = u.id;
+
+    const empIdInput = document.getElementById("editEmployeeId");
+    if (empIdInput) empIdInput.value = u.employee_id || `EMP-${u.id}`;
+
+    const nameInput = document.getElementById("editFullName");
+    if (nameInput) nameInput.value = u.full_name || "";
+
+    const userEmailVal = (u.email_original || u.display_email || u.email || "").trim();
+    const origEmailInput = document.getElementById("editOriginalEmail");
+    if (origEmailInput) origEmailInput.value = userEmailVal;
+
+    const emailInput = document.getElementById("editEmail");
+    if (emailInput) emailInput.value = userEmailVal;
+
+    const passInput = document.getElementById("editPassword");
+    if (passInput) {
+        passInput.value = "";
+        passInput.type = "password";
+    }
+
+    const passIcon = document.getElementById("toggleEditPassIcon");
+    if (passIcon) passIcon.setAttribute("data-lucide", "eye");
+
+    const roleSelect = document.getElementById("editRoleId");
+    if (roleSelect) roleSelect.value = u.role_id || "3";
+
+    const teamSelect = document.getElementById("editTeamId");
+    if (teamSelect) teamSelect.value = u.team_id || "";
+
+    const desigInput = document.getElementById("editDesignation");
+    if (desigInput) {
+        const val = (u.designation || "").trim();
+        if (val) {
+            let exists = false;
+            for (let i = 0; i < desigInput.options.length; i++) {
+                if (desigInput.options[i].value.toLowerCase() === val.toLowerCase()) {
+                    desigInput.selectedIndex = i;
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                const opt = document.createElement("option");
+                opt.value = val;
+                opt.text = val;
+                desigInput.appendChild(opt);
+                desigInput.value = val;
+            }
+        } else {
+            desigInput.value = "";
+        }
+    }
+
+    const phoneInput = document.getElementById("editPhone");
+    if (phoneInput) phoneInput.value = u.phone || "";
+
+    const notifyCheck = document.getElementById("editNotifyUser");
+    if (notifyCheck) notifyCheck.checked = true;
+
+    const modalEl = document.getElementById("editUserModal");
+    if (modalEl) {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+        if (window.lucide) lucide.createIcons();
+    }
+}
+window.openEditUserModal = openEditUserModal;
+
+function toggleEditPasswordVisibility() {
+    const passInput = document.getElementById("editPassword");
+    const passIcon = document.getElementById("toggleEditPassIcon");
+    if (!passInput) return;
+
+    if (passInput.type === "password") {
+        passInput.type = "text";
+        if (passIcon) passIcon.setAttribute("data-lucide", "eye-off");
+    } else {
+        passInput.type = "password";
+        if (passIcon) passIcon.setAttribute("data-lucide", "eye");
+    }
+    if (window.lucide) lucide.createIcons();
+}
+window.toggleEditPasswordVisibility = toggleEditPasswordVisibility;
+
+function generateRandomPasswordForEdit() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+    let randomPass = "";
+    for (let i = 0; i < 10; i++) {
+        randomPass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const passInput = document.getElementById("editPassword");
+    if (passInput) {
+        passInput.value = randomPass;
+        passInput.type = "text";
+    }
+    const passIcon = document.getElementById("toggleEditPassIcon");
+    if (passIcon) passIcon.setAttribute("data-lucide", "eye-off");
+    if (window.lucide) lucide.createIcons();
+}
+window.generateRandomPasswordForEdit = generateRandomPasswordForEdit;
+
+let isUpdatingCredentials = false;
+async function submitEditUserForm(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (isUpdatingCredentials) return;
+
+    const alertBox = document.getElementById("editUserAlert");
+    const submitBtn = document.getElementById("btnEditUserSubmit");
+
+    const userId = parseInt(document.getElementById("editUserId")?.value, 10);
+    const fullName = document.getElementById("editFullName")?.value.trim();
+    const email = document.getElementById("editEmail")?.value.trim().toLowerCase();
+    const password = document.getElementById("editPassword")?.value;
+    const roleId = parseInt(document.getElementById("editRoleId")?.value, 10) || 3;
+    const teamVal = document.getElementById("editTeamId")?.value;
+    const teamId = teamVal ? parseInt(teamVal, 10) : null;
+    const designation = document.getElementById("editDesignation")?.value.trim() || null;
+    const phone = document.getElementById("editPhone")?.value.trim() || null;
+    const notifyUser = document.getElementById("editNotifyUser")?.checked ?? true;
+
+    if (!userId || !fullName || !email) {
+        if (alertBox) {
+            alertBox.innerText = "Please fill in all required fields (Full Name and Email Address).";
+            alertBox.classList.remove("d-none");
+        }
+        return;
+    }
+
+    if (password && password.length < 6) {
+        if (alertBox) {
+            alertBox.innerText = "Password must be at least 6 characters long.";
+            alertBox.classList.remove("d-none");
+        }
+        return;
+    }
+
+    isUpdatingCredentials = true;
+    if (alertBox) alertBox.classList.add("d-none");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Saving Changes...";
+    }
+
+    const payload = {
+        user_id: userId,
+        full_name: fullName,
+        email: email,
+        password: password ? password : null,
+        role_id: roleId,
+        team_id: teamId,
+        designation: designation,
+        phone: phone,
+        notify_user: notifyUser
+    };
+
+    try {
+        let res = await fetch("/api/users/admin_update_credentials", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.status === 404) {
+            res = await fetch(`/api/users/${userId}/credentials`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to update user credentials.");
+        }
+
+        const data = await res.json();
+
+        // Close modal
+        const modalEl = document.getElementById("editUserModal");
+        if (modalEl) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.hide();
+        }
+
+        let notifyDetails = "";
+        if (data.email_changed && data.password_changed) {
+            notifyDetails = `Email & Password updated. Security notices dispatched to both ${data.old_email} and ${data.new_email}.`;
+        } else if (data.email_changed) {
+            notifyDetails = `Email updated (${data.old_email} &rarr; ${data.new_email}). Notification dispatched to both inboxes.`;
+        } else if (data.password_changed) {
+            notifyDetails = `Password has been reset. Confirmation dispatched to ${data.email}.`;
+        } else {
+            notifyDetails = `User profile details updated successfully.`;
+        }
+
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(notifyDetails, 'success', '👤 Account Updated');
+        } else {
+            alert(notifyDetails);
+        }
+
+        await fetchUsers();
+    } catch (err) {
+        console.error("Update credentials error:", err);
+        if (alertBox) {
+            alertBox.innerText = err.message || "Failed to update user credentials.";
+            alertBox.classList.remove("d-none");
+        }
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(err.message || "Failed to update user credentials.", 'error', 'Update Failed');
+        }
+    } finally {
+        isUpdatingCredentials = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Save Changes";
+        }
+    }
+}
+window.submitEditUserForm = submitEditUserForm;
+
+let isCreatingUser = false;
+async function submitAddUserForm(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (isCreatingUser) return;
+
+    const alertBox = document.getElementById("addUserAlert");
+    const submitBtn = document.getElementById("btnAddUserSubmit");
+
+    const fullName = document.getElementById("addFullName")?.value.trim();
+    const email = document.getElementById("addEmail")?.value.trim().toLowerCase();
+    const roleId = parseInt(document.getElementById("addRoleId")?.value, 10) || 3;
+    const employeeId = document.getElementById("addEmployeeId")?.value.trim() || null;
+    const password = document.getElementById("addPassword")?.value;
+    const designation = document.getElementById("addDesignation")?.value.trim() || null;
+    const teamVal = document.getElementById("addTeamId")?.value;
+    const teamId = teamVal ? parseInt(teamVal, 10) : 1;
+    const phone = document.getElementById("addPhone")?.value.trim() || null;
+
+    if (!fullName || !email || !password) {
+        if (alertBox) {
+            alertBox.innerText = "Please provide Full Name, Email, and Password.";
+            alertBox.classList.remove("d-none");
+        }
+        return;
+    }
+
+    if (password.length < 6) {
+        if (alertBox) {
+            alertBox.innerText = "Password must be at least 6 characters long.";
+            alertBox.classList.remove("d-none");
+        }
+        return;
+    }
+
+    isCreatingUser = true;
+    if (alertBox) alertBox.classList.add("d-none");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Creating User...";
+    }
+
+    const payload = {
+        full_name: fullName,
+        email: email,
+        password: password,
+        role_id: roleId,
+        team_id: teamId,
+        employee_id: employeeId,
+        designation: designation,
+        phone: phone
+    };
+
+    try {
+        const res = await fetch("/api/users/admin_create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to create user.");
+        }
+
+        const newUser = await res.json();
+
+        // Close modal and reset form
+        const modalEl = document.getElementById("addUserModal");
+        if (modalEl) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.hide();
+        }
+        const form = document.getElementById("addUserForm");
+        if (form) form.reset();
+
+        const successMsg = `User "${newUser.full_name}" created with designation "${newUser.designation || designation || 'Team Member'}"! (ID: ${newUser.employee_id})`;
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(successMsg, 'success', '✅ User Created');
+        } else {
+            alert(successMsg);
+        }
+
+        await fetchUsers();
+    } catch (err) {
+        console.error("Create user error:", err);
+        if (alertBox) {
+            alertBox.innerText = err.message || "Failed to create user.";
+            alertBox.classList.remove("d-none");
+        }
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(err.message || "Failed to create user.", 'error', 'Creation Error');
+        }
+    } finally {
+        isCreatingUser = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Create User";
+        }
+    }
+}
+window.submitAddUserForm = submitAddUserForm;
+
 

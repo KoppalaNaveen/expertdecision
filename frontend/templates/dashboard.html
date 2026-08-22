@@ -509,16 +509,16 @@
         }
     };
 
-    var trendData = JSON.parse(document.getElementById('trend-data').textContent);
-    var deptData = JSON.parse(document.getElementById('dept-data').textContent);
-    var activityData = JSON.parse(document.getElementById('activity-data').textContent);
+    var trendData = JSON.parse(document.getElementById('trend-data').textContent || '{}');
+    var deptData = JSON.parse(document.getElementById('dept-data').textContent || '{}');
+    var activityData = JSON.parse(document.getElementById('activity-data').textContent || '{}');
 
-    // 1. Decision Trends Chart (Line Chart with curved splines from Backend)
+    // 1. Decision Trends Chart (Line Chart from Live Backend)
     if (document.getElementById('chartTrend')) {
-        var labels = (trendData && trendData.labels) ? trendData.labels : ['Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan'];
-        var subData = (trendData && trendData.submitted) ? trendData.submitted : [35, 42, 38, 56, 52, 60];
-        var appData = (trendData && trendData.approved) ? trendData.approved : [25, 30, 28, 44, 40, 48];
-        var rejData = (trendData && trendData.rejected) ? trendData.rejected : [5, 8, 6, 9, 7, 8];
+        var labels = (trendData && Array.isArray(trendData.labels) && trendData.labels.length) ? trendData.labels : ['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
+        var subData = (trendData && Array.isArray(trendData.submitted)) ? trendData.submitted : [0, 0, 0, 0, 0, 0];
+        var appData = (trendData && Array.isArray(trendData.approved)) ? trendData.approved : [0, 0, 0, 0, 0, 0];
+        var rejData = (trendData && Array.isArray(trendData.rejected)) ? trendData.rejected : [0, 0, 0, 0, 0, 0];
 
         new Chart(document.getElementById('chartTrend'), {
             type: 'line',
@@ -531,9 +531,10 @@
                         borderColor: '#6366F1',
                         backgroundColor: 'rgba(99, 102, 241, 0.08)',
                         borderWidth: 2.5,
-                        tension: 0.4,
+                        tension: 0.35,
                         fill: true,
-                        pointRadius: 3
+                        pointRadius: 4,
+                        pointHoverRadius: 6
                     },
                     {
                         label: 'Approved',
@@ -541,18 +542,21 @@
                         borderColor: '#10B981',
                         backgroundColor: 'rgba(16, 185, 129, 0.05)',
                         borderWidth: 2.5,
-                        tension: 0.4,
+                        tension: 0.35,
                         fill: true,
-                        pointRadius: 3
+                        pointRadius: 4,
+                        pointHoverRadius: 6
                     },
                     {
                         label: 'Rejected',
                         data: rejData,
                         borderColor: '#EF4444',
+                        backgroundColor: 'transparent',
                         borderWidth: 2,
-                        tension: 0.4,
+                        tension: 0.35,
                         fill: false,
-                        pointRadius: 2
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     }
                 ]
             },
@@ -560,10 +564,10 @@
         });
     }
 
-    // 2. Department Comparison Chart (Bar Chart from Backend)
+    // 2. Department Comparison Chart (Bar Chart from Live Backend)
     if (document.getElementById('chartDept')) {
-        var dLabels = (deptData && deptData.labels) ? deptData.labels : ['Tech', 'HR', 'Fin', 'Proc', 'Sec', 'Ops', 'Exec'];
-        var dValues = (deptData && deptData.data) ? deptData.data : [65, 48, 36, 28, 22, 18, 12];
+        var dLabels = (deptData && Array.isArray(deptData.labels) && deptData.labels.length) ? deptData.labels : ['Finance & Operations', 'Engineering'];
+        var dValues = (deptData && Array.isArray(deptData.data)) ? deptData.data : [0, 0];
 
         new Chart(document.getElementById('chartDept'), {
             type: 'bar',
@@ -575,38 +579,39 @@
                     backgroundColor: [
                         '#3B82F6', '#10B981', '#6366F1', '#8B5CF6', '#EC4899', '#0D9488', '#F59E0B'
                     ],
-                    borderRadius: 4,
-                    barThickness: 16
+                    borderRadius: 6,
+                    barThickness: 22
                 }]
             },
             options: chartDefaults
         });
     }
 
-    // 3. Monthly Activity Chart (Area Chart from Backend)
+    // 3. Monthly Activity Chart (Area Chart from Live Backend)
     if (document.getElementById('chartActivity')) {
-        var aLabels = (activityData && activityData.labels) ? activityData.labels : ['Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan'];
-        var aValues = (activityData && activityData.data) ? activityData.data : [14, 18, 22, 28, 35, 42];
+        var aLabels = (activityData && Array.isArray(activityData.labels) && activityData.labels.length) ? activityData.labels : ['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
+        var aValues = (activityData && Array.isArray(activityData.data)) ? activityData.data : [0, 0, 0, 0, 0, 0];
 
         new Chart(document.getElementById('chartActivity'), {
             type: 'line',
             data: {
                 labels: aLabels,
                 datasets: [{
-                    label: 'Activity',
+                    label: 'Activity Logs',
                     data: aValues,
                     borderColor: '#8B5CF6',
                     backgroundColor: 'rgba(139, 92, 246, 0.12)',
                     borderWidth: 2.5,
-                    tension: 0.4,
+                    tension: 0.35,
                     fill: true,
-                    pointRadius: 3,
+                    pointRadius: 4,
                     pointBackgroundColor: '#8B5CF6'
                 }]
             },
             options: chartDefaults
         });
     }
+
 
     const adminUserId = parseInt("{{ session.get('user_id', 0) }}", 10);
     function updateSidebarNotifications() {

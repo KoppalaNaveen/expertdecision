@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import urllib.request
@@ -18,66 +19,84 @@ try:
 except Exception:
     pass
 
-EDRP_SYSTEM_PROMPT = """You are the EDRP AI Assistant for the Expert Decision Replay Platform (EDRP).
-EDRP is an enterprise platform for creating, evaluating, reviewing, approving, replaying, and auditing critical strategic business decisions.
+EDRP_SYSTEM_PROMPT = """You are the EDRP AI Assistant, the intelligent copilot for the Expert Decision Replay Platform (EDRP).
+EDRP is an enterprise-grade platform for creating, evaluating, reviewing, approving, replaying, restoring, and auditing critical strategic business decisions.
 
-=== Core Platform Knowledge ===
-1. User Roles:
-   - Administrator (AD-xxxx): Platform governance, user verification, system settings, final approval stage, master audit logs.
-   - Manager (MN-xxxx): Team oversight, budget review, Stage 2 approval authority, department analytics.
-   - Reviewer (RW-xxxx): Domain expert review, evaluating alternatives, Stage 1 approval/rejection/revision requests.
-   - Employee (EMP-xxxx): Creating decisions, proposing alternatives, tracking status, participating in decision discussions.
+=== Core Platform Knowledge & Workflows ===
+1. User Roles & Access Hierarchy:
+   - Administrator (AD-xxxx): Platform governance, user verification, system configuration, final approval sign-off, master audit logs, support ticket management.
+   - Manager (MN-xxxx): Departmental team oversight, budget and resource allocation review, Stage 2 approval authority, department analytics.
+   - Reviewer (RW-xxxx): Domain expert evaluation, alternative scoring (feasibility, cost, risk, pros/cons), Stage 1 approval/rejection/revision requests.
+   - Employee (EMP-xxxx): Proposing new strategic decisions, drafting alternatives, participating in decision discussion threads, viewing approved records.
 
 2. Step-by-Step Decision Creation Process (UI Navigation & Fields):
-   - Step 1: Open the Sidebar and click "Create Decision" (or go to /create-decision).
-   - Step 2: Fill in the Primary Information:
-     * Title: Descriptive decision name (e.g. "Select Cloud Provider for EDRP").
-     * Problem Statement / Rationale: Detailed problem description and business necessity.
-     * Category: Technology, Finance, Operations, Legal, HR, Infrastructure, etc.
-     * Department: Target department (Engineering, Sales, IT, etc.).
+   - Step 1: Click "Create Decision" in the sidebar navigation (or navigate to /create-decision).
+   - Step 2: Primary Information:
+     * Title: Clear, descriptive name (e.g., "Select Cloud Infrastructure Provider for EDRP").
+     * Problem Statement / Rationale: Detailed problem context, operational challenges, and business justification.
+     * Category: Technology, Finance, Operations, Human Resources, Infrastructure, Legal, Security, etc.
+     * Department: Target organizational department (Engineering, IT, Finance, Operations, Product, HR).
      * Priority / Urgency: Low, Medium, High, or Critical.
-     * Stakeholders: Key persons/groups impacted.
-     * Financial Impact / Budget: Estimated total cost/investment.
-   - Step 3: Define Alternatives (Must evaluate at least 1 alternative, recommended 2+):
-     * Alternative Title & Description.
-     * Pros & Cons: Key benefits and trade-offs.
-     * Estimated Cost ($): Projected implementation cost.
-     * Feasibility Score (1-10): Implementation practicality rating.
-     * Risk Level: Low, Medium, or High.
-   - Step 4: Attach Files: Optional supporting documents (PDF, DOCX, PPTX up to 200MB).
-   - Step 5: Save as "Draft" or click "Submit Decision" to transition status to "In Review" and trigger the approval chain.
+     * Stakeholders: Impacted teams or key individuals.
+     * Financial Impact / Budget: Estimated total cost/investment in dollars ($).
+   - Step 3: Alternative Evaluation Matrix (Must evaluate at least 1 alternative, recommended 2+):
+     * Alternative Title & Detailed Description.
+     * Pros & Cons: Itemized benefits vs operational trade-offs.
+     * Estimated Cost ($): Direct and indirect implementation cost.
+     * Feasibility Score (1-10): Technical readiness and practicality rating (10 = highest feasibility).
+     * Risk Level: Low, Medium, High, or Critical.
+     * Recommended Option: Mark one option as "Recommended".
+   - Step 4: Attachments: Optional supporting documents (PDF, DOCX, PPTX, CSV, PNG up to 200MB).
+   - Step 5: Save as "Draft" (with auto-save) or click "Submit Decision" to transition to "In Review" and trigger the approval chain.
 
-3. Approval & Review Workflow:
-   - Lifecycle: Draft → In Review → Approved / Rejected / Revision Requested → Archived.
-   - Sequential Approval Chain: Reviewer (RW) → Manager (MN) → Administrator (AD).
+3. Multi-Tier Sequential Approval Workflow:
+   - Lifecycle: Draft → In Review (Stage 1: Reviewer) → In Review (Stage 2: Manager) → In Review (Stage 3: Administrator) → Approved / Rejected / Revision Requested → Archived.
    - Reviewer Actions:
      * Approve: Endorses the decision and advances it to the next tier or final approval.
-     * Reject: Denies the decision with mandatory rejection justification.
-     * Request Revision: Sends the decision back to the author with required modifications and feedback.
+     * Reject: Denies the decision with mandatory explanatory feedback.
+     * Request Revision: Returns decision to Draft status with revision notes, allowing author to update and resubmit as Version v2.
 
-4. Decision Replay & Versioning:
-   - Navigate to any decision detail page and click "Decision Replay" (or Replay tab).
-   - Step-by-step visual timeline reconstruction of the decision's entire history: initial draft, reviewer comments, alternative comparisons, and version diffs (v1, v2, etc.).
+4. Decision Replay, Version History & Version Restore:
+   - Timeline Slider: Visual chronological reconstruction of decision lifecycle (initial draft, reviewer scores, comments, status changes).
+   - Version Snapshotting: Every major event (Submission, Revision, Review, Restore) creates an immutable version snapshot (v1, v2, v3, etc.).
+   - Version Restore Feature:
+     * Purpose: Enables authorized users to roll back an accidental edit or restore an earlier evaluated consensus (e.g. Version 1) without losing history.
+     * Lineage & Attribution: Restoring a version generates a new version state (e.g., v3 restored from v1) and records the actor's User Name, User ID, and Role (e.g., "Restored from Version 1 by Koppala Naveen (ID: 1, Administrator)").
+     * Where to View: The restored version details are displayed in:
+       1. Decision Overview Page (Status banner, current version tag, and restoration notice).
+       2. Version History Modal (Full version timeline with user name, user ID, role, and diff comparison).
+       3. Immutable Audit Logs Table (Before/after JSON diffs).
 
-5. Audit Logs & Compliance:
-   - Append-only immutable audit trail capturing every change, field-level before/after JSON diffs, timestamps, user IDs, and IP addresses.
-   - Exportable to CSV or PDF for compliance audits.
+5. Knowledge Repository & RAG Intelligence:
+   - Central repository of approved strategic decisions, evaluated alternatives, cost histories, and feasibility scores.
+   - Cross-Department Analysis: Query decisions by department, compare alternatives and budgets, and review historical reviewer conclusions.
 
-6. Support Center & Tickets:
-   - Use the AI Support Assistant for instant answers or click "Create Ticket" to generate a formal support ticket (SUP-xxxx) for helpdesk assistance.
+6. Append-Only Audit Logs & Security:
+   - PostgreSQL/SQLite immutable append-only audit trail capturing every state change, field-level before/after JSON diffs, timestamps, user IDs, roles, and client IP addresses.
+   - Exportable to CSV / PDF for SOC 2 and ISO 27001 compliance.
 
-=== Response Instructions ===
-- When the user asks "how to create a decision", "explain the steps", or questions about platform features, provide clear, step-by-step instructions with exact UI buttons, fields, and workflow stages.
-- When the user asks to "create", "generate", "write", "draft", or "suggest" a Problem Statement or Alternatives for a decision title (e.g. "create and generate a new problem statement for the decision title Cloud mitigation"):
-  * Generate a comprehensive, professional, enterprise-grade problem statement and rationale tailored to that topic.
-  * Structure the response with:
-    1. **Executive Problem Statement / Rationale** (A crisp, impactful rationale paragraph ready to paste into EDRP).
-    2. **Background & Technical / Business Friction** (Current challenges and root causes).
-    3. **Key Risks & Business Impact** (Security, downtime, compliance, financial impact).
-    4. **Success Criteria & Objectives** (Measurable goals like 99.99% availability, SLA compliance).
-    5. **Recommended Alternatives to Evaluate in EDRP** (2-3 structured alternatives with Pros, Cons, Estimated Cost, Feasibility Score, and Risk Level).
-- Format all responses using clean Markdown with bold headings, numbered lists, bullet points, and code spans.
-- If real platform decisions, alternatives, or reviews are provided in the [Database Context], seamlessly reference them as concrete examples.
+7. Communication, Email & Notifications:
+   - Internal Notification Engine: Real-time top navbar bell alerts with unread badge count for review assignments, status changes, and mentions.
+   - Email Service (/email): Role-based recipient filtering (@mention by name or ID), Gmail and SMTP delivery options, message editing, and resending.
+
+8. Support Center & SLA Guarantees:
+   - AI Support Assistant (Standard Helpdesk & Knowledge Repo AI modes).
+   - Formal Support Tickets (SUP-xxxx) with priority SLAs (1-Hour Resolution for Urgent requests).
+
+=== Response Guidelines ===
+- Always provide accurate, structured, and enterprise-grade answers.
+- Use clean Markdown with bold titles, bullet points, structured comparison tables, code spans, and clickable links [DEC-xx](/decisions/xx).
+- When asked to create, draft, write, or generate problem statements or alternatives, generate rich, professional enterprise content ready to use.
+"""
+
+KNOWLEDGE_REPOSITORY_SYSTEM_PROMPT = """You are the EDRP Knowledge Repository AI Assistant for the Expert Decision Replay Platform.
+Your mission is to answer user questions strictly grounded in the institutional knowledge repository records, approved decisions, evaluated alternatives, cost estimates, feasibility metrics, and historical reviewer conclusions provided in the [Knowledge Repository Context].
+
+When answering:
+1. Ground your response in the actual institutional decision records (e.g. DEC-45, DEC-12, etc.).
+2. Detail the exact problem statements, approved budgets/costs, evaluated alternatives with Pros/Cons and feasibility scores, and reviewer conclusions.
+3. Structure your reply cleanly using Markdown with bold headings, bullet points, structured comparison tables, and direct links like [Open Decision DEC-xx Details & Replay](/decisions/xx).
+4. If a decision is not found in the repository, summarize what is available in related departments/categories and suggest creating a new decision or checking other keywords.
 """
 
 def generate_ai_response(
@@ -87,23 +106,48 @@ def generate_ai_response(
     conversation_history: List[dict] = None,
     page_context: Optional[str] = None,
     page_title: Optional[str] = None,
-    page_url: Optional[str] = None
+    page_url: Optional[str] = None,
+    mode: Optional[str] = "standard",
+    use_knowledge_repository: Optional[bool] = False
 ) -> Dict[str, Any]:
     """
     Generates an intelligent AI response for the EDRP Support Center.
+    Supports Standard Platform Helpdesk Mode and Knowledge Repository RAG Mode.
     Queries real platform database records (RAG), attempts live LLM APIs (Gemini, OpenAI, Groq, Claude, OpenRouter),
     and falls back to the high-precision EDRP Knowledge Engine.
     """
     clean_msg = (user_message or "").strip()
+    is_kr_mode = use_knowledge_repository or (mode == "knowledge_repository") or any(
+        k in clean_msg.lower() for k in [
+            "knowledge repository", "knowledge repo", "approved decision", "approved decisions",
+            "decisions were approved", "decisions that were approved", "decisions approved",
+            "repository details", "from the repository", "past decisions", "previous decisions",
+            "in the repository", "technology budget", "search repository", "compare past decisions",
+            "what decisions was approved", "what decisions are approved"
+        ]
+    )
+
     if not clean_msg:
-        greeting_text = f"Hello {user_name}! I am your EDRP AI Assistant."
-        if page_title:
-            greeting_text += f" I see you are on **{page_title}**."
-        greeting_text += " How can I assist you with this page or any platform and decision queries?"
+        if is_kr_mode:
+            greeting_text = f"Hello {user_name}! I am your **EDRP Knowledge Repository AI Assistant**.\n\nI can answer questions grounded in our institutional repository of approved decisions, alternative evaluations, budgets, and historical decision replays. What would you like to search or analyze?"
+            suggested = [
+                "Search Technology & Cloud decisions",
+                "What decisions were approved in Finance & Operations?",
+                "Compare alternatives and costs across past decisions",
+                "Summarize risk mitigations from Knowledge Repository"
+            ]
+        else:
+            greeting_text = f"Hello {user_name}! I am your EDRP AI Assistant."
+            if page_title:
+                greeting_text += f" I see you are on **{page_title}**."
+            greeting_text += " How can I assist you with this page or any platform and decision queries?"
+            suggested = ["Explain this page", "How do I create a decision?", "Show my decisions", "Explain approval workflow"]
+
         return {
             "reply": greeting_text,
-            "suggested_actions": ["Explain this page", "How do I create a decision?", "Show my decisions", "Explain approval workflow"],
-            "source": "EDRP AI Assistant"
+            "suggested_actions": suggested,
+            "source": "EDRP Knowledge Repository AI" if is_kr_mode else "EDRP AI Assistant",
+            "is_knowledge_repository": is_kr_mode
         }
 
     # 1. Retrieve Real Database Context (Decisions, Alternatives, Reviews)
@@ -124,10 +168,46 @@ def generate_ai_response(
         else:
             db_context['summary_text'] = page_context_str
 
+    # 1c. If in Knowledge Repository Mode, prioritize Knowledge Repository Engine
+    if is_kr_mode:
+        kr_response = _answer_knowledge_repository_query(clean_msg, user_name, db_context, force_mode=True)
+        if kr_response is not None:
+            return kr_response
+
     # 2. Check if this is a direct Decision Data Query (e.g. "what problem did i add for...", "my decisions", "status of DEC-28")
     data_response = _answer_decision_data_query(clean_msg, user_name, db_context)
     if data_response is not None:
         return data_response
+
+    # 2b. Direct Decision Description / Rationale generator for specific decision title & category
+    is_gen_desc = (
+        ("generate" in clean_msg.lower() or "create" in clean_msg.lower() or "draft" in clean_msg.lower() or "suggest" in clean_msg.lower() or "auto-generate" in clean_msg.lower()) and
+        ("description" in clean_msg.lower() or "problem statement" in clean_msg.lower() or "rationale" in clean_msg.lower()) and
+        ("titled" in clean_msg.lower() or "under category" in clean_msg.lower() or "for decision" in clean_msg.lower())
+    )
+    if is_gen_desc:
+        title_m = re.search(r"titled\s+['\"]([^'\"]+)['\"]", clean_msg, re.IGNORECASE)
+        cat_m = re.search(r"category\s+['\"]([^'\"]+)['\"]", clean_msg, re.IGNORECASE)
+        dept_m = re.search(r"department\s+['\"]([^'\"]+)['\"]", clean_msg, re.IGNORECASE)
+        target_title = title_m.group(1).strip() if title_m else ""
+        if not target_title:
+            t_match = re.search(r"(?:for|titled)\s+['\"]?([^'\"\n\r,]+)['\"]?", clean_msg, re.IGNORECASE)
+            if t_match and len(t_match.group(1).strip()) > 2:
+                target_title = t_match.group(1).strip()
+        target_cat = cat_m.group(1).strip() if cat_m else "General"
+        target_dept = dept_m.group(1).strip() if dept_m else "Operations"
+
+        if target_title:
+            gen_paragraph = _generate_tailored_decision_description(target_title, target_cat, target_dept)
+            return {
+                "reply": gen_paragraph,
+                "suggested_actions": ["Evaluate alternatives", "Check feasibility score", "View approval workflow"],
+                "source": "EDRP Decision AI"
+            }
+
+    # 2c. Check if the query is unrelated to EDRP / Decision Governance
+    if not _is_edrp_related_query(clean_msg, db_context):
+        return _handle_unrelated_query(clean_msg, user_name)
 
     # 3. Live Groq API (with RAG Context Injection)
     groq_key = os.getenv("GROQ_API_KEY")
@@ -533,9 +613,7 @@ def _call_openrouter_api(clean_msg: str, user_name: str, db_context: Dict[str, A
 
 
 def _retrieve_database_context(query: str, user_id: Optional[int] = None, page_url: Optional[str] = None, page_title: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Queries the database for decisions, alternatives, and reviews matching the query, active URL, or user.
-    """
+    # Queries the database for decisions, alternatives, and reviews matching the query, active URL, or user.
     context = {
         "matched_decisions": [],
         "user_decisions": [],
@@ -636,6 +714,32 @@ def _retrieve_database_context(query: str, user_id: Optional[int] = None, page_u
 
         scored_decisions.sort(key=lambda x: x[0], reverse=True)
         context["matched_decisions"] = [x[1] for x in scored_decisions]
+        context["all_repository_decisions"] = [
+            {
+                "id": d.id,
+                "title": d.title,
+                "description": d.description,
+                "status": d.status or "Pending",
+                "department": d.department or "General",
+                "priority_level": d.priority_level or "Medium",
+                "created_by": d.created_by,
+                "creator_name": "Enterprise User",
+                "created_at": d.created_at.strftime("%b %d, %Y") if d.created_at else "Recently",
+                "alternatives": [
+                    {
+                        "title": a.title,
+                        "description": a.description or "",
+                        "cost": float(a.cost) if a.cost is not None else 0.0,
+                        "feasibility_score": a.feasibility_score or 0,
+                        "risk_level": a.risk_level or "Low",
+                        "pros": a.pros or "",
+                        "cons": a.cons or ""
+                    }
+                    for a in db.query(Alternative).filter(Alternative.decision_id == d.id).all()
+                ]
+            }
+            for d in all_decisions
+        ]
 
         # Ensure current decision is at the very top of matched_decisions
         if context.get("current_decision") and (not context["matched_decisions"] or context["matched_decisions"][0]["id"] != context["current_decision"]["id"]):
@@ -655,12 +759,98 @@ def _retrieve_database_context(query: str, user_id: Optional[int] = None, page_u
     return context
 
 
+def _answer_knowledge_repository_query(query: str, user_name: str, db_context: Dict[str, Any], force_mode: bool = False) -> Optional[Dict[str, Any]]:
+    # Synthesizes and answers queries grounded exclusively in Knowledge Repository records
+    # (Approved & institutional strategic decisions, alternatives, feasibility scores, and cost data).
+    q = query.lower().strip()
+    all_decisions = db_context.get("all_repository_decisions", []) or db_context.get("matched_decisions", [])
+    matched = db_context.get("matched_decisions", [])
+
+    targets = matched if matched else all_decisions
+
+    if not targets:
+        return {
+            "reply": "### 📚 Knowledge Repository Overview\n\nNo decision records are currently found in the Knowledge Repository. Once strategic decisions are reviewed and approved through the platform's multi-stage review workflow (Reviewer -> Manager -> Administrator), they are automatically indexed into the repository for historical lookup, cross-department comparison, and AI-assisted analytics.",
+            "suggested_actions": ["How to create a decision", "Explain approval workflow", "View Knowledge Repository"],
+            "source": "EDRP Knowledge Repository AI",
+            "is_knowledge_repository": True
+        }
+
+    # Detect specific question intents
+    is_cost_inquiry = any(w in q for w in ["cost", "budget", "cheapest", "expensive", "investment", "price", "how much", "$"])
+    is_risk_inquiry = any(w in q for w in ["risk", "mitigation", "safety", "hazard", "threat", "downside"])
+    is_general_list = any(w in q for w in ["what is in", "show all", "list all", "all decisions", "what decisions", "browse", "available in", "what do we have", "index", "overview"]) or len(q.split()) <= 2
+
+    reply_lines = []
+    reply_lines.append("### 📚 Knowledge Repository Verified Intelligence\n")
+
+    # If asking for a specific decision or top matching decision
+    if not is_general_list and matched:
+        top_d = matched[0]
+        status_tag = f"**[{top_d['status']}]**" if top_d['status'] == "Approved" else f"*({top_d['status']})*"
+        
+        reply_lines.append(f"#### 📌 **DEC-{top_d['id']}: {top_d['title']}** {status_tag}")
+        reply_lines.append(f"- **Department**: `{top_d.get('department', 'General')}` · **Priority Level**: `{top_d.get('priority_level', 'Medium')}`")
+        reply_lines.append(f"- **Problem Statement / Rationale**:\n> ❝ *{top_d.get('description', 'No rationale documented.')}* ❞\n")
+        
+        alts = top_d.get('alternatives', [])
+        if alts:
+            reply_lines.append(f"**Comparative Alternatives Matrix ({len(alts)} Evaluated Options):**\n")
+            reply_lines.append("| Alternative Title | Estimated Cost | Feasibility | Risk Level |")
+            reply_lines.append("|---|:---:|:---:|:---:|")
+            for a in alts:
+                cost_str = f"${a['cost']:,.2f}" if a.get('cost') is not None and a.get('cost') > 0 else "N/A"
+                feas_str = f"{a['feasibility_score']}/10" if a.get('feasibility_score') else "N/A"
+                risk_str = a.get('risk_level', 'Low')
+                reply_lines.append(f"| **{a['title']}** | `{cost_str}` | `{feas_str}` | `{risk_str}` |")
+            
+            reply_lines.append("\n**Detailed Pros & Cons Breakdown:**")
+            for idx, a in enumerate(alts, 1):
+                p_text = a.get('pros', '').strip() or 'None documented'
+                c_text = a.get('cons', '').strip() or 'None documented'
+                reply_lines.append(f"- **Option {idx} ({a['title']})**:")
+                reply_lines.append(f"  * **Pros**: {p_text}")
+                reply_lines.append(f"  * **Cons**: {c_text}")
+
+        reply_lines.append(f"\n👉 **[Open Complete Record & Replay for DEC-{top_d['id']}](/decisions/{top_d['id']})**\n")
+
+        # If there are additional related decisions in the repository, list them concisely
+        if len(matched) > 1:
+            reply_lines.append("##### 📁 Other Related Decisions in Repository:")
+            for d in matched[1:4]:
+                s_tag = f"[{d['status']}]" if d['status'] == "Approved" else f"({d['status']})"
+                reply_lines.append(f"- **DEC-{d['id']}: {d['title']}** {s_tag} &mdash; Department: {d.get('department', 'General')} · [View](/decisions/{d['id']})")
+    else:
+        # General list / department overview
+        reply_lines.append(f"Here is the summary of strategic decision records indexed across organizational departments:\n")
+        reply_lines.append("| Decision ID | Title | Department | Status | Alternatives |")
+        reply_lines.append("|:---:|---|---|:---:|:---:|")
+        for d in targets[:6]:
+            s_tag = f"**{d['status']}**" if d['status'] == "Approved" else d['status']
+            alt_cnt = f"{len(d.get('alternatives', []))} options"
+            reply_lines.append(f"| `DEC-{d['id']}` | **[{d['title']}](/decisions/{d['id']})** | {d.get('department', 'General')} | {s_tag} | {alt_cnt} |")
+        
+        reply_lines.append("\n💡 *Tip: Click any decision link or ask specific questions like 'What are the alternatives for DEC-45?' for full metrics and cost diffs.*")
+
+    top_id = targets[0]['id'] if targets else 1
+    suggested = [
+        f"What are the alternatives for DEC-{top_id}?",
+        "What decisions were approved for Technology Budget?",
+        "Compare past decision costs",
+        "Open Knowledge Repository"
+    ]
+
+    return {
+        "reply": "\n".join(reply_lines),
+        "suggested_actions": suggested,
+        "source": "EDRP Knowledge Repository AI",
+        "is_knowledge_repository": True
+    }
+
+
 def _answer_decision_data_query(query: str, user_name: str, db_context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Detects if the user is asking about specific decisions, problem statements,
-    alternatives, statuses, or their own decision list, and generates direct data-driven replies.
-    If the user is asking to CREATE / GENERATE / DRAFT new content, returns None to allow LLM generation.
-    """
+    # Detects if the user is asking about specific decisions, problem statements,
+    # alternatives, statuses, or their own decision list, and generates direct data-driven replies.
     q = query.lower().strip()
     matched = db_context.get("matched_decisions", [])
     user_decisions = db_context.get("user_decisions", [])
@@ -826,12 +1016,141 @@ def _answer_decision_data_query(query: str, user_name: str, db_context: Dict[str
     return None
 
 
+def _generate_tailored_decision_description(title: str, category: str = "General", department: str = "Operations") -> str:
+    t_clean = (title or "Strategic Business Initiative").strip()
+    c_clean = (category or "General").strip()
+    d_clean = (department or "Operations").strip()
+    t_lower = t_clean.lower()
+
+    if any(w in t_lower for w in ["database", "migration", "postgres", "sql", "data warehouse", "mongodb"]):
+        exec_summary = f"This strategic initiative addresses critical scalability, data throughput, and schema integrity constraints in our core database infrastructure for {d_clean}. Migrating to a modern distributed database architecture will eliminate legacy query bottlenecks, implement multi-region automated failover, and ensure 99.99% system availability to support projected enterprise transaction volume growth over the next 24 months."
+        friction = "Legacy on-premises database instances are operating at 85%+ CPU utilization during peak hours, causing query latency spikes (>1,200ms) and limiting developer velocity for new microservice deployments."
+        risks = "Unscheduled downtime risks during peak traffic periods, data synchronization latency across regions, and compliance exposure if backup snapshots fail recovery SLAs."
+        kpis = "Reduce average query latency to <150ms, achieve zero data loss (RPO = 0, RTO < 5 min), and support 3x annual transaction scaling."
+        alts = [
+            {"title": "Managed PostgreSQL on Cloud (RDS/AlloyDB)", "cost": 42000, "score": 9, "risk": "Low", "pros": "Fully automated backups, seamless vertical/horizontal scaling, native IAM integration.", "cons": "Ongoing cloud compute subscription costs."},
+            {"title": "Self-Hosted Distributed Cluster (CockroachDB/Kubernetes)", "cost": 65000, "score": 7, "risk": "Medium", "pros": "Multi-cloud portability, zero vendor lock-in, customizable shard controls.", "cons": "Requires dedicated in-house DevOps maintenance and operational complexity."},
+            {"title": "In-Place Vertical Hardware & Schema Optimization", "cost": 15000, "score": 4, "risk": "High", "pros": "Lowest upfront implementation capital.", "cons": "Short-term temporary fix; fails to resolve underlying architectural scalability limits."}
+        ]
+    elif any(w in t_lower for w in ["cloud", "aws", "azure", "gcp", "hosting", "kubernetes", "infra"]):
+        exec_summary = f"This strategic decision establishes the adoption and migration roadmap for {t_clean} within {d_clean}. Transitioning from high-maintenance on-premises infrastructure to a resilient, secure, and auto-scaling cloud environment optimizes compute resource utilization, enhances multi-zone disaster recovery, and reduces total cost of ownership (TCO) by an estimated 28% over 3 years."
+        friction = "Aging physical servers require frequent emergency maintenance, have rigid capacity limits that delay application launches by 4-6 weeks, and lack automated disaster recovery failover."
+        risks = "Cloud migration egress costs, temporary service cutover friction, and security policy misalignment during initial configuration."
+        kpis = "Achieve 99.99% infrastructure uptime, reduce provisioning time from weeks to minutes, and maintain SOC2 Type II compliance."
+        alts = [
+            {"title": "Multi-Cloud Native Architecture (AWS + GCP)", "cost": 85000, "score": 8, "risk": "Low", "pros": "High redundancy, best-of-breed services, zero vendor lock-in.", "cons": "Higher cross-cloud orchestration complexity."},
+            {"title": "Single Cloud Provider Tier-1 Partner (AWS / Azure)", "cost": 55000, "score": 9, "risk": "Low", "pros": "Consolidated enterprise discounts, unified IAM and billing, faster implementation timeline.", "cons": "Moderate vendor lock-in over 3-year term."},
+            {"title": "Hybrid Cloud Extension with On-Premises Core", "cost": 40000, "score": 6, "risk": "Medium", "pros": "Preserves existing hardware depreciation assets.", "cons": "Dual operational overhead for maintenance and security patching."}
+        ]
+    elif any(w in t_lower for w in ["ai", "chatbot", "machine learning", "llm", "automation", "assistant", "copilot"]):
+        exec_summary = f"This proposal approves the implementation of {t_clean} to automate repetitive workflows, accelerate decision evaluation turnaround, and enhance stakeholder communication across {d_clean}. Deploying this AI copilot solution is projected to reduce decision cycle duration by 45%, deliver 24/7 grounded guidance, and empower teams to focus on high-leverage strategic initiatives while adhering to enterprise governance."
+        friction = "Manual review triage and repetitive query answering consume 15+ hours per week per reviewer, slowing strategic decision turnaround and delaying cross-department projects."
+        risks = "Hallucination risks if models are not strictly grounded with RAG, API rate limits, and sensitive data exposure without proper RBAC masking."
+        kpis = "Resolve 75% of helpdesk queries instantly, cut approval turnaround time from 7 days to 48 hours, and achieve 95%+ user satisfaction rating."
+        alts = [
+            {"title": "Enterprise Grounded RAG + Local LLM Fallback", "cost": 25000, "score": 9, "risk": "Low", "pros": "100% database-grounded, zero data leakage, automatic fallback ensures 100% uptime.", "cons": "Requires periodic vector index optimization."},
+            {"title": "Third-Party SaaS AI Integration", "cost": 38000, "score": 7, "risk": "Medium", "pros": "Turnkey deployment with minimal setup.", "cons": "External data transit, recurring per-seat licensing, limited custom RBAC controls."},
+            {"title": "Rule-Based FAQ Engine", "cost": 5000, "score": 4, "risk": "High", "pros": "Lowest cost.", "cons": "Inflexible, cannot synthesize alternatives or understand natural language queries."}
+        ]
+    elif any(w in t_lower for w in ["security", "cyber", "firewall", "iam", "zero trust", "vulnerability", "audit"]):
+        exec_summary = f"This cybersecurity initiative establishes the deployment framework for {t_clean} to enforce zero-trust security principles, protect sensitive corporate assets, and guarantee regulatory compliance across all {d_clean} endpoints and microservices. Executing this decision hardens platform defenses, eliminates single-point authentication vulnerabilities, and fulfills SOC2 and GDPR mandate requirements."
+        friction = "Fragmented legacy access controls and disparate credential stores increase risk of unauthorized lateral movement and complicate compliance auditing."
+        risks = "User friction during MFA/SSO rollout, potential temporary service disruption during firewall rule tightening."
+        kpis = "100% enforcement of Multi-Factor Authentication, zero unpatched critical CVEs, and automated audit logging with zero tamper tolerance."
+        alts = [
+            {"title": "Enterprise Zero-Trust IAM & SSO Gateway", "cost": 35000, "score": 9, "risk": "Low", "pros": "Centralized policy enforcement, automated offboarding, seamless SAML/OAuth integration.", "cons": "Initial end-user migration training required."},
+            {"title": "Perimeter-Based Firewall & VPN Upgrade", "cost": 22000, "score": 6, "risk": "Medium", "pros": "Familiar architecture for legacy systems.", "cons": "Does not protect against internal lateral threats in modern remote/hybrid environments."},
+            {"title": "Manual Periodic Security Audits & Pentesting", "cost": 12000, "score": 4, "risk": "High", "pros": "Low upfront tooling spend.", "cons": "Reactive approach that fails continuous real-time compliance requirements."}
+        ]
+    elif any(w in t_lower for w in ["budget", "finance", "q4", "q1", "q2", "q3", "capex", "opex", "allocation", "pricing", "cost"]):
+        exec_summary = f"This financial governance decision outlines the capital allocation and expenditure framework for {t_clean} within {d_clean}. The strategic objective is to prioritize high-ROI operational requirements, establish clear accountability thresholds, and mitigate fiscal risk while guaranteeing funding for all critical milestones."
+        friction = "Uncoordinated departmental spending and variable software licenses lead to 15-20% budget variance and delayed quarterly reconciliation."
+        risks = "Cost overruns due to scope creep, currency/inflation fluctuations, and delayed vendor deliverables."
+        kpis = "Maintain budget variance within ±3%, achieve 15% procurement cost reduction, and automate monthly audit reconciliations."
+        alts = [
+            {"title": "Tiered Milestone-Based Budget Allocation", "cost": 50000, "score": 9, "risk": "Low", "pros": "Funds released only upon verified milestone delivery; maximum accountability.", "cons": "Requires active manager sign-offs at each phase."},
+            {"title": "Consolidated Upfront Annual CapEx Allocation", "cost": 75000, "score": 7, "risk": "Medium", "pros": "Secures maximum volume vendor discounts.", "cons": "Less flexibility if quarterly priorities shift."},
+            {"title": "Ad-Hoc Expense Approval Model", "cost": 60000, "score": 4, "risk": "High", "pros": "Minimal upfront planning.", "cons": "High risk of duplicate spending and poor fiscal governance."}
+        ]
+    else:
+        exec_summary = f"This strategic decision outlines the operational execution plan and business rationale for {t_clean} under the {c_clean} category for {d_clean}. The primary objective is to address operational bottlenecks, establish standardized governance, and align cross-functional workflows with organizational priorities to ensure high-quality delivery, measurable ROI, and minimal business disruption."
+        friction = "Current unstructured workflows create operational delays, inconsistent quality standards, and lack clear accountability metrics across cross-functional teams."
+        risks = "Resource contention during rollout, resistance to new operational workflows, and initial adjustment curve."
+        kpis = "Achieve 99% SLA adherence, decrease project delivery turnaround time by 30%, and establish 100% audit traceability."
+        alts = [
+            {"title": "Phased Implementation with Automated Tooling", "cost": 30000, "score": 9, "risk": "Low", "pros": "Controlled rollout, minimal operational downtime, rapid user adoption.", "cons": "Requires 2-week transition phase."},
+            {"title": "Comprehensive All-at-Once Overhaul", "cost": 45000, "score": 6, "risk": "Medium", "pros": "Instantly eliminates legacy technical debt.", "cons": "Higher initial change management friction."},
+            {"title": "Minimal Policy-Only Update", "cost": 8000, "score": 4, "risk": "High", "pros": "Lowest direct expense.", "cons": "Fails to provide automated tooling needed for long-term scalability."}
+        ]
+
+    # Assemble structured response
+    output_lines = [
+        f"### 🎯 Tailored Decision Formulation: **\"{t_clean}\"**\n",
+        f"- **Category**: `{c_clean}` · **Department**: `{d_clean}` · **Target Priority**: `High`\n",
+        "#### 1. Executive Problem Statement & Rationale *(Ready to paste into EDRP)*:",
+        f"> ❝ *{exec_summary}* ❞\n",
+        "#### 2. Root Operational Challenges & Friction:",
+        f"- {friction}\n",
+        "#### 3. Strategic Risks & Business Exposure:",
+        f"- {risks}\n",
+        "#### 4. Measurable Success Criteria & Target KPIs:",
+        f"- {kpis}\n",
+        "#### 5. Recommended Alternative Evaluation Matrix (3 Options):",
+        "| Option | Estimated Cost | Feasibility | Risk Level | Recommendation |",
+        "|---|:---:|:---:|:---:|:---:|"
+    ]
+
+    for idx, alt in enumerate(alts, 1):
+        rec_str = "⭐ **Recommended**" if idx == 1 else "Viable Alternative"
+        output_lines.append(f"| **{idx}. {alt['title']}** | `${alt['cost']:,}` | `{alt['score']}/10` | `{alt['risk']}` | {rec_str} |")
+
+    output_lines.append("\n**Detailed Pros & Cons Breakdown:**")
+    for idx, alt in enumerate(alts, 1):
+        output_lines.append(f"- **Option {idx}: {alt['title']}**")
+        output_lines.append(f"  * **Pros**: {alt['pros']}")
+        output_lines.append(f"  * **Cons**: {alt['cons']}")
+
+    output_lines.extend([
+        "\n💡 **Next Steps in EDRP**:",
+        "1. Click **'Create Decision'** in the sidebar navigation.",
+        "2. Copy and paste the **Executive Problem Statement** above into the *Problem Statement* field.",
+        "3. Add the 3 evaluated alternatives into the *Alternative Evaluation Matrix* and click **'Submit Decision'** to start the approval review chain."
+    ])
+
+    return "\n".join(output_lines)
+
+
 def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Intelligent built-in EDRP Knowledge Engine that understands all workflows,
-    lifecycle states, approval tiers, audit trails, and troubleshooting steps.
-    """
+    # Built-in EDRP Knowledge Engine that understands all workflows,
+    # lifecycle states, approval tiers, audit trails, and troubleshooting steps.
     q = query.lower().strip()
+
+    # --- Direct Decision Description / Problem Statement Generation for specific title ---
+    is_gen_desc = (
+        ("generate" in q or "create" in q or "draft" in q or "write" in q or "suggest" in q or "auto-generate" in q) and
+        ("description" in q or "problem statement" in q or "rationale" in q or "decision titled" in q)
+    )
+    if is_gen_desc:
+        title_m = re.search(r"titled\s+['\"]([^'\"]+)['\"]", query, re.IGNORECASE)
+        cat_m = re.search(r"category\s+['\"]([^'\"]+)['\"]", query, re.IGNORECASE)
+        dept_m = re.search(r"department\s+['\"]([^'\"]+)['\"]", query, re.IGNORECASE)
+        
+        target_title = title_m.group(1).strip() if title_m else ""
+        if not target_title:
+            t_match = re.search(r"(?:for|titled)\s+['\"]?([^'\"\n\r,]+)['\"]?", query, re.IGNORECASE)
+            if t_match and len(t_match.group(1).strip()) > 2:
+                target_title = t_match.group(1).strip()
+
+        target_cat = cat_m.group(1).strip() if cat_m else "General"
+        target_dept = dept_m.group(1).strip() if dept_m else "Operations"
+
+        if target_title:
+            gen_paragraph = _generate_tailored_decision_description(target_title, target_cat, target_dept)
+            return {
+                "reply": gen_paragraph,
+                "suggested_actions": ["Evaluate alternatives", "Check feasibility score", "View approval workflow"],
+                "source": "EDRP Decision AI"
+            }
 
     # --- Greetings & Casual Chat ---
     if q in ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "greetings", "help"]:
@@ -850,15 +1169,16 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
 
     if any(k in q for k in ["who are you", "what is your name", "what can you do", "what are you"]):
         return {
-            "reply": """I am the **EDRP AI Support Assistant**, designed to provide real-time guidance and data lookups on the **Expert Decision Replay Platform**.
-
-**What I Can Do:**
-- 🔍 Look up your **actual decisions, problem statements, and alternative matrices**.
-- 📋 Guide you through **creating decisions** and structuring evaluations.
-- ⚡ Explain **multi-tier approval chains** (Reviewer → Manager → Administrator).
-- ⏪ Explain **Decision Replay**, version snapshotting (`v1`, `v2`), and timeline diffs.
-- 🔒 Clarify **append-only audit logs**, field-level diffs, and compliance exports.
-""",
+            "reply": (
+                "I am the **EDRP AI Support Assistant**, designed to provide real-time guidance and data lookups on the **Expert Decision Replay Platform**.\n\n"
+                "**What I Can Do:**\n"
+                "- Look up your **actual decisions, problem statements, and alternative matrices**.\n"
+                "- Query approved strategic decisions and alternatives in the **Knowledge Repository**.\n"
+                "- Guide you through **creating decisions** and structuring evaluations.\n"
+                "- Explain **multi-tier approval chains** (Reviewer -> Manager -> Administrator).\n"
+                "- Explain **Decision Replay**, version snapshotting (`v1`, `v2`), and timeline diffs.\n"
+                "- Clarify **append-only audit logs**, field-level diffs, and compliance exports."
+            ),
             "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "Show my decisions"],
             "source": "EDRP AI Assistant"
         }
@@ -1094,39 +1414,38 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
     # --- 1. Decision Creation & Problem Rationale ---
     if any(k in q for k in ["how do i create", "how to create a decision", "create new decision", "start decision", "make decision", "steps to create"]):
         return {
-            "reply": """**Step-by-Step Guide to Creating a Decision in EDRP:**
-
-1. **Open Creation Wizard**: Click **'Create Decision'** in the sidebar navigation.
-2. **Step 1 — Problem Statement & Rationale**:
-   - Enter a clear **Title** and detailed **Problem Rationale** (explain why this decision is needed).
-   - Select the **Category** (e.g. Infrastructure, Software, Operations) and **Urgency** (Low/Med/High/Critical).
-   - Enter estimated **Financial Impact ($ ROI / Budget)**.
-3. **Step 2 — Alternative Evaluation**:
-   - Add at least 2 evaluated alternatives.
-   - For each alternative, provide estimated **Cost**, **Feasibility Score (1-10)**, **Risk Level**, and **Pros & Cons**.
-   - Select one alternative as **'Recommended'**.
-4. **Step 3 — Attachments & Reviewers**:
-   - Upload supporting files (PDF, DOCX, PPTX up to 200MB).
-   - Choose assigned Reviewers and Managers.
-5. **Step 4 — Submit**:
-   - Click **'Save as Draft'** (auto-saves every 30s) or click **'Submit for Approval'** to trigger the review workflow.
-""",
+            "reply": (
+                "**Step-by-Step Guide to Creating a Decision in EDRP:**\n\n"
+                "1. **Open Creation Wizard**: Click **'Create Decision'** in the sidebar navigation.\n"
+                "2. **Step 1 - Problem Statement & Rationale**:\n"
+                "   - Enter a clear **Title** and detailed **Problem Rationale** (explain why this decision is needed).\n"
+                "   - Select the **Category** (e.g. Infrastructure, Software, Operations) and **Urgency** (Low/Med/High/Critical).\n"
+                "   - Enter estimated **Financial Impact ($ ROI / Budget)**.\n"
+                "3. **Step 2 - Alternative Evaluation**:\n"
+                "   - Add at least 2 evaluated alternatives.\n"
+                "   - For each alternative, provide estimated **Cost**, **Feasibility Score (1-10)**, **Risk Level**, and **Pros & Cons**.\n"
+                "   - Select one alternative as **'Recommended'**.\n"
+                "4. **Step 3 - Attachments & Reviewers**:\n"
+                "   - Upload supporting files (PDF, DOCX, PPTX up to 200MB).\n"
+                "   - Choose assigned Reviewers and Managers.\n"
+                "5. **Step 4 - Submit**:\n"
+                "   - Click **'Save as Draft'** (auto-saves every 30s) or click **'Submit for Approval'** to trigger the review workflow."
+            ),
             "suggested_actions": ["What is an Alternative Analysis?", "Explain the approval workflow", "Can I edit a decision after submission?"],
             "source": "EDRP AI Assistant"
         }
 
     if any(k in q for k in ["rationale", "problem statement", "justification", "why rationale"]):
         return {
-            "reply": """**What is a Decision Rationale in EDRP?**
-
-The **Decision Rationale** is the foundational justification for why a strategic choice is being made. It captures:
-- **The Core Problem**: The business challenge or opportunity being addressed.
-- **Expected Value / ROI**: Financial impact, cost savings, or efficiency gains.
-- **Strategic Alignment**: How this decision aligns with organizational goals.
-- **Urgency & Context**: Why this decision must be made now and what happens if no action is taken.
-
-*Tip: A well-defined rationale speeds up reviewer approval and provides valuable context during future Decision Replays.*
-""",
+            "reply": (
+                "**What is a Decision Rationale in EDRP?**\n\n"
+                "The **Decision Rationale** is the foundational justification for why a strategic choice is being made. It captures:\n"
+                "- **The Core Problem**: The business challenge or opportunity being addressed.\n"
+                "- **Expected Value / ROI**: Financial impact, cost savings, or efficiency gains.\n"
+                "- **Strategic Alignment**: How this decision aligns with organizational goals.\n"
+                "- **Urgency & Context**: Why this decision must be made now and what happens if no action is taken.\n\n"
+                "*Tip: A well-defined rationale speeds up reviewer approval and provides valuable context during future Decision Replays.*"
+            ),
             "suggested_actions": ["How do I evaluate alternatives?", "Explain the approval workflow", "How does Decision Replay work?"],
             "source": "EDRP AI Assistant"
         }
@@ -1134,22 +1453,21 @@ The **Decision Rationale** is the foundational justification for why a strategic
     # --- 2. Alternative Matrix, Feasibility & Risk ---
     if any(k in q for k in ["alternative", "feasibility", "risk level", "pros and cons", "matrix", "recommended option"]):
         return {
-            "reply": """**How the Alternative Evaluation Matrix Works:**
-
-When submitting a decision, EDRP requires comparative analysis across alternatives:
-
-1. **Feasibility Score (1–10)**:
-   - Evaluates technical capability, time constraints, resource readiness, and complexity.
-   - *10 = Extremely Easy / High Confidence; 1 = High Complexity / Low Feasibility.*
-2. **Estimated Cost / Budget**:
-   - Direct and indirect financial investment required for this option.
-3. **Risk Level (Low / Medium / High)**:
-   - Assessment of potential downsides, security exposure, or operational disruption.
-4. **Pros & Cons**:
-   - Clear bullet points outlining the competitive advantages vs trade-offs.
-5. **Recommended Flag**:
-   - Mark the proposed option as **'Recommended'** to guide the approval chain.
-""",
+            "reply": (
+                "**How the Alternative Evaluation Matrix Works:**\n\n"
+                "When submitting a decision, EDRP requires comparative analysis across alternatives:\n\n"
+                "1. **Feasibility Score (1-10)**:\n"
+                "   - Evaluates technical capability, time constraints, resource readiness, and complexity.\n"
+                "   - *10 = Extremely Easy / High Confidence; 1 = High Complexity / Low Feasibility.*\n"
+                "2. **Estimated Cost / Budget**:\n"
+                "   - Direct and indirect financial investment required for this option.\n"
+                "3. **Risk Level (Low / Medium / High)**:\n"
+                "   - Assessment of potential downsides, security exposure, or operational disruption.\n"
+                "4. **Pros & Cons**:\n"
+                "   - Clear bullet points outlining the competitive advantages vs trade-offs.\n"
+                "5. **Recommended Flag**:\n"
+                "   - Mark the proposed option as **'Recommended'** to guide the approval chain."
+            ),
             "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "How does Decision Replay work?"],
             "source": "EDRP AI Assistant"
         }
@@ -1157,98 +1475,122 @@ When submitting a decision, EDRP requires comparative analysis across alternativ
     # --- 3. Approval Workflow, Reviewers, Rejection & Revision ---
     if any(k in q for k in ["can i edit", "edit decision", "modify decision", "update after submit", "change after submit"]):
         return {
-            "reply": """**Can I Edit a Decision After It Has Been Submitted?**
-
-- **Once Submitted**: Decisions are **locked from direct editing** while active in the review pipeline to maintain audit integrity.
-- **If Changes are Needed**:
-  - A Reviewer or Manager can select **'Request Revision'** (or **'Send Back'**).
-  - This returns the decision to **Draft** status.
-  - You can update title, rationale, alternatives, or attachments and click **'Resubmit'**.
-  - Resubmission automatically generates a new version snapshot (**`v2`**) with a documented change reason.
-""",
+            "reply": (
+                "**Can I Edit a Decision After It Has Been Submitted?**\n\n"
+                "- **Once Submitted**: Decisions are **locked from direct editing** while active in the review pipeline to maintain audit integrity.\n"
+                "- **If Changes are Needed**:\n"
+                "  - A Reviewer or Manager can select **'Request Revision'** (or **'Send Back'**).\n"
+                "  - This returns the decision to **Draft** status.\n"
+                "  - You can update title, rationale, alternatives, or attachments and click **'Resubmit'**.\n"
+                "  - Resubmission automatically generates a new version snapshot (**`v2`**) with a documented change reason."
+            ),
             "suggested_actions": ["Explain the approval workflow", "How does Decision Replay work?", "Where do I find my pending reviews?"],
             "source": "EDRP AI Assistant"
         }
 
     if any(k in q for k in ["reject", "rejected", "why rejected", "rejection reason"]):
         return {
-            "reply": """**What Happens When a Decision is Rejected?**
-
-1. **Mandatory Feedback**: When a Reviewer or Manager rejects a decision, they are required to submit an **explanatory rejection note**.
-2. **Notification**: The decision creator receives an immediate in-app and email notification containing the rejection comments.
-3. **Resubmission**:
-   - The creator can review the feedback, adjust the rationale or alternatives, and click **'Resubmit for Review'**.
-   - This moves the decision back into review as Version `v2`.
-4. **Audit Trail**: Both the initial rejection and subsequent resubmission are permanently recorded in the immutable Audit Log.
-""",
+            "reply": (
+                "**What Happens When a Decision is Rejected?**\n\n"
+                "1. **Mandatory Feedback**: When a Reviewer or Manager rejects a decision, they are required to submit an **explanatory rejection note**.\n"
+                "2. **Notification**: The decision creator receives an immediate in-app and email notification containing the rejection comments.\n"
+                "3. **Resubmission**:\n"
+                "   - The creator can review the feedback, adjust the rationale or alternatives, and click **'Resubmit for Review'**.\n"
+                "   - This moves the decision back into review as Version `v2`.\n"
+                "4. **Audit Trail**: Both the initial rejection and subsequent resubmission are permanently recorded in the immutable Audit Log."
+            ),
             "suggested_actions": ["Explain the approval workflow", "How do I create a revision?", "How to view audit logs?"],
             "source": "EDRP AI Assistant"
         }
 
-    if any(k in q for k in ["approval", "approve", "review workflow", "sequential", "chain", "tier", "stages", "pending review"]):
+    if any(k in q for k in ["approval workflow", "how does approval", "explain approval", "review workflow", "sequential review", "approval chain", "approval tier", "approval stages", "how to approve", "stages of approval"]) or (("approval" in q or "approve" in q) and ("how" in q or "explain" in q or "process" in q or "steps" in q or "chain" in q or "tier" in q)):
         return {
-            "reply": """**EDRP Multi-Tier Approval Workflow:**
-
-Decisions progress through sequential review stages:
-
-1. **Stage 1 — Domain Reviewer (RW)**:
-   - Evaluates feasibility, technical merit, pros/cons, and risks.
-   - Can choose: ✅ **Approve**, ❌ **Reject**, or 🔄 **Request Revision**.
-2. **Stage 2 — Department Manager (MN)**:
-   - Reviews resource allocation, team budget, and strategic priorities.
-3. **Stage 3 — Administrator (AD)**:
-   - Final sign-off, enterprise compliance verification, and organization-wide archiving.
-4. **Automated Status Progression**:
-   - `Draft` → `In Review` (Stage 1) → `In Review` (Stage 2) → `Approved` / `Rejected`.
-""",
+            "reply": (
+                "**EDRP Multi-Tier Approval Workflow:**\n\n"
+                "Decisions progress through sequential review stages:\n\n"
+                "1. **Stage 1 - Domain Reviewer (RW)**:\n"
+                "   - Evaluates feasibility, technical merit, pros/cons, and risks.\n"
+                "   - Can choose: **Approve**, **Reject**, or **Request Revision**.\n"
+                "2. **Stage 2 - Department Manager (MN)**:\n"
+                "   - Reviews resource allocation, team budget, and strategic priorities.\n"
+                "3. **Stage 3 - Administrator (AD)**:\n"
+                "   - Final sign-off, enterprise compliance verification, and organization-wide archiving.\n"
+                "4. **Automated Status Progression**:\n"
+                "   - `Draft` -> `In Review (Stage 1)` -> `In Review (Stage 2)` -> `Approved` / `Rejected`."
+            ),
             "suggested_actions": ["Where do I find my pending reviews?", "Can I edit a submitted decision?", "How does Decision Replay work?"],
             "source": "EDRP AI Assistant"
         }
 
     if any(k in q for k in ["pending review", "reviewer workspace", "my reviews", "where to review", "assigned to me"]):
         return {
-            "reply": """**Where to Find Your Pending Reviews:**
-
-1. Navigate to **'Reviewer Workspace'** or **'Pending Approvals'** in the left sidebar.
-2. Here you will see all decisions waiting for your evaluation.
-3. Click **'Review Decision'** to inspect the rationale, financial impact, and alternatives.
-4. Enter your evaluation notes and submit your decision (**Approve**, **Reject**, or **Request Revision**).
-""",
+            "reply": (
+                "**Where to Find Your Pending Reviews:**\n\n"
+                "1. Navigate to **'Reviewer Workspace'** or **'Pending Approvals'** in the left sidebar.\n"
+                "2. Here you will see all decisions waiting for your evaluation.\n"
+                "3. Click **'Review Decision'** to inspect the rationale, financial impact, and alternatives.\n"
+                "4. Enter your evaluation notes and submit your decision (**Approve**, **Reject**, or **Request Revision**)."
+            ),
             "suggested_actions": ["Explain the approval workflow", "What happens when a decision is rejected?", "How does Decision Replay work?"],
             "source": "EDRP AI Assistant"
         }
 
-    # --- 4. Decision Replay & Versioning ---
-    if any(k in q for k in ["replay", "version", "history", "snapshot", "timeline", "v1", "v2", "playback"]):
+    # --- 4. Decision Replay, Versioning & Version Restore ---
+    if any(k in q for k in [
+        "restore version", "use of restore", "why restore", "restored version", "how to restore",
+        "where can the restored", "where to see restored", "restored details", "restored version details",
+        "who restored", "restore v1", "restore version 1"
+    ]):
         return {
-            "reply": """**How Decision Replay & Versioning Works:**
+            "reply": (
+                "### 🔄 Version Restore & Historical Snapshot Engine in EDRP\n\n"
+                "#### 1. What is the Purpose of 'Restore Version'?\n"
+                "- **Revert to Approved Baseline**: Enables authorized Managers and Administrators to roll back unintended modifications or reinstate an earlier consensus state (e.g. `Version 1`) without breaking compliance.\n"
+                "- **Audit Preservation**: Instead of overwriting history, restoring generates a **new version snapshot** (e.g. `v3` restored from `v1`), preserving every intermediate draft, revision comment, and approval stage.\n\n"
+                "#### 2. Where Can You Find Restored Version Details?\n"
+                "1. **Decision Overview Page** (`/decisions/xx`):\n"
+                "   - Displays the active version tag and an alert banner indicating: *\"Restored from Version X by [User Name, User ID, Role]\"*.\n"
+                "2. **Version History Modal**:\n"
+                "   - Click **'Version History'** on the decision page to view all version records, timestamps, change summaries, and actor attributions (User Name, User ID, Role: Reviewer/Manager/Administrator).\n"
+                "   - Provides side-by-side field-level comparison diffs.\n"
+                "3. **Immutable Audit Logs** (`/audit-logs`):\n"
+                "   - Full append-only log entry capturing action `DECISION_RESTORE` with before/after JSON diffs, actor ID, and IP address."
+            ),
+            "suggested_actions": ["How does Decision Replay work?", "How do I view Audit Logs?", "Explain the approval workflow"],
+            "source": "EDRP Decision Engine"
+        }
 
-- **Automatic Snapshotting**: Every major event (Submission, Revision, Reviewer Evaluation, Approval) creates an immutable point-in-time snapshot (`v1`, `v2`, `v3`).
-- **Interactive Visual Playback**:
-  1. Navigate to **'Replays'** in the sidebar.
-  2. Select any decision to launch the interactive replay viewer.
-  3. Use the timeline slider to view the exact state of the decision at any moment in time:
-     - Initial problem statement & estimated budget.
-     - Alternative matrix scores.
-     - Reviewer comments, votes, and timestamps.
-- **Use Cases**: Ideal for onboarding new executives, post-mortem reviews, and regulatory compliance audits.
-""",
-            "suggested_actions": ["How do I view Audit Logs?", "How do I create a new decision?", "Explain the approval workflow"],
-            "source": "EDRP AI Assistant"
+    if any(k in q for k in ["replay", "version", "history", "snapshot", "timeline", "v1", "v2", "playback", "diff engine"]):
+        return {
+            "reply": (
+                "**How Decision Replay & Versioning Works in EDRP:**\n\n"
+                "- **Automatic Snapshotting**: Every major event (Submission, Revision, Reviewer Evaluation, Approval, Restore) creates an immutable point-in-time snapshot (`v1`, `v2`, `v3`).\n"
+                "- **Interactive Visual Playback**:\n"
+                "  1. Navigate to **'Replays'** in the sidebar (or click 'Decision Replay' on any decision page).\n"
+                "  2. Select any decision to launch the interactive timeline player.\n"
+                "  3. Use the playback slider to view the exact state of the decision at each step:\n"
+                "     - Initial problem statement & estimated budget.\n"
+                "     - Alternative matrix scores and feasibility rankings.\n"
+                "     - Reviewer evaluations, votes, comments, and timestamps.\n"
+                "     - Restored version checkpoints and diff comparisons.\n"
+                "- **Use Cases**: Ideal for onboarding new team members, executive reviews, and regulatory compliance audits."
+            ),
+            "suggested_actions": ["Where can I see restored version details?", "How do I view Audit Logs?", "Explain the approval workflow"],
+            "source": "EDRP Decision Engine"
         }
 
     # --- 5. Roles & RBAC ---
     if any(k in q for k in ["role", "roles", "permission", "permissions", "rbac", "employee id", "prefix", "administrator vs", "admin and manager", "manager and reviewer"]):
         return {
-            "reply": """**EDRP Role-Based Access Control (RBAC):**
-
-| Role | Prefix | Responsibilities & Access |
-|---|:---:|---|
-| **Administrator** | `AD-xxx` | Full platform control, user verification, audit log review, global settings, ticket administration. |
-| **Manager** | `MN-xxx` | Team decision reviews, departmental analytics, assigning reviewers, second-tier approvals. |
-| **Reviewer** | `RW-xxx` | Domain evaluations, alternative scoring, approving/rejecting assigned decisions, revision requests. |
-| **Employee** | `EMP-xxx` | Creating decisions, drafting alternatives, participating in discussion threads, viewing approved records. |
-""",
+            "reply": (
+                "**EDRP Role-Based Access Control (RBAC):**\n\n"
+                "| Role | Prefix | Responsibilities & Access |\n"
+                "|---|:---:|---|\n"
+                "| **Administrator** | `AD-xxx` | Full platform control, user verification, audit log review, global settings, ticket administration. |\n"
+                "| **Manager** | `MN-xxx` | Team decision reviews, departmental analytics, assigning reviewers, second-tier approvals. |\n"
+                "| **Reviewer** | `RW-xxx` | Domain evaluations, alternative scoring, approving/rejecting assigned decisions, revision requests. |\n"
+                "| **Employee** | `EMP-xxx` | Creating decisions, drafting alternatives, participating in discussion threads, viewing approved records. |"
+            ),
             "suggested_actions": ["How do I reset my password?", "How do I create a new decision?", "Explain the approval workflow"],
             "source": "EDRP AI Assistant"
         }
@@ -1256,19 +1598,19 @@ Decisions progress through sequential review stages:
     # --- 6. Audit Logs, Diff Engine & Compliance ---
     if any(k in q for k in ["audit", "audit log", "audit logs", "diff engine", "diffs", "compliance", "append-only", "tamper", "export csv"]):
         return {
-            "reply": """**Enterprise Audit Logging & Field-Level Diff Engine:**
-
-- **Append-Only Immutability**: PostgreSQL database triggers physically reject any `UPDATE` or `DELETE` queries on the `audit_logs` table, ensuring an unalterable compliance record.
-- **Field-Level Diff Engine**: Records exact before-and-after values for all modified fields:
-  ```json
-  {
-    "status": {"before": "Draft", "after": "In Review"},
-    "financial_impact": {"before": 50000, "after": 65000}
-  }
-  ```
-- **Metadata Recorded**: User ID, Full Name, Role, IP Address, User-Agent, Action, and Timestamp.
-- **Export**: Administrators can click **'Export CSV'** in the Audit Logs page for SOC 2 / ISO 27001 compliance reviews.
-""",
+            "reply": (
+                "**Enterprise Audit Logging & Field-Level Diff Engine:**\n\n"
+                "- **Append-Only Immutability**: PostgreSQL database triggers physically reject any `UPDATE` or `DELETE` queries on the `audit_logs` table, ensuring an unalterable compliance record.\n"
+                "- **Field-Level Diff Engine**: Records exact before-and-after values for all modified fields:\n"
+                "  ```json\n"
+                "  {\n"
+                "    \"status\": {\"before\": \"Draft\", \"after\": \"In Review\"},\n"
+                "    \"financial_impact\": {\"before\": 50000, \"after\": 65000}\n"
+                "  }\n"
+                "  ```\n"
+                "- **Metadata Recorded**: User ID, Full Name, Role, IP Address, User-Agent, Action, and Timestamp.\n"
+                "- **Export**: Administrators can click **'Export CSV'** in the Audit Logs page for SOC 2 / ISO 27001 compliance reviews."
+            ),
             "suggested_actions": ["Who can view Audit Logs?", "How does Decision Replay work?", "Explain the approval workflow"],
             "source": "EDRP AI Assistant"
         }
@@ -1276,18 +1618,18 @@ Decisions progress through sequential review stages:
     # --- 7. Password Reset, OTP, Login & Account ---
     if any(k in q for k in ["password", "reset password", "forgot password", "otp", "login issue", "change password", "profile"]):
         return {
-            "reply": """**Password Reset & Account Security:**
-
-1. **If You Are Logged In**:
-   - Go to **'Profile'** or **'Settings'** in the sidebar.
-   - Enter your current password and specify a new secure password.
-2. **If You Forgot Your Password**:
-   - On the Login screen, click **'Forgot Password?'**.
-   - Enter your corporate email address to receive a **6-Digit OTP code** via email.
-   - Enter the OTP code within 10 minutes and choose a new password.
-3. **Remember Me**:
-   - Selecting **'Remember Me'** on login preserves your authenticated session for **72 hours**.
-""",
+            "reply": (
+                "**Password Reset & Account Security:**\n\n"
+                "1. **If You Are Logged In**:\n"
+                "   - Go to **'Profile'** or **'Settings'** in the sidebar.\n"
+                "   - Enter your current password and specify a new secure password.\n"
+                "2. **If You Forgot Your Password**:\n"
+                "   - On the Login screen, click **'Forgot Password?'**.\n"
+                "   - Enter your corporate email address to receive a **6-Digit OTP code** via email.\n"
+                "   - Enter the OTP code within 10 minutes and choose a new password.\n"
+                "3. **Remember Me**:\n"
+                "   - Selecting **'Remember Me'** on login preserves your authenticated session for **72 hours**."
+            ),
             "suggested_actions": ["How does OTP verification work?", "What are the roles in EDRP?", "How do I contact support?"],
             "source": "EDRP AI Assistant"
         }
@@ -1295,17 +1637,17 @@ Decisions progress through sequential review stages:
     # --- 8. Email & Notifications ---
     if any(k in q for k in ["notification", "notifications", "email alert", "email notification", "smtp", "badge", "unread"]):
         return {
-            "reply": """**How Notifications & Email Alerts Work in EDRP:**
-
-- **Automatic Event Triggers**: Notifications are dispatched immediately for:
-  - **Review Assignment**: Reviewers receive an email and in-app alert when a decision requires their evaluation.
-  - **Decision Status Changes**: Submitter is notified when their decision is **Approved**, **Rejected**, or **Revision Requested**.
-  - **New Comments**: Participants in a decision thread receive alerts on new discussion replies.
-  - **Support Updates**: Support ticket confirmations and administrator responses are emailed via SMTP.
-- **In-App Notification Bell**:
-  - Located in the top-right header, displaying unread count badges in real-time.
-  - Click any notification to navigate directly to the relevant decision or ticket.
-""",
+            "reply": (
+                "**How Notifications & Email Alerts Work in EDRP:**\n\n"
+                "- **Automatic Event Triggers**: Notifications are dispatched immediately for:\n"
+                "  - **Review Assignment**: Reviewers receive an email and in-app alert when a decision requires their evaluation.\n"
+                "  - **Decision Status Changes**: Submitter is notified when their decision is **Approved**, **Rejected**, or **Revision Requested**.\n"
+                "  - **New Comments**: Participants in a decision thread receive alerts on new discussion replies.\n"
+                "  - **Support Updates**: Support ticket confirmations and administrator responses are emailed via SMTP.\n"
+                "- **In-App Notification Bell**:\n"
+                "  - Located in the top-right header, displaying unread count badges in real-time.\n"
+                "  - Click any notification to navigate directly to the relevant decision or ticket."
+            ),
             "suggested_actions": ["Explain the approval workflow", "How do I create a new decision?", "How do I contact support?"],
             "source": "EDRP AI Assistant"
         }
@@ -1313,12 +1655,12 @@ Decisions progress through sequential review stages:
     # --- 9. File Uploads & Documents ---
     if any(k in q for k in ["file", "upload", "attachment", "document", "pdf", "docx", "pptx", "size limit", "format"]):
         return {
-            "reply": """**File Attachment Guidelines:**
-
-- **Supported Formats**: PDF (`.pdf`), Microsoft Word (`.docx`), PowerPoint (`.pptx`), CSV (`.csv`), and Images (`.png`, `.jpg`).
-- **Maximum File Size**: Up to **200 MB** per uploaded attachment.
-- **Security**: Uploaded documents undergo MIME-type validation and are linked securely to the decision record with role-based access.
-""",
+            "reply": (
+                "**File Attachment Guidelines:**\n\n"
+                "- **Supported Formats**: PDF (`.pdf`), Microsoft Word (`.docx`), PowerPoint (`.pptx`), CSV (`.csv`), and Images (`.png`, `.jpg`).\n"
+                "- **Maximum File Size**: Up to **200 MB** per uploaded attachment.\n"
+                "- **Security**: Uploaded documents undergo MIME-type validation and are linked securely to the decision record with role-based access."
+            ),
             "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "How to submit a ticket?"],
             "source": "EDRP AI Assistant"
         }
@@ -1326,12 +1668,12 @@ Decisions progress through sequential review stages:
     # --- 10. Discussions & Collaboration ---
     if any(k in q for k in ["discuss", "comment", "discussion", "mention", "reply to comment", "stakeholder"]):
         return {
-            "reply": """**Decision Discussions & Collaboration:**
-
-- **Discussion Threads**: Every decision detail page includes a live **Discussion Thread** where creators, reviewers, and stakeholders can ask clarifying questions.
-- **Mentions & Notifications**: Posting a comment sends an immediate in-app and email notification to the decision creator and assigned reviewers.
-- **Audit Persistence**: All discussion comments are timestamped and preserved in the decision history and replay timeline.
-""",
+            "reply": (
+                "**Decision Discussions & Collaboration:**\n\n"
+                "- **Discussion Threads**: Every decision detail page includes a live **Discussion Thread** where creators, reviewers, and stakeholders can ask clarifying questions.\n"
+                "- **Mentions & Notifications**: Posting a comment sends an immediate in-app and email notification to the decision creator and assigned reviewers.\n"
+                "- **Audit Persistence**: All discussion comments are timestamped and preserved in the decision history and replay timeline."
+            ),
             "suggested_actions": ["How do I create a new decision?", "Explain the approval workflow", "How does Decision Replay work?"],
             "source": "EDRP AI Assistant"
         }
@@ -1339,12 +1681,12 @@ Decisions progress through sequential review stages:
     # --- 11. Reports & Analytics ---
     if any(k in q for k in ["report", "analytics", "chart", "export report", "excel", "metrics", "dashboard"]):
         return {
-            "reply": """**Reports & Decision Analytics:**
-
-- **Dashboard Visualizations**: View monthly decision volume, approval vs rejection rates, department comparisons, and average SLA review duration.
-- **Export Capabilities**: Export decision summaries, review evaluation matrices, and audit logs to **PDF** or **Excel / CSV** format.
-- **Department Metrics**: Compare decision velocity across Engineering, Operations, Finance, and Product teams.
-""",
+            "reply": (
+                "**Reports & Decision Analytics:**\n\n"
+                "- **Dashboard Visualizations**: View monthly decision volume, approval vs rejection rates, department comparisons, and average SLA review duration.\n"
+                "- **Export Capabilities**: Export decision summaries, review evaluation matrices, and audit logs to **PDF** or **Excel / CSV** format.\n"
+                "- **Department Metrics**: Compare decision velocity across Engineering, Operations, Finance, and Product teams."
+            ),
             "suggested_actions": ["How do I view Audit Logs?", "How do I create a new decision?", "Explain the approval workflow"],
             "source": "EDRP AI Assistant"
         }
@@ -1352,12 +1694,12 @@ Decisions progress through sequential review stages:
     # --- 12. Teams & Departments ---
     if any(k in q for k in ["team", "department", "invite", "add member", "organization"]):
         return {
-            "reply": """**Team & Department Management:**
-
-- **Departments**: Decisions are categorized by department (e.g., Engineering, Finance, Operations, Product, Legal).
-- **Manager Visibility**: Managers have direct visibility into decisions submitted by members within their department or assigned team.
-- **Administrator Role Assignment**: Administrators can configure user teams, designations, and role permissions from the **User Management** console.
-""",
+            "reply": (
+                "**Team & Department Management:**\n\n"
+                "- **Departments**: Decisions are categorized by department (e.g., Engineering, Finance, Operations, Product, Legal).\n"
+                "- **Manager Visibility**: Managers have direct visibility into decisions submitted by members within their department or assigned team.\n"
+                "- **Administrator Role Assignment**: Administrators can configure user teams, designations, and role permissions from the **User Management** console."
+            ),
             "suggested_actions": ["What are the roles in EDRP?", "How do I create a new decision?", "Explain the approval workflow"],
             "source": "EDRP AI Assistant"
         }
@@ -1365,15 +1707,15 @@ Decisions progress through sequential review stages:
     # --- 13. Support Tickets & Contact ---
     if any(k in q for k in ["ticket", "contact", "support email", "office hours", "phone", "helpdesk"]):
         return {
-            "reply": """**Need Assistance or Encountered a Bug?**
-
-- **Submit a Ticket**: Click **'Create Ticket'** or **'Report an Issue'** in the top action cards.
-- **Track Status**: Monitor your requests under **'Previous Requests'** (`Open`, `In Progress`, `Resolved`).
-- **Enterprise Contact Details**:
-  - **Email**: `support@edrp-platform.com`
-  - **Company**: `contact@edrp.org`
-  - **Support Hours**: Mon - Fri, 9:00 AM - 6:00 PM EST
-""",
+            "reply": (
+                "**Need Assistance or Encountered a Bug?**\n\n"
+                "- **Submit a Ticket**: Click **'Create Ticket'** or **'Report an Issue'** in the top action cards.\n"
+                "- **Track Status**: Monitor your requests under **'Previous Requests'** (`Open`, `In Progress`, `Resolved`).\n"
+                "- **Enterprise Contact Details**:\n"
+                "  - **Email**: `support@edrp-platform.com`\n"
+                "  - **Company**: `contact@edrp.org`\n"
+                "  - **Support Hours**: Mon - Fri, 9:00 AM - 6:00 PM EST"
+            ),
             "suggested_actions": ["How do I reset my password?", "How do I create a new decision?", "Explain the approval workflow"],
             "source": "EDRP AI Assistant"
         }
@@ -1381,12 +1723,12 @@ Decisions progress through sequential review stages:
     # --- 14. Theme & Accessibility ---
     if any(k in q for k in ["dark mode", "theme", "light mode", "accessibility", "color"]):
         return {
-            "reply": """**Theme & Accessibility Options:**
-
-- **Theme Toggle**: Navigate to **'Profile'** or use the top navbar to toggle between **Light Mode** and **Dark Mode**.
-- **System Default**: Automatically matches your operating system preference.
-- **High Contrast**: Enhanced contrast mode is available in Profile Settings for accessibility compliance.
-""",
+            "reply": (
+                "**Theme & Accessibility Options:**\n\n"
+                "- **Theme Toggle**: Navigate to **'Profile'** or use the top navbar to toggle between **Light Mode** and **Dark Mode**.\n"
+                "- **System Default**: Automatically matches your operating system preference.\n"
+                "- **High Contrast**: Enhanced contrast mode is available in Profile Settings for accessibility compliance."
+            ),
             "suggested_actions": ["How do I update my profile?", "How do I reset my password?", "How do I create a decision?"],
             "source": "EDRP AI Assistant"
         }
@@ -1401,9 +1743,6 @@ Decisions progress through sequential review stages:
 
 
 def _build_dynamic_tailored_reply(query: str, user_name: str) -> str:
-    """
-    Constructs a customized, direct answer analyzing the user's specific question phrasing.
-    """
     clean = query.strip()
     words = re.findall(r'\b\w+\b', clean.lower())
     
@@ -1416,24 +1755,105 @@ def _build_dynamic_tailored_reply(query: str, user_name: str) -> str:
     ]
 
     if "decision" in words:
-        response_parts.append("• **Decisions**: All strategic decisions in EDRP follow a structured lifecycle: `Draft` → `In Review` → `Approved` / `Rejected`. You can create decisions from the sidebar wizard, attach alternative matrices, and submit them for multi-stage review.")
+        response_parts.append("- **Decisions**: All strategic decisions in EDRP follow a structured lifecycle: `Draft` -> `In Review` -> `Approved` / `Rejected`. You can create decisions from the sidebar wizard, attach alternative matrices, and submit them for multi-stage review.")
     
     if any(w in words for w in ["review", "reviewer", "approval", "approve"]):
-        response_parts.append("• **Reviews & Approvals**: Assigned reviewers evaluate feasibility scores, budget impact, and risk levels. They can Approve, Reject with mandatory notes, or Request Revision back to draft.")
+        response_parts.append("- **Reviews & Approvals**: Assigned reviewers evaluate feasibility scores, budget impact, and risk levels. They can Approve, Reject with mandatory notes, or Request Revision back to draft.")
 
     if any(w in words for w in ["replay", "history", "version"]):
-        response_parts.append("• **Replay & History**: Point-in-time snapshots (`v1`, `v2`) allow complete visual playback of the decision timeline, reviewer scores, and discussions.")
+        response_parts.append("- **Replay & History**: Point-in-time snapshots (`v1`, `v2`) allow complete visual playback of the decision timeline, reviewer scores, and discussions.")
 
     if any(w in words for w in ["audit", "log", "security", "diff"]):
-        response_parts.append("• **Audit Logs**: Append-only database triggers ensure immutable logging of all state changes, capturing before/after JSON diffs, actor details, and client IP addresses.")
+        response_parts.append("- **Audit Logs**: Append-only database triggers ensure immutable logging of all state changes, capturing before/after JSON diffs, actor details, and client IP addresses.")
 
     if any(w in words for w in ["user", "account", "password", "login", "otp", "role"]):
-        response_parts.append("• **User Accounts & Security**: Roles (Admin, Manager, Reviewer, Employee) control access. Password resets use 6-digit email OTP verification, and 'Remember Me' maintains sessions for 72 hours.")
+        response_parts.append("- **User Accounts & Security**: Roles (Admin, Manager, Reviewer, Employee) control access. Password resets use 6-digit email OTP verification, and 'Remember Me' maintains sessions for 72 hours.")
 
     if len(response_parts) == 1:
         response_parts.append(f"In the **Expert Decision Replay Platform**, you can manage decisions, coordinate multi-stage approvals, track append-only audit diffs, and inspect version replays.\n\nTo help you with this, you can:\n1. Check the relevant section in the **Sidebar Navigation**.\n2. Click **'Create Ticket'** above to submit a specific support request to our engineering team.\n3. Or ask me a more specific question about decision creation, workflows, or account settings!")
 
     return "\n\n".join(response_parts)
+
+
+def _is_edrp_related_query(query: str, db_context: Dict[str, Any]) -> bool:
+    """
+    Determines if a query is relevant to EDRP, enterprise decision governance, or platform workflows.
+    Returns False for off-topic questions (e.g. general programming tutorials, recipes, weather, general trivia).
+    """
+    q = query.lower().strip()
+    words = set(re.findall(r'\b[a-zA-Z0-9_-]+\b', q))
+
+    # Common greetings and identity queries are always valid
+    if q in ["hi", "hello", "hey", "greetings", "good morning", "good afternoon", "good evening", "help", "who are you", "what can you do", "what is your name", "thank you", "thanks"]:
+        return True
+
+    # Core EDRP and Decision Management Keywords
+    edrp_keywords = {
+        "edrp", "decision", "decisions", "dec", "alternative", "alternatives", "rationale", "problem",
+        "statement", "approval", "approve", "approvals", "approving", "reject", "rejected", "rejection",
+        "revision", "resubmit", "reviewer", "reviewers", "review", "reviews", "manager", "managers",
+        "admin", "administrator", "administrators", "employee", "employees", "role", "roles", "rbac",
+        "replay", "replays", "history", "version", "versions", "snapshot", "restore", "restored",
+        "restoration", "timeline", "playback", "diff", "diffs", "audit", "logs", "log", "compliance",
+        "tamper", "immutable", "ticket", "tickets", "support", "helpdesk", "sla", "email", "emails",
+        "smtp", "notification", "notifications", "unread", "bell", "team", "teams", "department",
+        "departments", "budget", "budgets", "cost", "costs", "feasibility", "risk", "risks",
+        "pros", "cons", "matrix", "priority", "urgency", "stakeholder", "stakeholders", "attachment",
+        "attachments", "upload", "uploads", "export", "report", "reports", "analytics", "repository",
+        "knowledge", "password", "otp", "login", "profile", "settings", "draft", "drafts", "overview",
+        "summary", "page", "guide", "workflow", "stage", "stages", "tier", "tiers", "governance"
+    }
+
+    if words.intersection(edrp_keywords):
+        return True
+
+    # Check for decision ID pattern (e.g., DEC-1, DEC-28, #12, /decision/5)
+    if re.search(r'\b(?:dec[-_ /]?|/decision/)?\d+\b', q):
+        return True
+
+    # Check for decision creation/formulation intents (e.g. "generate problem statement for...", "suggest alternatives for...")
+    is_decision_generative = any(g in q for g in ["problem statement", "rationale", "alternative", "decision for", "titled", "category", "department", "evaluate", "formulate"]) and any(a in q for a in ["create", "generate", "draft", "suggest", "write", "propose", "recommend"])
+    if is_decision_generative:
+        return True
+
+    # Check if query matches existing database decisions or active page
+    matched_decisions = db_context.get("matched_decisions", [])
+    if matched_decisions:
+        top_d = matched_decisions[0]
+        d_words = set(re.findall(r'\b[a-zA-Z0-9_-]+\b', (top_d.get("title", "") + " " + top_d.get("description", "")).lower()))
+        if len(words.intersection(d_words)) >= 2:
+            return True
+
+    return False
+
+
+def _handle_unrelated_query(clean_msg: str, user_name: str) -> Dict[str, Any]:
+    """
+    Returns a polite refusal explaining that this assistant is dedicated to EDRP,
+    and guides the user to ask questions related to the Expert Decision Replay Platform.
+    """
+    reply_text = (
+        f"I am the specialized AI Assistant for the **Expert Decision Replay Platform (EDRP)**.\n\n"
+        f"I can only assist you with questions related to **EDRP**, strategic organizational decisions, and decision governance. I cannot provide answers for unrelated topics (such as general programming tutorials, recipes, weather, or general trivia).\n\n"
+        f"**Please ask questions regarding EDRP, such as:**\n"
+        f"- 🎯 **Decision Management**: *\"How do I create and structure a new strategic decision?\"*\n"
+        f"- 🛡️ **Approval Workflows**: *\"Explain the 3-tier review chain (Reviewer → Manager → Administrator)\"*\n"
+        f"- ⚖️ **Alternative Matrices**: *\"How to evaluate alternatives, feasibility scores, and cost estimates?\"*\n"
+        f"- 🔄 **Decision Replay & Restore**: *\"What is the use of restore version and where can I view it?\"*\n"
+        f"- 📚 **Knowledge Repository**: *\"What decisions were approved for Technology Budget?\"*\n"
+        f"- 🔒 **Audit & Security**: *\"How does the immutable audit log and diff engine work?\"*"
+    )
+    return {
+        "reply": reply_text,
+        "suggested_actions": [
+            "How do I create a new decision?",
+            "Explain the approval workflow",
+            "What is the use of restore version?",
+            "Search Knowledge Repository"
+        ],
+        "source": "EDRP AI Assistant",
+        "is_knowledge_repository": False
+    }
 
 
 def _derive_custom_suggestions(query: str, db_context: Optional[Dict[str, Any]] = None) -> List[str]:

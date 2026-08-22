@@ -32,7 +32,8 @@ class ProfileService:
             "phone": user.phone,
             "designation": user.designation,
             "role": role.role_name if role else "User",
-            "team": team.team_name if team else "General",
+            "team": team.team_name if team else "Not Assigned",
+            "team_id": team.id if team else None,
             "is_own_profile": is_own_profile
         }
 

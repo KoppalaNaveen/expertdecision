@@ -13,8 +13,8 @@ class DecisionService:
         return DecisionRepository.create_decision_full(db, full_decision)
 
     @staticmethod
-    def get_all_decisions(db: Session, user_id: int = None, role_name: str = None):
-        return DecisionRepository.get_all_decisions(db, user_id=user_id, role_name=role_name)
+    def get_all_decisions(db: Session, user_id: int = None, role_name: str = None, status: str = None, scope: str = None):
+        return DecisionRepository.get_all_decisions(db, user_id=user_id, role_name=role_name, status=status, scope=scope)
 
     @staticmethod
     def get_decision_by_id(db: Session, decision_id: int, user_id: int = None):

@@ -41,8 +41,11 @@ class AiSupportChatRequest(BaseModel):
     page_context: Optional[str] = None
     page_title: Optional[str] = None
     page_url: Optional[str] = None
+    mode: Optional[str] = "standard"
+    use_knowledge_repository: Optional[bool] = False
 
 class AiSupportChatResponse(BaseModel):
     reply: str
     suggested_actions: Optional[List[str]] = []
     source: str = "EDRP AI Assistant"
+    is_knowledge_repository: Optional[bool] = False

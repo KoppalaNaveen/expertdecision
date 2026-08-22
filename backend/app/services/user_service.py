@@ -6,7 +6,7 @@ import time
 import hashlib
 import threading
 
-from app.schemas.user import UserRegister, UserLogin, AdminUserCreate
+from app.schemas.user import UserRegister, UserLogin, AdminUserCreate, AdminUserUpdateCredentials
 from app.repositories.user_repository import UserRepository
 from app.core.security import hash_password, verify_password
 from app.core.auth import create_access_token
@@ -21,37 +21,18 @@ from app.services.email_service import (
     send_account_deleted_email,
     send_role_changed_email,
     send_account_status_email,
+    send_credentials_updated_email,
     get_recipient_email
 )
 from app.services.notification_service import NotificationService
+
 
 class UserService:
 
     @staticmethod
     def _log_activity(db: Session, user_id: int, action: str, details: str = ""):
-        try:
-            from app.models.activity_log import ActivityLog
-            from app.models.user import User
-            
-            valid_user = db.query(User).filter(User.id == user_id).first()
-            if not valid_user:
-                system_user = db.query(User).first()
-                if system_user:
-                    user_id = system_user.id
-                else:
-                    return
-
-            clean_action = str(action)[:95]
-            log_entry = ActivityLog(user_id=user_id, action=clean_action, details=str(details))
-            db.add(log_entry)
-            db.commit()
-            print(f"[AUDIT LOG SUCCESS] Recorded activity log: {clean_action}")
-        except Exception as e:
-            try:
-                db.rollback()
-            except Exception:
-                pass
-            print(f"[AUDIT LOG ERROR] Failed to record activity log: {e}")
+        from app.services.audit_service import AuditService
+        AuditService.log_event(db, user_id=user_id, action=action, details=details)
 
     @staticmethod
     def _get_role_prefix(db: Session, role_id: int) -> str:
@@ -152,7 +133,10 @@ class UserService:
         # Notify all Admin users about the new registration awaiting approval
         try:
             from app.models.notification import Notification
-            admin_users = db.query(User).filter(User.role_id == 1).all()
+            from app.models.role import Role
+            admin_roles = db.query(Role).filter(Role.role_name.in_(["Admin", "Administrator"])).all()
+            admin_role_ids = [r.id for r in admin_roles] or [1]
+            admin_users = db.query(User).filter(User.role_id.in_(admin_role_ids)).all()
             for admin in admin_users:
                 notif = Notification(
                     user_id=admin.id,
@@ -193,14 +177,16 @@ class UserService:
     def login_user(db: Session, user: UserLogin):
         identifier = user.employee_id.strip()
         
-        # Strictly look up user by employee_id only
+        # Look up user by employee_id or email
         db_user = UserRepository.get_user_by_employee_id(db, identifier)
+        if not db_user:
+            db_user = UserRepository.get_user_by_email(db, identifier)
 
-        # Case 1: Employee ID not found
+        # Case 1: Account not found
         if not db_user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Employee ID or Password."
+                detail="Invalid Employee ID / Email or Password."
             )
 
         # Case 2: Wrong password
@@ -209,6 +195,16 @@ class UserService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Employee ID or Password."
             )
+
+        # Upgrade legacy hash to modern SHA-256 if needed
+        expected_sha = hash_password(user.password)
+        if db_user.password != expected_sha:
+            try:
+                db_user.password = expected_sha
+                db.commit()
+                db.refresh(db_user)
+            except Exception:
+                db.rollback()
 
         # Case 3: Email not verified
         if db_user.email_verified is False:
@@ -254,7 +250,11 @@ class UserService:
             "token_type": "bearer",
             "user_id": db_user.id,
             "role_name": db_user.role.role_name if db_user.role else "User",
-            "full_name": db_user.full_name
+            "full_name": db_user.full_name,
+            "team_id": db_user.team_id,
+            "team_name": db_user.team.team_name if db_user.team else "Not Assigned",
+            "designation": db_user.designation or "Team Member",
+            "employee_id": db_user.employee_id or f"EMP-{db_user.id}"
         }
 
     @staticmethod
@@ -285,7 +285,11 @@ class UserService:
 
         # 1. In-App Notification (Independent)
         try:
-            status_msg = "Your account has been approved by the Administrator." if action == "approve" else "Your account registration application was not approved."
+            status_msg = (
+                f"Your account has been verified and approved by the Administrator. You can now login with Employee ID {updated_user.employee_id}."
+                if action == "approve"
+                else "Your account registration application was not approved."
+            )
             NotificationService.create_notification(
                 db,
                 user_id=updated_user.id,
@@ -295,8 +299,45 @@ class UserService:
         except Exception as notif_err:
             print(f"Approval status notification note: {notif_err}")
 
-        # 2. Automated Email via Original Gmail (Async post-commit)
-        user_email = get_recipient_email(updated_user)
+        # 2. In-App Mail (Internal Email Service Inbox)
+        if action == "approve":
+            try:
+                from app.models.internal_email import InternalEmail
+                from datetime import datetime, timezone
+
+                admin_user = db.query(User).filter(User.role_id == 1).first()
+                sender_id = admin_user.id if admin_user else user_id
+                user_role_str = updated_user.role.role_name if (updated_user.role and updated_user.role.role_name) else "Employee"
+
+                in_app_mail = InternalEmail(
+                    sender_id=sender_id,
+                    recipient_type=user_role_str,
+                    recipient_names=f"{updated_user.full_name} ({updated_user.employee_id})",
+                    subject="Your Account is Verified and Approved by Administrator",
+                    priority="High",
+                    message=(
+                        f"Hello {updated_user.full_name},\n\n"
+                        f"Your account on the Expert Decision Replay Platform (EDRP) has been verified and approved by the Administrator.\n\n"
+                        f"You can now access your dashboard and all platform features using your login credentials:\n"
+                        f"• Employee ID / Login ID: {updated_user.employee_id}\n"
+                        f"• Role: {user_role_str}\n"
+                        f"• Status: Verified & Active\n\n"
+                        f"If you have any questions or need help, please reach out to the Support team.\n\n"
+                        f"Best regards,\n"
+                        f"EDRP Administration Team"
+                    ),
+                    status="Delivered",
+                    created_at=datetime.now(timezone.utc)
+                )
+                db.add(in_app_mail)
+                db.commit()
+                print(f"[IN-APP MAIL CREATED] Approval in-app mail created for {updated_user.full_name} ({updated_user.employee_id})")
+            except Exception as in_app_err:
+                db.rollback()
+                print(f"In-app approval email dispatch note: {in_app_err}")
+
+        # 3. Automated External Email via Gmail SMTP (Async post-commit)
+        user_email = get_recipient_email(updated_user) or (updated_user.email_original if (updated_user.email_original and "@" in updated_user.email_original) else (updated_user.email if (updated_user.email and "@" in updated_user.email) else None))
         if user_email:
             def _async_status_email(target_email, emp_id, name, act):
                 try:
@@ -312,6 +353,8 @@ class UserService:
                 args=(user_email, updated_user.employee_id, updated_user.full_name, action),
                 daemon=True
             ).start()
+        else:
+            print(f"[ACCOUNT APPROVAL NOTE] No valid email found for user ID {updated_user.id} ({updated_user.employee_id})")
 
         UserService._log_activity(db, user_id, f"Administrator {action}d account for {updated_user.full_name} ({updated_user.employee_id})", f"By: {actor_name}")
 
@@ -500,6 +543,144 @@ class UserService:
         UserService._log_activity(db, created_user.id, f"Administrator created user: {created_user.full_name} ({created_user.employee_id})", f"Role ID: {created_user.role_id}")
 
         return created_user
+
+    @staticmethod
+    def admin_update_user_credentials(db: Session, req: AdminUserUpdateCredentials):
+        user = UserRepository.get_user_by_id(db, req.user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        old_email = (getattr(user, 'email_original', None) or user.email or "").strip().lower()
+        if '@' not in old_email:
+            # If old_email was stored as a raw hash without original, keep fallback
+            orig = getattr(user, 'email_original', '')
+            if orig and '@' in orig:
+                old_email = orig.strip().lower()
+        old_full_name = user.full_name
+        employee_id = user.employee_id or f"EMP-{user.id}"
+
+        email_changed = False
+        new_email = old_email
+        if req.email:
+            candidate_email = req.email.strip().lower()
+            if candidate_email != old_email:
+                existing = UserService._find_user_by_email(db, candidate_email)
+                if existing and existing.id != user.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="This email address is already in use by another account."
+                    )
+                new_email = candidate_email
+                candidate_hash = hashlib.sha256(candidate_email.encode('utf-8')).hexdigest()
+                user.email = candidate_hash
+                user.email_original = candidate_email
+                user.email_hash = candidate_hash
+                email_changed = True
+
+
+        password_changed = False
+        if req.password:
+            raw_pwd = req.password.strip()
+            if len(raw_pwd) < 6:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Password must be at least 6 characters long."
+                )
+            user.password = hash_password(raw_pwd)
+            password_changed = True
+
+        if req.full_name:
+            user.full_name = req.full_name.strip()
+        if req.role_id:
+            user.role_id = req.role_id
+        if req.team_id is not None:
+            user.team_id = req.team_id if req.team_id > 0 else None
+        if req.designation is not None:
+            user.designation = req.designation.strip()
+        if req.phone is not None:
+            user.phone = req.phone.strip()
+
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        user.updated_at = now_str
+        db.commit()
+        db.refresh(user)
+
+        # Activity logging
+        changes_desc = []
+        if email_changed: changes_desc.append(f"Email: {old_email} -> {new_email}")
+        if password_changed: changes_desc.append("Password reset")
+        if req.full_name and req.full_name != old_full_name: changes_desc.append(f"Name updated")
+        if req.role_id: changes_desc.append(f"Role ID: {req.role_id}")
+        if req.team_id is not None: changes_desc.append(f"Team ID: {req.team_id}")
+
+        UserService._log_activity(
+            db,
+            user.id,
+            f"Administrator updated credentials for {user.full_name} ({employee_id})",
+            ", ".join(changes_desc) if changes_desc else "Profile updated"
+        )
+
+        # Invalidate dashboard caches
+        try:
+            from app.repositories.dashboard_repository import _DASHBOARD_CACHE
+            _DASHBOARD_CACHE.clear()
+        except Exception:
+            pass
+
+        # Dispatches emails to OLD email and NEW email
+        if (email_changed or password_changed) and req.notify_user:
+            plain_new_pwd = req.password.strip() if req.password else ""
+            def _async_send_credential_updates(to_old, to_new, name, emp_id, em_chg, pwd_chg, new_pwd):
+                try:
+                    # 1. Send to old email
+                    if to_old:
+                        send_credentials_updated_email(
+                            to_email=to_old,
+                            full_name=name,
+                            employee_id=emp_id,
+                            email_changed=em_chg,
+                            old_email=to_old,
+                            new_email=to_new,
+                            password_changed=pwd_chg,
+                            new_password=new_pwd,
+                            is_old_inbox=(to_old != to_new)
+                        )
+                    # 2. Send to new email if different from old
+                    if to_new and to_new != to_old:
+                        send_credentials_updated_email(
+                            to_email=to_new,
+                            full_name=name,
+                            employee_id=emp_id,
+                            email_changed=em_chg,
+                            old_email=to_old,
+                            new_email=to_new,
+                            password_changed=pwd_chg,
+                            new_password=new_pwd,
+                            is_old_inbox=False
+                        )
+                except Exception as mail_err:
+                    print(f"Async credential email notification error: {mail_err}")
+
+            threading.Thread(
+                target=_async_send_credential_updates,
+                args=(old_email, new_email, user.full_name, employee_id, email_changed, password_changed, plain_new_pwd),
+                daemon=True
+            ).start()
+
+
+        return {
+            "message": "User account and credentials updated successfully",
+            "user_id": user.id,
+            "employee_id": employee_id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "email_changed": email_changed,
+            "password_changed": password_changed,
+            "old_email": old_email,
+            "new_email": new_email
+        }
+
 
     @staticmethod
     def delete_user(db: Session, user_id: int):

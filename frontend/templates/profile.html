@@ -33,7 +33,7 @@
                         <p style="font-size: 14px; color: #64748B; margin: 0 0 1rem 0; font-weight: 500;">{{ profile.designation or 'Team Member' }}</p>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                             <span class="{{ role_theme_class }}" style="color: white; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 8px;">{{ profile.role }}</span>
-                            <span style="background: #F3F4F6; color: #374151; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;">{{ profile.team }}</span>
+                            <span style="background: #F3F4F6; color: #374151; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;"><i data-lucide="users" style="width: 13px; height: 13px; display: inline; vertical-align: middle; margin-right: 4px;"></i>Team: {{ profile.team or 'Not Assigned' }}</span>
                         </div>
                     </div>
                 </div>
@@ -137,12 +137,45 @@
                             <input
                                 class="form-control"
                                 name="designation"
+                                list="profileDesignationList"
                                 value="{{ profile.designation or '' }}"
-                                placeholder="Enter job designation"
+                                placeholder="Select or type job designation"
                                 style="padding: 0.75rem 1rem; border: 1px solid #E2E8F0; border-radius: 10px; font-size: 14px; transition: all 0.2s;"
                                 onFocus="this.style.borderColor='#3B82F6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
                                 onBlur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'"
                             >
+                            <datalist id="profileDesignationList">
+                                <option value="Senior Software Engineer">
+                                <option value="Lead Software Engineer">
+                                <option value="Principal Systems Architect">
+                                <option value="Full Stack Developer">
+                                <option value="Frontend Developer">
+                                <option value="Backend Developer">
+                                <option value="Cloud Solutions Architect">
+                                <option value="DevOps & SRE Specialist">
+                                <option value="Database Administrator">
+                                <option value="QA & Test Automation Lead">
+                                <option value="Data Scientist / ML Engineer">
+                                <option value="Cybersecurity Analyst">
+                                <option value="Engineering Manager">
+                                <option value="Technical Team Lead">
+                                <option value="Senior Product Manager">
+                                <option value="Scrum Master / Agile Coach">
+                                <option value="Director of Technology">
+                                <option value="Operations Lead">
+                                <option value="Chief Technology Officer (CTO)">
+                                <option value="Senior Decision Reviewer">
+                                <option value="Technical Reviewer">
+                                <option value="Architecture Review Board Member">
+                                <option value="Compliance & Risk Specialist">
+                                <option value="Audit & Governance Officer">
+                                <option value="Business Systems Analyst">
+                                <option value="Financial Analyst">
+                                <option value="HR Business Partner">
+                                <option value="Talent Acquisition Specialist">
+                                <option value="Enterprise Solutions Consultant">
+                                <option value="Legal & Corporate Counsel">
+                            </datalist>
                         </div>
 
                         <!-- Action Buttons -->

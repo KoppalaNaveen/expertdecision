@@ -64,36 +64,18 @@ def _resolve_backend_url():
             return "http://127.0.0.1:8000"
     return env_url
 
-API_URL = _resolve_backend_url()
+API_URL = "http://127.0.0.1:8000"
 
 def make_backend_request(method, path, **kwargs):
     """
-    Sends an HTTP request to the FastAPI backend with automatic retry and connection pooling.
+    Sends a high-speed HTTP request directly to the FastAPI backend.
     """
     if "timeout" not in kwargs:
-        kwargs["timeout"] = 5
+        kwargs["timeout"] = 6
 
-    urls = [API_URL, "http://127.0.0.1:8000", "http://localhost:8000"]
-    seen = set()
-    unique_urls = []
-    for u in urls:
-        if u and u not in seen:
-            seen.add(u)
-            unique_urls.append(u)
-
-    last_exception = None
-    for base in unique_urls:
-        full_url = f"{base}{path}" if path.startswith("/") else f"{base}/{path}"
-        try:
-            res = http_session.request(method, full_url, **kwargs)
-            return res
-        except requests.exceptions.RequestException as e:
-            last_exception = e
-            print(f"[BACKEND CONNECT ATTEMPT] {method} {full_url} note: {e}")
-
-    if last_exception:
-        raise last_exception
-    return None
+    url_path = path if path.startswith("/") else f"/{path}"
+    full_url = f"{API_URL}{url_path}"
+    return http_session.request(method, full_url, **kwargs)
 
 CONTACT_CONFIG = {
     "company_email": "contact@edrp.org",
@@ -121,13 +103,13 @@ def inject_global_stats():
 
     now = time.time()
     cached = _GLOBAL_STATS_CACHE.get(user_id)
-    if cached and (now - cached["ts"] < 25):
+    if cached and (now - cached["ts"] < 60):
         base_data.update(cached["data"])
         return base_data
         
     try:
         headers = {"Authorization": f"Bearer {token}"}
-        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=0.6)
+        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=2)
         if response is not None and response.status_code == 200:
             data = response.json()
             fresh = {
@@ -141,6 +123,7 @@ def inject_global_stats():
             base_data.update(cached["data"])
     
     return base_data
+
 
 
 # ===========================
@@ -179,13 +162,10 @@ def login():
         }
 
         response = None
-        for base_api in [API_URL, "http://127.0.0.1:8000", "http://localhost:8000"]:
-            try:
-                response = requests.post(f"{base_api}/users/login", json=payload, timeout=8)
-                if response is not None:
-                    break
-            except Exception as e:
-                print(f"Login connection attempt to {base_api} note: {e}")
+        try:
+            response = make_backend_request("POST", "/users/login", json=payload, timeout=15)
+        except Exception as e:
+            print(f"Login connection error note: {e}")
 
         if response is not None and response.status_code == 200:
             token = response.json()
@@ -198,23 +178,32 @@ def login():
             session["token"] = token["access_token"]
             session["user_id"] = token["user_id"]
             session["role_name"] = token.get("role_name", "User")
+            session["team_id"] = token.get("team_id")
+            session["team_name"] = token.get("team_name", "Not Assigned")
+            session["designation"] = token.get("designation") or "Team Member"
+            session["employee_id"] = token.get("employee_id") or ""
             full_name = token.get("full_name", "User")
             session["full_name"] = full_name
             
             parts = full_name.split()
             session["initials"] = (parts[0][0] + (parts[-1][0] if len(parts) > 1 else "")).upper()
 
-            try:
-                make_backend_request("POST", "/audit/log", json={
-                    "user_id": token["user_id"],
-                    "action": f"User login successful: {full_name}",
-                    "details": f"Role: {session['role_name']}"
-                }, timeout=2)
-            except Exception as log_err:
-                print(f"Frontend audit log note: {log_err}")
+            def _dispatch_login_log(uid, name, role):
+                try:
+                    make_backend_request("POST", "/audit/log", json={
+                        "user_id": uid,
+                        "action": f"User login successful: {name}",
+                        "details": f"Role: {role}"
+                    }, timeout=2)
+                except Exception:
+                    pass
+
+            import threading
+            threading.Thread(target=_dispatch_login_log, args=(token["user_id"], full_name, session['role_name']), daemon=True).start()
 
             flash("Login Successful", "success")
             return redirect(url_for("dashboard"))
+
 
         if response is not None:
             try:
@@ -397,6 +386,32 @@ def pending_approvals():
     return render_template("pending_approvals.html", pending_users=pending_users)
 
 
+@app.route("/api/pending-approvals/action", methods=["POST"])
+def api_pending_approvals_action():
+    if "token" not in session:
+        return jsonify({"detail": "Unauthorized"}), 401
+
+    role = session.get("role_name", "User")
+    if role not in ("Administrator", "Admin", "System Administrator"):
+        return jsonify({"detail": "Access Denied: Only Administrators can process approvals."}), 403
+
+    try:
+        data = request.json or {}
+        actor_name = session.get("full_name") or "Administrator"
+        if "actor_name" not in data:
+            data["actor_name"] = actor_name
+
+        headers = {"Authorization": f"Bearer {session.get('token', '')}"}
+        action = data.get("action", "approve")
+        endpoint = f"/users/{action}" if action in ("approve", "reject") else "/users/approve"
+        response = make_backend_request("POST", endpoint, json=data, headers=headers, timeout=15)
+        if response is not None:
+            return jsonify(response.json()), response.status_code
+        return jsonify({"detail": "Backend connection error"}), 500
+    except Exception as e:
+        return jsonify({"detail": f"Error processing approval: {e}"}), 500
+
+
 @app.route("/api/check-employee-id", methods=["POST"])
 def api_check_employee_id():
     data = request.json
@@ -431,6 +446,31 @@ def api_delete_user(user_id):
         return jsonify({"detail": "Backend connection error. Ensure FastAPI server is running."}), 500
     except Exception as e:
         return jsonify({"detail": f"Error deleting user: {e}"}), 500
+
+
+@app.route("/api/users/admin_update_credentials", methods=["POST", "PUT"])
+@app.route("/api/users/<int:user_id>/credentials", methods=["PUT", "POST"])
+def proxy_admin_update_credentials(user_id=None):
+    if "token" not in session:
+        return jsonify({"detail": "Unauthorized"}), 401
+    
+    role = session.get("role_name", "User")
+    if role not in ("Administrator", "Admin", "System Administrator"):
+        return jsonify({"detail": "Access Denied: Only Administrators can update user credentials."}), 403
+
+    try:
+        data = request.json or {}
+        if user_id and "user_id" not in data:
+            data["user_id"] = user_id
+
+        headers = {"Authorization": f"Bearer {session.get('token', '')}"}
+        resp = make_backend_request("POST", "/users/admin_update_credentials", json=data, headers=headers, timeout=20)
+        if resp is not None:
+            return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+        return jsonify({"detail": "Backend connection error"}), 500
+    except Exception as e:
+        return jsonify({"detail": f"Error updating user credentials: {e}"}), 500
+
 
 
 @app.route("/api/support/<ticket_id>", methods=["DELETE"])
@@ -545,11 +585,17 @@ def proxy_get_all_decisions():
     try:
         user_id = request.args.get("user_id") or session.get("user_id", "")
         role_name = request.args.get("role_name") or session.get("role_name", "")
+        scope = request.args.get("scope", "")
+        status_val = request.args.get("status", "")
         params = []
         if user_id:
             params.append(f"user_id={user_id}")
         if role_name:
             params.append(f"role_name={role_name}")
+        if scope:
+            params.append(f"scope={scope}")
+        if status_val:
+            params.append(f"status={status_val}")
         query_str = f"?{'&'.join(params)}" if params else ""
         resp = make_backend_request("GET", f"/decisions/{query_str}", timeout=15)
         return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
@@ -887,18 +933,33 @@ def dashboard():
         "Authorization": f"Bearer {session['token']}"
     }
 
-    user_id = session.get("user_id", 2)
+    user_id = session.get("user_id") or 48
 
     dashboard = {}
     try:
-        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=5)
+        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=10)
         if response is not None and response.status_code == 200:
             dashboard = response.json()
+            if dashboard.get("team"):
+                session["team_name"] = dashboard.get("team")
+            elif dashboard.get("team") == "":
+                session["team_name"] = "Not Assigned"
         else:
-            flash("Backend service returned an error. Showing offline dashboard view.", "warning")
+            # Fallback to general admin ID 48
+            fallback_resp = make_backend_request("GET", "/dashboard/48", headers=headers, timeout=10)
+            if fallback_resp is not None and fallback_resp.status_code == 200:
+                dashboard = fallback_resp.json()
+            else:
+                flash("Backend service returned an error. Showing offline dashboard view.", "warning")
     except Exception as e:
         print(f"[FRONTEND DASHBOARD REQ ERR] {e}")
-        flash("Backend server is unreachable. Please ensure the backend is running.", "warning")
+        try:
+            fallback_resp = make_backend_request("GET", "/dashboard/48", headers=headers, timeout=10)
+            if fallback_resp is not None and fallback_resp.status_code == 200:
+                dashboard = fallback_resp.json()
+        except Exception:
+            flash("Backend server is unreachable. Please ensure the backend is running.", "warning")
+
 
     role = (session.get("role_name") or "Employee").strip()
     role_lower = role.lower()
@@ -926,6 +987,7 @@ def dashboard():
     return render_template(
         template,
         dashboard=dashboard,
+        team=dashboard.get("team") or session.get("team_name") or "Not Assigned",
         # Unpack for convenient direct access in templates
         total_users=dashboard.get("total_users", 0),
         active_users=dashboard.get("active_users", 0),
@@ -956,6 +1018,7 @@ def dashboard():
         rejected_pct=rejected_pct,
         draft_pct=draft_pct,
     )
+
 
 # ===========================
 # USERS
@@ -1165,6 +1228,14 @@ def profile():
             flash("Unable to load profile.", "danger")
             return redirect(url_for("dashboard"))
         profile = response.json()
+        if profile.get("designation"):
+            session["designation"] = profile.get("designation")
+        if profile.get("team"):
+            session["team_name"] = profile.get("team")
+            session["team_id"] = profile.get("team_id")
+        elif profile.get("team") == "":
+            session["team_name"] = "Not Assigned"
+            session["team_id"] = None
     except Exception as e:
         print(f"[FRONTEND PROFILE REQ ERR] {e}")
         flash("Backend connection error. Please ensure the backend service is running.", "danger")
@@ -1175,6 +1246,7 @@ def profile():
         profile=profile,
         current_user_id=current_user_id
     )
+
 
 
 @app.route("/profile/update", methods=["POST"])
@@ -1299,8 +1371,38 @@ def account_deleted():
 
 
 # ===========================
+# API PROXY (FLASK TO FASTAPI)
+# ===========================
+
+@app.route("/api/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+def api_proxy(subpath):
+    try:
+        url = f"{API_URL}/{subpath}"
+        headers = {k: v for k, v in request.headers if k.lower() not in ("host", "content-length")}
+        if "token" in session and "Authorization" not in headers:
+            headers["Authorization"] = f"Bearer {session['token']}"
+        
+        res = http_session.request(
+            method=request.method,
+            url=url,
+            headers=headers,
+            data=request.get_data(),
+            params=request.args,
+            cookies=request.cookies,
+            allow_redirects=False,
+            timeout=15
+        )
+        excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
+        resp_headers = [(k, v) for k, v in res.headers.items() if k.lower() not in excluded_headers]
+        return make_response(res.content, res.status_code, resp_headers)
+    except Exception as e:
+        return jsonify({"detail": f"API Proxy connection error: {str(e)}"}), 502
+
+
+# ===========================
 # ERROR HANDLERS
 # ===========================
+
 
 @app.route("/404-error")
 def error_404():

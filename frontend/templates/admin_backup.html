@@ -1,33 +1,368 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="container-fluid py-4" style="max-width: 1400px;">
+    
+    <!-- Page Header & Action -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
-            <h3 class="fw-bold mb-1">Backup Management</h3>
-            <p class="text-muted mb-0">Create full system backups and review recent backup history.</p>
+            <h3 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                <i data-lucide="archive" class="text-primary" style="width: 26px; height: 26px;"></i>
+                Backup Management
+            </h3>
+            <p class="text-muted mb-0" style="font-size: 13.5px;">Create full system snapshots, download platform archives, and inspect backed-up data records.</p>
         </div>
-        <button class="btn btn-primary fw-bold" onclick="runAdminBackup()">Create Backup</button>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-secondary px-3 py-2 d-inline-flex align-items-center gap-1.5 fw-semibold" style="font-size: 13px;" onclick="loadBackupHistory()">
+                <i data-lucide="refresh-cw" style="width: 15px; height: 15px;"></i> Refresh
+            </button>
+            <button class="btn btn-primary px-3.5 py-2 d-inline-flex align-items-center gap-2 fw-bold shadow-sm" style="font-size: 13px; border-radius: 8px;" id="btnCreateBackup" onclick="runAdminBackup()">
+                <i data-lucide="database-backup" style="width: 16px; height: 16px;"></i> Create Full Backup
+            </button>
+        </div>
     </div>
 
+    <!-- KPI Summary Stat Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3" style="border-radius: 12px; background: #FFFFFF;">
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: #EEF2FF; color: #4F46E5; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="folder-archive" style="width: 22px; height: 22px;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Total Backups</div>
+                        <div class="fw-bold text-dark" style="font-size: 22px;" id="statTotalBackups">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3" style="border-radius: 12px; background: #FFFFFF;">
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: #ECFDF5; color: #059669; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="clock" style="width: 22px; height: 22px;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Last Backup Created</div>
+                        <div class="fw-bold text-dark" style="font-size: 14.5px;" id="statLastBackupTime">Never</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3" style="border-radius: 12px; background: #FFFFFF;">
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: #FAF5FF; color: #9333EA; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="shield-check" style="width: 22px; height: 22px;"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small fw-semibold">Snapshot Scope</div>
+                        <div class="fw-bold text-dark" style="font-size: 15px;">Full Platform Snapshot (17 Tables)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert / Toast Banner -->
     <div id="backupAlert" class="mb-3"></div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0">Recent Backup History</h5>
-                <span class="text-muted small">Stored for the current administrator</span>
+    <!-- Recent Backup History Table Card -->
+    <div class="card shadow-sm border-0 mb-4" style="border-radius: 14px; overflow: hidden;">
+        <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+                <i data-lucide="history" style="width: 18px; height: 18px;" class="text-primary"></i>
+                <h5 class="fw-bold text-dark mb-0" style="font-size: 15px;">Recent Backup Archives</h5>
             </div>
-            <div id="backupHistoryList" class="list-group">
-                <div class="text-muted small">Loading backup history...</div>
+            <span class="badge bg-light text-muted border px-2.5 py-1" style="font-size: 11px;">Persistent Database Records</span>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                <thead class="table-light text-secondary" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">
+                    <tr>
+                        <th class="ps-4" width="60">ID</th>
+                        <th width="320">Archive Name</th>
+                        <th width="170">Created At</th>
+                        <th width="100">Size</th>
+                        <th>Data Scope & Entities</th>
+                        <th class="text-end pe-4" width="220">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="backupHistoryTableBody">
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <div class="spinner-border spinner-border-sm me-2 text-primary"></div>Loading backup archives...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     Interactive Backup Data Inspector Modal
+     ============================================================= -->
+<div class="modal fade" id="inspectBackupModal" tabindex="-1" aria-labelledby="inspectBackupModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            
+            <div class="modal-header border-bottom py-3 px-4 bg-light">
+                <div class="d-flex align-items-center gap-2.5">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: #EEF2FF; color: #4F46E5; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="search" style="width: 18px; height: 18px;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark mb-0" id="inspectBackupModalTitle" style="font-size: 15px;">Inspect Backup Data</h5>
+                        <span class="text-muted small" id="inspectBackupModalSubtitle" style="font-size: 11.5px;">Review all entities captured in this snapshot</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4 bg-white custom-scrollbar">
+                
+                <!-- Metric Overview Cards -->
+                <div class="row g-2 mb-4" id="modalMetricChips">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Categorized Data Tabs -->
+                <ul class="nav nav-pills mb-3 gap-1.5 p-1 bg-light rounded-3 border" id="backupDataTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active py-1.5 px-3 fw-bold" style="font-size: 12px;" id="tab-users-btn" data-bs-toggle="pill" data-bs-target="#tab-users" type="button" role="tab">
+                            <i data-lucide="users" style="width: 13px; height: 13px;" class="me-1"></i> Users (<span id="tabCountUsers">0</span>)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link py-1.5 px-3 fw-bold" style="font-size: 12px;" id="tab-teams-btn" data-bs-toggle="pill" data-bs-target="#tab-teams" type="button" role="tab">
+                            <i data-lucide="network" style="width: 13px; height: 13px;" class="me-1"></i> Teams (<span id="tabCountTeams">0</span>)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link py-1.5 px-3 fw-bold" style="font-size: 12px;" id="tab-decisions-btn" data-bs-toggle="pill" data-bs-target="#tab-decisions" type="button" role="tab">
+                            <i data-lucide="file-check-2" style="width: 13px; height: 13px;" class="me-1"></i> Decisions (<span id="tabCountDecisions">0</span>)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link py-1.5 px-3 fw-bold" style="font-size: 12px;" id="tab-discussions-btn" data-bs-toggle="pill" data-bs-target="#tab-discussions" type="button" role="tab">
+                            <i data-lucide="message-square" style="width: 13px; height: 13px;" class="me-1"></i> Discussions (<span id="tabCountDiscussions">0</span>)
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link py-1.5 px-3 fw-bold" style="font-size: 12px;" id="tab-json-btn" data-bs-toggle="pill" data-bs-target="#tab-json" type="button" role="tab">
+                            <i data-lucide="code" style="width: 13px; height: 13px;" class="me-1"></i> Raw JSON Payload
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Contents -->
+                <div class="tab-content" id="backupDataTabsContent">
+                    
+                    <!-- Users Tab -->
+                    <div class="tab-pane fade show active" id="tab-users" role="tabpanel">
+                        <div class="table-responsive border rounded-3" style="max-height: 350px;">
+                            <table class="table table-hover align-middle mb-0" style="font-size: 12.5px;">
+                                <thead class="table-light text-secondary">
+                                    <tr>
+                                        <th class="ps-3">ID</th>
+                                        <th>Name</th>
+                                        <th>Emp ID</th>
+                                        <th>Email</th>
+                                        <th>Role ID</th>
+                                        <th>Team ID</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inspectorUsersTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Teams Tab -->
+                    <div class="tab-pane fade" id="tab-teams" role="tabpanel">
+                        <div class="table-responsive border rounded-3" style="max-height: 350px;">
+                            <table class="table table-hover align-middle mb-0" style="font-size: 12.5px;">
+                                <thead class="table-light text-secondary">
+                                    <tr>
+                                        <th class="ps-3">Team ID</th>
+                                        <th>Team Name</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inspectorTeamsTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Decisions Tab -->
+                    <div class="tab-pane fade" id="tab-decisions" role="tabpanel">
+                        <div class="table-responsive border rounded-3" style="max-height: 380px;">
+                            <table class="table table-hover align-middle mb-0" style="font-size: 12.5px;">
+                                <thead class="table-light text-secondary">
+                                    <tr>
+                                        <th class="ps-3" width="70">ID</th>
+                                        <th>Decision Title</th>
+                                        <th width="125">Status</th>
+                                        <th width="120">Scope</th>
+                                        <th width="180">Created Date</th>
+                                        <th class="text-end pe-3" width="100">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inspectorDecisionsTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Discussions Tab -->
+                    <div class="tab-pane fade" id="tab-discussions" role="tabpanel">
+                        <div class="table-responsive border rounded-3" style="max-height: 380px;">
+                            <table class="table table-hover align-middle mb-0" style="font-size: 12.5px;">
+                                <thead class="table-light text-secondary">
+                                    <tr>
+                                        <th class="ps-3" width="80">Thread ID</th>
+                                        <th width="120">Decision ID</th>
+                                        <th>Title / Content</th>
+                                        <th width="110">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inspectorDiscussionsTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Raw JSON Viewer -->
+                    <div class="tab-pane fade" id="tab-json" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small">Complete exported JSON object</span>
+                            <button type="button" class="btn btn-xs btn-outline-secondary px-2 py-1" onclick="copyRawJsonToClipboard()">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy JSON
+                            </button>
+                        </div>
+                        <pre id="inspectorRawJson" class="p-3 bg-light border rounded-3 text-dark custom-scrollbar" style="max-height: 380px; font-size: 11.5px; font-family: monospace; overflow: auto;"></pre>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer bg-light border-top py-2.5 px-4 d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 fw-semibold" id="btnModalDownloadBackup" onclick="downloadActiveModalBackup()">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i> Download This Backup (.json)
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     View Decision Snapshot Details Modal
+     ============================================================= -->
+<div class="modal fade" id="viewDecisionSnapshotModal" tabindex="-1" aria-labelledby="viewDecisionSnapshotModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header border-bottom py-3 px-4 bg-light d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary px-2.5 py-1 font-monospace" id="snapshotDecId" style="font-size: 12px;">DEC-#</span>
+                    <h5 class="modal-title fw-bold text-dark mb-0" id="viewDecisionSnapshotModalTitle" style="font-size: 16px;">Decision Details</h5>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span id="snapshotDecStatusBadge"></span>
+                    <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body p-4 bg-white custom-scrollbar">
+                <div class="mb-4">
+                    <h5 class="fw-bold text-dark mb-2" id="snapshotDecTitle">Decision Title</h5>
+                    <div class="d-flex flex-wrap gap-2 align-items-center text-muted small" style="font-size: 12px;">
+                        <span><i data-lucide="briefcase" style="width:12px;height:12px;" class="me-1"></i> Department: <strong class="text-dark" id="snapshotDecDept">—</strong></span>
+                        <span>•</span>
+                        <span><i data-lucide="tag" style="width:12px;height:12px;" class="me-1"></i> Scope: <strong class="text-dark" id="snapshotDecScope">—</strong></span>
+                        <span>•</span>
+                        <span><i data-lucide="calendar" style="width:12px;height:12px;" class="me-1"></i> Created: <strong class="text-dark" id="snapshotDecDate">—</strong></span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.04em;">Problem Statement / Context</label>
+                    <div class="p-3 bg-light rounded-3 border text-dark" style="font-size: 13px; line-height: 1.6;" id="snapshotDecDesc">No description available.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.04em;">Chosen Decision / Rationale</label>
+                    <div class="p-3 bg-light rounded-3 border text-dark" style="font-size: 13px; line-height: 1.6;" id="snapshotDecRationale">No rationale documented.</div>
+                </div>
+
+                <div class="row g-3 mb-2">
+                    <div class="col-md-6">
+                        <div class="p-2.5 bg-light rounded-3 border">
+                            <div class="text-muted small" style="font-size: 11px;">Estimated Cost / Budget</div>
+                            <div class="fw-bold text-dark mt-0.5" id="snapshotDecCost">—</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2.5 bg-light rounded-3 border">
+                            <div class="text-muted small" style="font-size: 11px;">Impact / Urgency</div>
+                            <div class="fw-bold text-dark mt-0.5" id="snapshotDecImpact">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-top py-2.5 px-4 d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 fw-semibold" id="btnOpenLiveDecision">
+                    <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> Open Live Decision Page
+                </button>
             </div>
         </div>
     </div>
 </div>
 
+
+<style>
+.data-chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2.5px 7px;
+    border-radius: 6px;
+    background: #F1F5F9;
+    color: #475569;
+    border: 1px solid #E2E8F0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.metric-summary-tile {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    text-align: center;
+}
+.metric-summary-tile .val {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0F172A;
+    line-height: 1;
+}
+.metric-summary-tile .lbl {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748B;
+    margin-top: 3px;
+}
+</style>
+
 <script>
-    const API_URL = "/api";
-    const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
+    const API_URL = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") ? "http://127.0.0.1:8000" : "/api";
+    const CURRENT_USER_ID = parseInt("{{ session.get('user_id') or 48 }}", 10);
+    let allBackupRecords = [];
+    let currentInspectedBackup = null;
+
 
     document.addEventListener("DOMContentLoaded", () => {
         loadBackupHistory();
@@ -35,62 +370,319 @@
 
     async function runAdminBackup() {
         const alertBox = document.getElementById("backupAlert");
-        if (!confirm("This will create a full backup of the platform data. Continue?")) return;
+        const btn = document.getElementById("btnCreateBackup");
 
-        alertBox.innerHTML = '<div class="alert alert-info">Creating backup...</div>';
+        if (!confirm("This will create a complete full platform snapshot (all users, teams, decisions, reviews, and logs). Continue?")) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Creating Backup...';
+        alertBox.innerHTML = '<div class="alert alert-info py-2 px-3 d-flex align-items-center gap-2" style="font-size: 13px;"><div class="spinner-border spinner-border-sm"></div> Creating system snapshot archive...</div>';
+
         try {
             const response = await fetch(`${API_URL}/settings/backup-data/${CURRENT_USER_ID}`);
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data.detail || "Backup failed.");
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.detail || "Backup failed.");
             }
 
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `edrp_full_backup_${CURRENT_USER_ID}.json`;
+            a.download = `edrp_full_backup_${CURRENT_USER_ID}_${new Date().toISOString().slice(0, 10)}.json`;
             document.body.appendChild(a);
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
 
-            alertBox.innerHTML = '<div class="alert alert-success">Backup created successfully and downloaded.</div>';
-            loadBackupHistory();
+            alertBox.innerHTML = '<div class="alert alert-success py-2 px-3 d-flex align-items-center gap-2" style="font-size: 13px;"><i data-lucide="check-circle" style="width: 16px; height: 16px;"></i> Full platform backup created successfully and downloaded!</div>';
+            if (window.lucide) lucide.createIcons();
+            
+            await loadBackupHistory();
         } catch (err) {
-            alertBox.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+            alertBox.innerHTML = `<div class="alert alert-danger py-2 px-3" style="font-size: 13px;">${err.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="database-backup" style="width: 16px; height: 16px;"></i> Create Full Backup';
+            if (window.lucide) lucide.createIcons();
         }
     }
 
     async function loadBackupHistory() {
-        const list = document.getElementById("backupHistoryList");
+        const tbody = document.getElementById("backupHistoryTableBody");
         try {
             const response = await fetch(`${API_URL}/settings/backup-history/${CURRENT_USER_ID}`);
             if (!response.ok) {
                 throw new Error("Unable to load backup history.");
             }
 
-            const data = await response.json();
-            if (!Array.isArray(data) || data.length === 0) {
-                list.innerHTML = '<div class="text-muted small">No backup records yet.</div>';
+            allBackupRecords = await response.json();
+            
+            // Update Stats
+            document.getElementById("statTotalBackups").innerText = allBackupRecords.length;
+            if (allBackupRecords.length > 0) {
+                document.getElementById("statLastBackupTime").innerText = allBackupRecords[0].created_at || "Recent";
+            } else {
+                document.getElementById("statLastBackupTime").innerText = "None recorded";
+            }
+
+            if (!Array.isArray(allBackupRecords) || allBackupRecords.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i data-lucide="archive-x" style="width: 32px; height: 32px; color: #94A3B8; margin-bottom: 8px;"></i>
+                            <div class="fw-semibold">No backup records created yet.</div>
+                            <div class="small">Click 'Create Full Backup' above to snapshot your platform.</div>
+                        </td>
+                    </tr>
+                `;
+                if (window.lucide) lucide.createIcons();
                 return;
             }
 
-            list.innerHTML = data.map(item => `
-                <div class="list-group-item">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="fw-bold mb-1">${item.backup_name}</h6>
-                            <div class="text-muted small">Created: ${item.created_at}</div>
+            tbody.innerHTML = allBackupRecords.map(item => {
+                const stats = item.stats || {};
+                const chips = [
+                    stats.users ? `<span class="data-chip"><i data-lucide="users" style="width:11px;height:11px;"></i> ${stats.users} Users</span>` : '',
+                    stats.teams ? `<span class="data-chip"><i data-lucide="network" style="width:11px;height:11px;"></i> ${stats.teams} Teams</span>` : '',
+                    stats.decisions ? `<span class="data-chip"><i data-lucide="file-check-2" style="width:11px;height:11px;"></i> ${stats.decisions} Decisions</span>` : '',
+                    stats.reviews ? `<span class="data-chip"><i data-lucide="check-square" style="width:11px;height:11px;"></i> ${stats.reviews} Reviews</span>` : '',
+                    stats.discussion_threads ? `<span class="data-chip"><i data-lucide="message-square" style="width:11px;height:11px;"></i> ${stats.discussion_threads} Threads</span>` : '',
+                    stats.activity_logs ? `<span class="data-chip"><i data-lucide="activity" style="width:11px;height:11px;"></i> ${stats.activity_logs} Logs</span>` : ''
+                ].filter(Boolean).join(" ");
+
+                return `
+                <tr>
+                    <td class="ps-4">
+                        <span class="badge bg-light text-secondary border fw-bold" style="font-size: 11px;">#${item.id}</span>
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark font-monospace" style="font-size: 12.5px;">${item.backup_name}</div>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle mt-0.5" style="font-size: 9.5px; font-weight: 700;">Verified Snapshot</span>
+                    </td>
+                    <td class="text-secondary" style="font-size: 12px; white-space: nowrap;">
+                        <i data-lucide="calendar" style="width: 12px; height: 12px;" class="me-1 text-muted"></i>${item.created_at || '—'}
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border font-monospace" style="font-size: 11px;">${item.size_kb || 0} KB</span>
+                    </td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-1">
+                            ${chips || '<span class="text-muted small fst-italic">Full Database Snapshot</span>'}
                         </div>
-                        <span class="badge bg-primary">Stored</span>
-                    </div>
-                    <div class="text-muted small mt-2">Preview: ${Object.keys(item.preview?.data || {}).length} data sections</div>
-                </div>
-            `).join("");
+                    </td>
+                    <td class="text-end pe-4" style="white-space: nowrap;">
+                        <div class="d-inline-flex gap-1.5">
+                            <button class="btn btn-sm btn-outline-primary px-2.5 py-1 d-inline-flex align-items-center gap-1 fw-semibold" style="font-size: 11.5px;" onclick="openInspectBackupModal(${item.id})" title="Inspect Backed Up Data">
+                                <i data-lucide="search" style="width: 12.5px; height: 12.5px;"></i> Inspect Data
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary px-2.5 py-1 d-inline-flex align-items-center gap-1" style="font-size: 11.5px;" onclick="downloadBackupRecord(${item.id})" title="Download JSON File">
+                                <i data-lucide="download" style="width: 12.5px; height: 12.5px;"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join("");
+
+            if (window.lucide) lucide.createIcons();
         } catch (err) {
-            list.innerHTML = `<div class="text-danger small">${err.message}</div>`;
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-danger">
+                        <i data-lucide="alert-circle" style="width: 20px; height: 20px;" class="me-1"></i> ${err.message}
+                    </td>
+                </tr>
+            `;
+            if (window.lucide) lucide.createIcons();
         }
+    }
+
+    function openInspectBackupModal(backupId) {
+        const item = allBackupRecords.find(b => b.id === backupId);
+        if (!item) return;
+
+        currentInspectedBackup = item;
+        const preview = item.preview || {};
+        const data = preview.data || {};
+
+        document.getElementById("inspectBackupModalTitle").innerText = `Inspect Archive: ${item.backup_name}`;
+        document.getElementById("inspectBackupModalSubtitle").innerText = `Created on ${item.created_at} | Size: ${item.size_kb || 0} KB`;
+
+        // 1. Metric chips
+        const usersList = data.users || [];
+        const teamsList = data.teams || [];
+        const decisionsList = data.decisions || [];
+        const reviewsList = data.reviews || [];
+        const replaysList = data.replays || [];
+        const threadsList = data.discussion_threads || [];
+        const commentsList = data.comments || [];
+        const logsList = data.activity_logs || [];
+        const notesList = data.meeting_notes || [];
+
+        const metricTiles = [
+            { label: "Users", val: usersList.length },
+            { label: "Teams", val: teamsList.length },
+            { label: "Decisions", val: decisionsList.length },
+            { label: "Reviews", val: reviewsList.length },
+            { label: "Replays", val: replaysList.length },
+            { label: "Threads", val: threadsList.length },
+            { label: "Comments", val: commentsList.length },
+            { label: "Logs", val: logsList.length }
+        ];
+
+        document.getElementById("modalMetricChips").innerHTML = metricTiles.map(m => `
+            <div class="col-3 col-md-1-5">
+                <div class="metric-summary-tile">
+                    <div class="val">${m.val}</div>
+                    <div class="lbl">${m.label}</div>
+                </div>
+            </div>
+        `).join("");
+
+        // 2. Tab counts
+        document.getElementById("tabCountUsers").innerText = usersList.length;
+        document.getElementById("tabCountTeams").innerText = teamsList.length;
+        document.getElementById("tabCountDecisions").innerText = decisionsList.length;
+        document.getElementById("tabCountDiscussions").innerText = threadsList.length;
+
+        // 3. Populate Users Table
+        document.getElementById("inspectorUsersTbody").innerHTML = usersList.map(u => `
+            <tr>
+                <td class="ps-3 fw-bold font-monospace">#${u.id}</td>
+                <td class="fw-bold">${u.full_name || '—'}</td>
+                <td><span class="badge bg-light text-dark border font-monospace">${u.employee_id || '—'}</span></td>
+                <td class="text-muted font-monospace" style="font-size: 11.5px;">${u.email_original || u.email || '—'}</td>
+                <td><span class="badge bg-secondary-subtle text-secondary">Role #${u.role_id || '—'}</span></td>
+                <td><span class="badge bg-primary-subtle text-primary">Team #${u.team_id || '—'}</span></td>
+                <td><span class="badge ${u.is_active ? 'bg-success-subtle text-success' : 'bg-light text-muted'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+            </tr>
+        `).join("") || '<tr><td colspan="7" class="text-center py-3 text-muted">No user records in this snapshot</td></tr>';
+
+        // 4. Populate Teams Table
+        document.getElementById("inspectorTeamsTbody").innerHTML = teamsList.map(t => `
+            <tr>
+                <td class="ps-3 fw-bold font-monospace">#${t.id}</td>
+                <td class="fw-bold">${t.team_name || '—'}</td>
+                <td class="text-muted">${t.description || 'No description'}</td>
+            </tr>
+        `).join("") || '<tr><td colspan="3" class="text-center py-3 text-muted">No team records in this snapshot</td></tr>';
+
+        // 5. Populate Decisions Table with distinct Status Colors & View Action
+        document.getElementById("inspectorDecisionsTbody").innerHTML = decisionsList.map(d => `
+            <tr>
+                <td class="ps-3 fw-bold font-monospace">#${d.id}</td>
+                <td>
+                    <div class="fw-bold text-dark text-truncate" style="max-width: 280px;">${d.title || 'Untitled'}</div>
+                    <div class="text-muted small" style="font-size: 11px;">Dept: ${d.department || 'Technology'}</div>
+                </td>
+                <td>${getDecisionStatusBadge(d.status)}</td>
+                <td><span class="badge bg-light text-secondary border font-monospace" style="font-size: 11px;">${d.scope || '—'}</span></td>
+                <td class="text-muted small font-monospace">${(d.created_at || '—').replace('T', ' ').slice(0, 19)}</td>
+                <td class="text-end pe-3">
+                    <button type="button" class="btn btn-xs btn-outline-primary px-2.5 py-1 d-inline-flex align-items-center gap-1 fw-bold" style="font-size: 11px; border-radius: 6px;" onclick="viewDecisionSnapshotDetails(${d.id})">
+                        <i data-lucide="eye" style="width: 12px; height: 12px;"></i> View
+                    </button>
+                </td>
+            </tr>
+        `).join("") || '<tr><td colspan="6" class="text-center py-4 text-muted">No decision records in this snapshot</td></tr>';
+
+        // 6. Populate Discussions Table
+        document.getElementById("inspectorDiscussionsTbody").innerHTML = threadsList.map(th => `
+            <tr>
+                <td class="ps-3 fw-bold font-monospace">#${th.id}</td>
+                <td><span class="badge bg-light text-secondary border">Decision #${th.decision_id}</span></td>
+                <td class="fw-bold">${th.title || th.content || 'Discussion Thread'}</td>
+                <td><span class="badge bg-info-subtle text-info">${th.status || 'Open'}</span></td>
+            </tr>
+        `).join("") || '<tr><td colspan="4" class="text-center py-3 text-muted">No discussion threads in this snapshot</td></tr>';
+
+        // 7. Raw JSON string
+        document.getElementById("inspectorRawJson").innerText = JSON.stringify(preview, null, 2);
+
+        // Show Modal
+        const modalEl = document.getElementById('inspectBackupModal');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function getDecisionStatusBadge(status) {
+        const s = (status || "").trim().toLowerCase();
+        if (s === "approved") {
+            return `<span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 fw-bold" style="font-size: 11px; border-radius: 6px;"><i data-lucide="check-circle-2" style="width:11px;height:11px;" class="me-1"></i>Approved</span>`;
+        } else if (s === "rejected") {
+            return `<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1 fw-bold" style="font-size: 11px; border-radius: 6px;"><i data-lucide="x-circle" style="width:11px;height:11px;" class="me-1"></i>Rejected</span>`;
+        } else if (s === "pending" || s === "in review" || s === "under review" || s === "pending review") {
+            return `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1 fw-bold" style="font-size: 11px; border-radius: 6px;"><i data-lucide="clock" style="width:11px;height:11px;" class="me-1"></i>Pending</span>`;
+        } else if (s === "draft") {
+            return `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2.5 py-1 fw-bold" style="font-size: 11px; border-radius: 6px;"><i data-lucide="file-edit" style="width:11px;height:11px;" class="me-1"></i>Draft</span>`;
+        } else if (s === "archived") {
+            return `<span class="badge bg-dark-subtle text-dark border border-dark-subtle px-2.5 py-1 fw-bold" style="font-size: 11px; border-radius: 6px;"><i data-lucide="archive" style="width:11px;height:11px;" class="me-1"></i>Archived</span>`;
+        } else {
+            return `<span class="badge bg-info-subtle text-info border border-info-subtle px-2.5 py-1 fw-bold" style="font-size: 11px; border-radius: 6px;">${status || 'Unknown'}</span>`;
+        }
+    }
+
+    function viewDecisionSnapshotDetails(decisionId) {
+        if (!currentInspectedBackup || !currentInspectedBackup.preview) return;
+        const data = currentInspectedBackup.preview.data || {};
+        const decisionsList = data.decisions || [];
+        const dec = decisionsList.find(d => d.id === decisionId);
+        if (!dec) return;
+
+        document.getElementById("snapshotDecId").innerText = `DEC-${dec.id}`;
+        document.getElementById("snapshotDecTitle").innerText = dec.title || 'Untitled Decision';
+        document.getElementById("snapshotDecStatusBadge").innerHTML = getDecisionStatusBadge(dec.status);
+        document.getElementById("snapshotDecDept").innerText = dec.department || 'Technology';
+        document.getElementById("snapshotDecScope").innerText = dec.scope || 'Organization';
+        document.getElementById("snapshotDecDate").innerText = (dec.created_at || '—').replace('T', ' ').slice(0, 19);
+        document.getElementById("snapshotDecDesc").innerText = dec.description || dec.problem_statement || 'No description recorded in this snapshot.';
+        document.getElementById("snapshotDecRationale").innerText = dec.business_justification || dec.rationale || 'No justification documented in this snapshot.';
+        document.getElementById("snapshotDecCost").innerText = dec.estimated_cost ? `$${Number(dec.estimated_cost).toLocaleString()}` : 'Not Specified';
+        document.getElementById("snapshotDecImpact").innerText = dec.impact || 'Medium Impact';
+
+        document.getElementById("btnOpenLiveDecision").onclick = function() {
+            window.open(`/decisions?id=${dec.id}`, '_blank');
+        };
+
+        const modalEl = document.getElementById('viewDecisionSnapshotModal');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function downloadBackupRecord(backupId) {
+        const item = allBackupRecords.find(b => b.id === backupId);
+        if (!item || !item.preview) return;
+
+        const rawJson = JSON.stringify(item.preview, null, 2);
+        const blob = new Blob([rawJson], { type: "application/json" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${item.backup_name || 'backup'}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    }
+
+    function downloadActiveModalBackup() {
+        if (currentInspectedBackup) {
+            downloadBackupRecord(currentInspectedBackup.id);
+        }
+    }
+
+    function copyRawJsonToClipboard() {
+        if (!currentInspectedBackup || !currentInspectedBackup.preview) return;
+        const text = JSON.stringify(currentInspectedBackup.preview, null, 2);
+        navigator.clipboard.writeText(text).then(() => {
+            alert("Raw JSON payload copied to clipboard!");
+        });
     }
 </script>
 {% endblock %}
+

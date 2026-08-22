@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, Any
 
 
 # -----------------------------
@@ -54,6 +54,18 @@ class AdminUserCreate(BaseModel):
     designation: Optional[str] = None
     phone: Optional[str] = None
 
+class AdminUserUpdateCredentials(BaseModel):
+    user_id: int
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    role_id: Optional[int] = None
+    team_id: Optional[int] = None
+    designation: Optional[str] = None
+    phone: Optional[str] = None
+    notify_user: Optional[bool] = True
+
+
 # -----------------------------
 # Code Verification
 # -----------------------------
@@ -89,6 +101,10 @@ class Token(BaseModel):
     user_id: int
     role_name: Optional[str] = None
     full_name: Optional[str] = None
+    team_id: Optional[int] = None
+    team_name: Optional[str] = "Not Assigned"
+    designation: Optional[str] = "Team Member"
+    employee_id: Optional[str] = None
 
 # -----------------------------
 # User Response
@@ -102,10 +118,11 @@ class UserResponse(BaseModel):
     email_original: Optional[str] = None
     employee_id: Optional[str] = None
     role_id: int
-    team_id: Optional[int] = 1
+    team_id: Optional[int] = None
+    team_name: Optional[str] = "Not Assigned"
     designation: Optional[str] = None
     phone: Optional[str] = None
-    is_active: bool = True
+    is_active: Optional[bool] = True
     email_verified: Optional[bool] = False
     approved: Optional[bool] = False
     status: Optional[str] = "Pending Approval"
@@ -113,7 +130,7 @@ class UserResponse(BaseModel):
     approved_at: Optional[str] = None
     rejected_by: Optional[str] = None
     rejected_at: Optional[str] = None
-    created_at: Optional[str] = None
+    created_at: Optional[Any] = None
     role_name: Optional[str] = None
 
     model_config = {

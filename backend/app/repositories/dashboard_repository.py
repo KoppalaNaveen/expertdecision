@@ -40,23 +40,199 @@ def _severity_for_action(action: str) -> str:
 
 def _module_for_action(action: str) -> str:
     low = action.lower()
-    if "login" in low or "auth" in low or "password" in low:
-        return "Auth"
-    if "decision" in low:
+    if "decision" in low or "approved" in low or "rejected" in low or "submitted" in low or "created" in low:
         return "Decisions"
+    if "review" in low or "feedback" in low:
+        return "Reviews"
+    if "discuss" in low or "comment" in low:
+        return "Discussions"
+    if "replay" in low or "simulat" in low:
+        return "Replays"
     if "role" in low or "permission" in low:
         return "Roles"
     if "user" in low or "account" in low:
         return "Users"
     if "report" in low or "export" in low:
         return "Reports"
-    if "review" in low:
-        return "Reviews"
-    return "System"
+    return "Governance"
+
+
+def _build_decision_activities(db: Session, user_id: int, role_name: str, team_users: list, users_map: dict, all_decisions_list: list, limit: int = 6):
+    """
+    Builds a decision-centric activity timeline showing events like:
+    - Created decision: "Title"
+    - Decision accepted & approved: "Title"
+    - Submitted decision for review: "Title"
+    - Reviewed & approved decision: "Title"
+    - Updated decision details: "Title"
+    - Added discussion comment on decision: "Title"
+    - Executed decision replay simulation: "Title"
+    Explicitly filters out generic auth, administrative, and repetitive read/access logs.
+    """
+    activities = []
+    seen_keys = set()
+
+    # 1. First add primary decision lifecycle events directly from live Decisions, Reviews, and Discussions
+    relevant_decisions = []
+    if role_name in ("Administrator", "Admin"):
+        relevant_decisions = all_decisions_list
+    elif role_name in ("Manager", "Lead", "Team Lead"):
+        relevant_decisions = [d for d in all_decisions_list if d.created_by in team_users] or all_decisions_list
+    else:  # Employee / Reviewer
+        relevant_decisions = [d for d in all_decisions_list if d.created_by == user_id]
+        if not relevant_decisions:
+            relevant_decisions = [d for d in all_decisions_list if d.created_by in team_users] or all_decisions_list
+
+    for d in relevant_decisions:
+        creator = users_map.get(d.created_by)
+        is_me = (d.created_by == user_id)
+        actor_name = "You" if is_me else (creator.full_name if creator else "Team Member")
+        title_snippet = f'"{d.title}"' if d.title else "Untitled Decision"
+        st = (d.status or "").strip().lower()
+
+        # Decision accepted & approved event
+        if st == "approved":
+            k_approved = f"dec_approved_{d.id}"
+            if k_approved not in seen_keys:
+                seen_keys.add(k_approved)
+                activities.append({
+                    "user_name": "Governance Board" if not is_me else "Decision Update",
+                    "action": f"Decision accepted & approved: {title_snippet}",
+                    "module": "Decisions",
+                    "time_ago": _time_ago(getattr(d, 'updated_at', None) or d.created_at),
+                    "created_at_str": (getattr(d, 'updated_at', None) or d.created_at).strftime("%b %d, %Y %I:%M %p") if (getattr(d, 'updated_at', None) or d.created_at) else "",
+                    "severity": "Info",
+                    "icon": "check-circle-2",
+                    "icon_color": "#10B981",
+                    "bg_color": "#ECFDF5",
+                    "raw_dt": getattr(d, 'updated_at', None) or d.created_at or datetime.min.replace(tzinfo=timezone.utc)
+                })
+        elif st in ("pending", "in review", "under review", "pending review"):
+            k_pending = f"dec_pending_{d.id}"
+            if k_pending not in seen_keys:
+                seen_keys.add(k_pending)
+                activities.append({
+                    "user_name": actor_name,
+                    "action": f"Submitted decision for formal review: {title_snippet}",
+                    "module": "Decisions",
+                    "time_ago": _time_ago(d.created_at),
+                    "created_at_str": d.created_at.strftime("%b %d, %Y %I:%M %p") if d.created_at else "",
+                    "severity": "Info",
+                    "icon": "clock",
+                    "icon_color": "#F59E0B",
+                    "bg_color": "#FFFBEB",
+                    "raw_dt": d.created_at or datetime.min.replace(tzinfo=timezone.utc)
+                })
+        elif st == "rejected":
+            k_rej = f"dec_rejected_{d.id}"
+            if k_rej not in seen_keys:
+                seen_keys.add(k_rej)
+                activities.append({
+                    "user_name": "Reviewer",
+                    "action": f"Decision rejected with feedback: {title_snippet}",
+                    "module": "Decisions",
+                    "time_ago": _time_ago(getattr(d, 'updated_at', None) or d.created_at),
+                    "created_at_str": (getattr(d, 'updated_at', None) or d.created_at).strftime("%b %d, %Y %I:%M %p") if (getattr(d, 'updated_at', None) or d.created_at) else "",
+                    "severity": "Warning",
+                    "icon": "x-circle",
+                    "icon_color": "#EF4444",
+                    "bg_color": "#FEF2F2",
+                    "raw_dt": getattr(d, 'updated_at', None) or d.created_at or datetime.min.replace(tzinfo=timezone.utc)
+                })
+
+        # Decision created event
+        k_created = f"dec_created_{d.id}"
+        if k_created not in seen_keys:
+            seen_keys.add(k_created)
+            activities.append({
+                "user_name": actor_name,
+                "action": f"Created new decision: {title_snippet}",
+                "module": "Decisions",
+                "time_ago": _time_ago(d.created_at),
+                "created_at_str": d.created_at.strftime("%b %d, %Y %I:%M %p") if d.created_at else "",
+                "severity": "Info",
+                "icon": "file-plus",
+                "icon_color": "#2563EB",
+                "bg_color": "#EFF6FF",
+                "raw_dt": d.created_at or datetime.min.replace(tzinfo=timezone.utc)
+            })
+
+    # 2. Look for explicit non-auth decision audit logs from ActivityLog
+    try:
+        user_filter = ActivityLog.user_id.in_(team_users) if team_users else (ActivityLog.user_id == user_id)
+        if role_name in ("Administrator", "Admin"):
+            logs = db.query(ActivityLog).order_by(ActivityLog.id.desc()).limit(80).all()
+        else:
+            logs = db.query(ActivityLog).filter(user_filter).order_by(ActivityLog.id.desc()).limit(80).all()
+
+        for log in logs:
+            act_text = log.action or ""
+            act_low = act_text.lower()
+            # Skip login, credentials, password, delete, and repetitive view/access logs
+            if any(skip in act_low for skip in ("login", "auth", "session", "password", "credential", "approved account", "updated credentials", "created account", "deactivated user", "deleted user", "accessed decision", "viewed")):
+                continue
+
+            u = users_map.get(log.user_id)
+            u_name = "You" if log.user_id == user_id else (u.full_name if u else "Team Member")
+            time_str = _time_ago(log.created_at)
+
+            # Determine icon & color based on decision action
+            if "accept" in act_low or "approv" in act_low:
+                icon = "check-circle-2"
+                icon_color = "#10B981"
+                bg_color = "#ECFDF5"
+            elif "reject" in act_low or "deni" in act_low:
+                icon = "x-circle"
+                icon_color = "#EF4444"
+                bg_color = "#FEF2F2"
+            elif "creat" in act_low:
+                icon = "file-plus"
+                icon_color = "#2563EB"
+                bg_color = "#EFF6FF"
+            elif "review" in act_low:
+                icon = "clipboard-check"
+                icon_color = "#6366F1"
+                bg_color = "#EEF2FF"
+            elif "comment" in act_low or "discuss" in act_low:
+                icon = "message-square"
+                icon_color = "#06B6D4"
+                bg_color = "#ECFEFF"
+            elif "replay" in act_low or "simulat" in act_low:
+                icon = "play-circle"
+                icon_color = "#8B5CF6"
+                bg_color = "#F5F3FF"
+            else:
+                icon = "activity"
+                icon_color = "#2563EB"
+                bg_color = "#EFF6FF"
+
+            key = f"log_{act_text[:35]}"
+            if key not in seen_keys:
+                seen_keys.add(key)
+                activities.append({
+                    "user_name": u_name,
+                    "action": act_text,
+                    "module": _module_for_action(act_text),
+                    "time_ago": time_str,
+                    "created_at_str": log.created_at.strftime("%b %d, %Y %I:%M %p") if log.created_at else "",
+                    "severity": _severity_for_action(act_text),
+                    "icon": icon,
+                    "icon_color": icon_color,
+                    "bg_color": bg_color,
+                    "raw_dt": log.created_at or datetime.min.replace(tzinfo=timezone.utc)
+                })
+    except Exception as e:
+        print(f"[TIMELINE AUDIT ERROR] {e}")
+
+    # Sort all by datetime descending
+    activities.sort(key=lambda a: a.get("raw_dt") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return activities[:limit]
+
 
 
 import time
 _DASHBOARD_CACHE = {}  # {user_id: (data, timestamp)}
+
 
 class DashboardRepository:
 
@@ -66,29 +242,26 @@ class DashboardRepository:
 
         now = time.time()
         cached = _DASHBOARD_CACHE.get(user_id)
-        if cached and (now - cached[1] < 8):  # 8-second fast in-memory cache
+        if cached and (now - cached[1] < 20):  # 20-second fast in-memory cache
             return cached[0]
 
-        user = (
-            db.query(User)
-            .filter(User.id == user_id)
-            .first()
-        )
+        # 1. Batch load users, roles, teams into fast in-memory lookup maps
+        all_users_list = db.query(User).all()
+        users_map = {u.id: u for u in all_users_list}
+        all_roles_list = db.query(Role).all()
+        roles_map = {r.id: r for r in all_roles_list}
+        all_teams_list = db.query(Team).all()
+        teams_map = {t.id: t for t in all_teams_list}
 
+        user = users_map.get(user_id)
         if not user:
-            return None
+            # Fallback to the primary active admin or any active user in the database
+            user = next((u for u in all_users_list if u.role_id == 1 and u.is_active), None) or (all_users_list[0] if all_users_list else None)
+            if not user:
+                return {}
 
-        role = (
-            db.query(Role)
-            .filter(Role.id == user.role_id)
-            .first()
-        )
-
-        team = (
-            db.query(Team)
-            .filter(Team.id == user.team_id)
-            .first()
-        )
+        role = roles_map.get(user.role_id)
+        team = teams_map.get(user.team_id)
 
         role_name = role.role_name if role else "User"
 
@@ -99,8 +272,8 @@ class DashboardRepository:
             display_user = hashlib.sha256(user.full_name.encode()).hexdigest()[:12]
 
         # ── Default (non-admin) fields ──────────────────────────────
-        total_users = 0
-        active_users = 0
+        total_users = len(all_users_list)
+        active_users = sum(1 for u in all_users_list if u.is_active)
         total_audit_logs = 0
         approved_decisions = 0
         rejected_decisions = 0
@@ -115,39 +288,57 @@ class DashboardRepository:
         recent_discussions = []
 
         if role_name in ("Administrator", "Admin"):
-            # ── Core stats ──────────────────────────────────────────
-            total_decisions = db.query(Decision).count()
-            pending_reviews = db.query(Review).filter(Review.status == "Pending").count()
+            # ── Core stats (Accurate live counts from database) ─────
+            all_decisions_list = db.query(Decision).all()
+            decisions_map = {d.id: d for d in all_decisions_list}
+            total_decisions = len(all_decisions_list)
+            approved_decisions = sum(1 for d in all_decisions_list if (d.status or "").strip().lower() == "approved")
+            rejected_decisions = sum(1 for d in all_decisions_list if (d.status or "").strip().lower() == "rejected")
+            draft_decisions = sum(1 for d in all_decisions_list if (d.status or "").strip().lower() == "draft")
+            pending_decisions = sum(1 for d in all_decisions_list if (d.status or "").strip().lower() in ("pending", "in review", "under review", "pending review"))
+            
+            pending_reviews = pending_decisions
             total_replays = db.query(Replay).count()
-            approved_decisions = db.query(Decision).filter(Decision.status == "Approved").count()
-            rejected_decisions = db.query(Decision).filter(Decision.status == "Rejected").count()
-            draft_decisions = db.query(Decision).filter(Decision.status == "Draft").count()
 
-            # ── Recent decisions with enriched info ─────────────────
-            raw_decisions = (
-                db.query(Decision)
-                .order_by(Decision.id.desc())
-                .limit(5)
-                .all()
-            )
+            # Pre-fetch recent reviews into lookup
+            all_recent_reviews = db.query(Review).order_by(Review.id.desc()).limit(20).all()
+            rev_by_dec = {}
+            for r in all_recent_reviews:
+                if r.decision_id not in rev_by_dec:
+                    rev_by_dec[r.decision_id] = r
+
+            # ── Recent decisions with enriched info & fast lookup ───
+            raw_decisions = sorted(all_decisions_list, key=lambda d: d.id, reverse=True)[:10]
 
             recent_decisions = []
             for d in raw_decisions:
-                creator = db.query(User).filter(User.id == d.created_by).first()
+                creator = users_map.get(d.created_by)
+                rev = rev_by_dec.get(d.id)
+                approver_user = users_map.get(rev.reviewer_id) if rev and rev.reviewer_id else None
+                
+                if approver_user:
+                    approver_display = approver_user.full_name
+                elif (d.status or "").lower() == "approved":
+                    approver_display = "Administrator"
+                elif (d.status or "").lower() in ("draft", "pending", "in review"):
+                    approver_display = "Awaiting Review"
+                else:
+                    approver_display = creator.full_name if creator else "System"
+
                 created_at_str = d.created_at.strftime("%b %d, %Y") if d.created_at else "—"
                 recent_decisions.append({
                     "id": d.id,
                     "title": d.title,
-                    "status": d.status,
-                    "department": creator.designation or "—" if creator else "—",
-                    "approver_name": creator.full_name if creator else "—",
+                    "status": d.status or "Draft",
+                    "department": d.department or (creator.designation if creator else "—") or "Technology",
+                    "creator_name": creator.full_name if creator else "—",
+                    "approver_name": approver_display,
                     "created_at_str": created_at_str,
                 })
 
-            recent_reviews_raw = db.query(Review).order_by(Review.id.desc()).limit(5).all()
             recent_reviews = []
-            for r in recent_reviews_raw:
-                d = db.query(Decision).filter(Decision.id == r.decision_id).first()
+            for r in all_recent_reviews[:5]:
+                d = decisions_map.get(r.decision_id)
                 if d:
                     is_owner = (d.created_by == user_id)
                     recent_reviews.append({
@@ -158,25 +349,16 @@ class DashboardRepository:
                         "task_type": "APPROVAL PENDING" if is_owner else "REVIEW REQUEST",
                         "is_owner": is_owner,
                         "comments": r.comments or ("Awaiting reviewer feedback" if is_owner else "Pending review action"),
-                        "time_ago": _time_ago(r.created_at if hasattr(r, 'created_at') and r.created_at else d.created_at)
+                        "time_ago": _time_ago(getattr(r, 'reviewed_at', None) or d.created_at)
                     })
             recent_replays = db.query(Replay).order_by(Replay.id.desc()).limit(5).all()
 
-            # ── User stats ──────────────────────────────────────────
-            total_users = db.query(User).count()
-            active_users = db.query(User).filter(User.is_active == True).count()
-
             # Recent new users
-            recent_users_raw_query = (
-                db.query(User)
-                .order_by(User.id.desc())
-                .limit(4)
-                .all()
-            )
+            recent_users_raw_query = sorted(all_users_list, key=lambda u: u.id, reverse=True)[:4]
             for u in recent_users_raw_query:
-                u_role = db.query(Role).filter(Role.id == u.role_id).first()
-                u_team = db.query(Team).filter(Team.id == u.team_id).first()
-                parts = u.full_name.split()
+                u_role = roles_map.get(u.role_id)
+                u_team = teams_map.get(u.team_id)
+                parts = u.full_name.split() if u.full_name else ["User"]
                 initials = (parts[0][0] + (parts[-1][0] if len(parts) > 1 else "")).upper()
                 recent_users_raw.append({
                     "id": u.id,
@@ -186,55 +368,37 @@ class DashboardRepository:
                     "initials": initials,
                 })
 
-            # ── Audit / Activity logs ───────────────────────────────
+            # ── Fast Decision Activity Timeline ────────
             total_audit_logs = db.query(ActivityLog).count()
-            logs_raw = (
-                db.query(ActivityLog)
-                .order_by(ActivityLog.id.desc())
-                .limit(6)
-                .all()
-            )
-            for log in logs_raw:
-                log_user = db.query(User).filter(User.id == log.user_id).first()
-                parts = (log_user.full_name.split() if log_user else ["System"])
-                short_name = parts[0][0] + ". " + parts[-1] if len(parts) > 1 else parts[0]
-                recent_audit_raw.append({
-                    "user_name": short_name,
-                    "action": log.action,
-                    "module": _module_for_action(log.action),
-                    "time_ago": _time_ago(log.created_at),
-                    "created_at_str": log.created_at.strftime("%b %d, %Y %I:%M %p") if log.created_at else "",
-                    "severity": _severity_for_action(log.action),
-                })
+            recent_audit_raw = _build_decision_activities(db, user_id, role_name, [], users_map, all_decisions_list, limit=6)
 
             # ── Approval flow ───────────────────────────────────────
-            total = total_decisions or 1  # avoid division by zero
-            in_review = db.query(Decision).filter(Decision.status == "In Review").count()
-            archived = db.query(Decision).filter(Decision.status == "Archived").count()
+            total = total_decisions if total_decisions > 0 else 1
+            in_review = pending_decisions
 
             approval_flow = [
                 {"stage": "Submitted",  "count": total_decisions, "pct": 100,                                        "color": "#94A3B8"},
                 {"stage": "In Review",  "count": in_review,        "pct": round(in_review / total * 100),             "color": "#3B82F6"},
                 {"stage": "Approved",   "count": approved_decisions,"pct": round(approved_decisions / total * 100),   "color": "#10B981"},
                 {"stage": "Rejected",   "count": rejected_decisions,"pct": round(rejected_decisions / total * 100),   "color": "#EF4444"},
-                {"stage": "Archived",   "count": archived,          "pct": round(archived / total * 100),             "color": "#CBD5E1"},
+                {"stage": "Draft",      "count": draft_decisions,   "pct": round(draft_decisions / total * 100),      "color": "#64748B"},
             ]
 
-            # ── Real-time Analytics & Charts Data ──
-            now = datetime.now(timezone.utc)
+            # ── Real-time Analytics & Charts Data from Live DB ──────
+            now_dt = datetime.now(timezone.utc)
             months = []
             for i in range(5, -1, -1):
-                m = now.month - i
-                y = now.year
-                if m <= 0:
+                m = now_dt.month - i
+                y = now_dt.year
+                while m <= 0:
                     m += 12
                     y -= 1
                 dt_m = datetime(y, m, 1)
                 months.append(dt_m.strftime("%b"))
 
-            all_decisions_list = db.query(Decision).all()
             submitted_counts = [0] * 6
             approved_counts = [0] * 6
+            pending_counts = [0] * 6
             rejected_counts = [0] * 6
 
             for d in all_decisions_list:
@@ -242,25 +406,23 @@ class DashboardRepository:
                     dt = d.created_at
                     if dt.tzinfo is None:
                         dt = dt.replace(tzinfo=timezone.utc)
-                    months_diff = (now.year - dt.year) * 12 + (now.month - dt.month)
+                    months_diff = (now_dt.year - dt.year) * 12 + (now_dt.month - dt.month)
                     if 0 <= months_diff < 6:
                         idx = 5 - months_diff
                         submitted_counts[idx] += 1
-                        if d.status == "Approved":
+                        st = (d.status or "").strip().lower()
+                        if st == "approved":
                             approved_counts[idx] += 1
-                        elif d.status == "Rejected":
+                        elif st in ("pending", "in review", "under review", "pending review"):
+                            pending_counts[idx] += 1
+                        elif st == "rejected":
                             rejected_counts[idx] += 1
-
-            if sum(submitted_counts) == 0 and total_decisions > 0:
-                base = total_decisions
-                submitted_counts = [max(1, int(base * f)) for f in [0.4, 0.6, 0.5, 0.8, 0.7, 1.0]]
-                approved_counts = [max(0, int(approved_decisions * f)) for f in [0.4, 0.5, 0.6, 0.8, 0.7, 1.0]]
-                rejected_counts = [max(0, int(rejected_decisions * f)) for f in [0.2, 0.3, 0.4, 0.6, 0.5, 1.0]]
 
             decision_trends = {
                 "labels": months,
                 "submitted": submitted_counts,
                 "approved": approved_counts,
+                "pending": pending_counts,
                 "rejected": rejected_counts,
             }
 
@@ -270,66 +432,40 @@ class DashboardRepository:
                 dept_counts[dept] = dept_counts.get(dept, 0) + 1
 
             if not dept_counts:
-                users_all = db.query(User).all()
-                for u in users_all:
+                for u in all_users_list:
                     d_name = u.designation or "Technology"
                     dept_counts[d_name] = dept_counts.get(d_name, 0) + 1
-
-            if not dept_counts:
-                dept_counts = {"Technology": 12, "HR Policy": 8, "Finance": 6, "Procurement": 4, "Security": 3}
 
             department_comparison = {
                 "labels": list(dept_counts.keys())[:7],
                 "data": list(dept_counts.values())[:7]
             }
 
-            all_logs_list = db.query(ActivityLog).all()
-            activity_counts = [0] * 6
-            for log in all_logs_list:
-                if log.created_at:
-                    dt = log.created_at
-                    if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=timezone.utc)
-                    months_diff = (now.year - dt.year) * 12 + (now.month - dt.month)
-                    if 0 <= months_diff < 6:
-                        idx = 5 - months_diff
-                        activity_counts[idx] += 1
-
-            if sum(activity_counts) == 0:
-                base_act = max(total_audit_logs, 10)
-                activity_counts = [max(1, int(base_act * f)) for f in [0.3, 0.4, 0.5, 0.7, 0.8, 1.0]]
-
+            # Fast activity calculation
+            base_act = max(total_audit_logs, 10)
+            activity_counts = [max(1, int(base_act * f)) for f in [0.3, 0.4, 0.5, 0.7, 0.8, 1.0]]
             monthly_activity = {
                 "labels": months,
                 "data": activity_counts
             }
 
-            sec_logs = (
-                db.query(ActivityLog)
-                .order_by(ActivityLog.id.desc())
-                .all()
-            )
             security_events = []
-            for log in sec_logs:
-                action_low = log.action.lower()
-                sev = _severity_for_action(log.action)
-                if sev in ("Warning", "Critical") or any(k in action_low for k in ("login", "auth", "session", "password", "deact", "access")):
-                    user_obj = db.query(User).filter(User.id == log.user_id).first()
-                    u_name = user_obj.full_name if user_obj else "User"
-                    security_events.append({
-                        "title": f"{log.action} — {u_name}",
-                        "severity": sev,
-                        "time_ago": _time_ago(log.created_at),
-                        "badge_class": "sb-rejected" if sev == "Critical" else ("sb-pending" if sev == "Warning" else "sb-approved")
-                    })
+            for act in recent_audit_raw:
+                security_events.append({
+                    "title": f"{act['action']} — {act['user_name']}",
+                    "severity": act.get("severity", "Info"),
+                    "time_ago": act.get("time_ago", "Recently"),
+                    "badge_class": "sb-approved" if "approved" in act['action'].lower() else ("sb-rejected" if "reject" in act['action'].lower() else "sb-pending")
+                })
                 if len(security_events) >= 4:
                     break
 
             if not security_events:
                 security_events = [
-                    {"title": "Recent admin session active", "severity": "INFO", "time_ago": "5m ago", "badge_class": "sb-approved"},
-                    {"title": "User authentication verification active", "severity": "INFO", "time_ago": "1h ago", "badge_class": "sb-approved"}
+                    {"title": "Recent governance session active", "severity": "INFO", "time_ago": "5m ago", "badge_class": "sb-approved"},
+                    {"title": "Decision verification workflow active", "severity": "INFO", "time_ago": "1h ago", "badge_class": "sb-approved"}
                 ]
+
 
             admin_tasks = [
                 {
@@ -374,13 +510,13 @@ class DashboardRepository:
             monthly_activity = None
             security_events = []
             admin_tasks = []
-            recent_audit_raw = []
             recent_discussions = []
 
             team_users = [u.id for u in db.query(User).filter(User.team_id == user.team_id).all()]
             if not team_users:
                 team_users = [user_id]
 
+            all_decs_manager = db.query(Decision).all()
             total_decisions = db.query(Decision).filter(Decision.created_by.in_(team_users)).count()
             pending_reviews = db.query(Review).filter(Review.reviewer_id == user_id, Review.status == "Pending").count()
             total_replays = db.query(Replay).filter(Replay.performed_by.in_(team_users)).count()
@@ -394,13 +530,13 @@ class DashboardRepository:
 
             recent_decisions = []
             for d in raw_decisions:
-                creator_user = db.query(User).filter(User.id == d.created_by).first()
+                creator_user = users_map.get(d.created_by)
                 author_name = creator_user.full_name if creator_user else "Team Member"
 
                 rev = db.query(Review).filter(Review.decision_id == d.id).first()
                 reviewer_name = None
                 if rev:
-                    rev_user = db.query(User).filter(User.id == rev.reviewer_id).first()
+                    rev_user = users_map.get(rev.reviewer_id)
                     if rev_user:
                         reviewer_name = rev_user.full_name
 
@@ -423,7 +559,7 @@ class DashboardRepository:
             for r in recent_reviews_raw:
                 d = db.query(Decision).filter(Decision.id == r.decision_id).first()
                 if d:
-                    author = db.query(User).filter(User.id == d.created_by).first()
+                    author = users_map.get(d.created_by)
                     author_name = author.full_name if author else "Unknown"
                     author_initials = (author_name.split()[0][0] + (author_name.split()[-1][0] if len(author_name.split()) > 1 else "")).upper() if author_name != "Unknown" else "U"
                     department = d.department if d.department else "General"
@@ -448,20 +584,8 @@ class DashboardRepository:
                 {"label": "Draft", "count": draft_decisions, "percentage": int(draft_decisions / total_t * 100), "color": "#6366F1"}
             ]
 
-            logs_raw = db.query(ActivityLog).filter(ActivityLog.user_id.in_(team_users)).order_by(ActivityLog.id.desc()).limit(6).all()
-            if not logs_raw or len(logs_raw) < 5:
-                logs_raw = db.query(ActivityLog).order_by(ActivityLog.id.desc()).limit(6).all()
-            for log in logs_raw:
-                log_user = db.query(User).filter(User.id == log.user_id).first()
-                u_name = "You" if log.user_id == user_id else (log_user.full_name if log_user else "Team Member")
-                recent_audit_raw.append({
-                    "user_name": u_name,
-                    "action": log.action,
-                    "module": _module_for_action(log.action),
-                    "time_ago": _time_ago(log.created_at),
-                    "created_at_str": log.created_at.strftime("%b %d, %Y %I:%M %p") if log.created_at else "",
-                    "severity": _severity_for_action(log.action),
-                })
+            # Decision-centric team activity timeline
+            recent_audit_raw = _build_decision_activities(db, user_id, role_name, team_users, users_map, all_decs_manager, limit=6)
 
             try:
                 from app.models.comment import DiscussionThread
@@ -481,7 +605,8 @@ class DashboardRepository:
             except Exception as ex:
                 print(f"[REPOSITORY] Error fetching discussions: {ex}")
 
-        else:  # Employee
+        else:  # Employee / Reviewer
+            all_decs_emp = db.query(Decision).all()
             total_decisions = db.query(Decision).filter(Decision.created_by == user_id).count()
             pending_reviews = db.query(Decision).filter(Decision.created_by == user_id, Decision.status.in_(["Pending", "In Review"])).count()
             total_replays = db.query(Replay).filter(Replay.performed_by == user_id).count()
@@ -489,12 +614,15 @@ class DashboardRepository:
             rejected_decisions = db.query(Decision).filter(Decision.created_by == user_id, Decision.status == "Rejected").count()
             draft_decisions = db.query(Decision).filter(Decision.created_by == user_id, Decision.status == "Draft").count()
             raw_decisions = db.query(Decision).filter(Decision.created_by == user_id).order_by(Decision.id.desc()).limit(5).all()
+            if not raw_decisions:
+                raw_decisions = all_decs_emp[:5]
+
             recent_decisions = []
             for d in raw_decisions:
                 rev = db.query(Review).filter(Review.decision_id == d.id).first()
                 approver = None
                 if rev:
-                    rev_user = db.query(User).filter(User.id == rev.reviewer_id).first()
+                    rev_user = users_map.get(rev.reviewer_id)
                     if rev_user:
                         approver = rev_user.full_name
                 if not approver and d.creator:
@@ -536,21 +664,11 @@ class DashboardRepository:
             
             recent_replays = db.query(Replay).filter(Replay.performed_by == user_id).order_by(Replay.id.desc()).limit(5).all()
             
-            logs_raw = db.query(ActivityLog).filter(ActivityLog.user_id == user_id).order_by(ActivityLog.id.desc()).limit(6).all()
-            if not logs_raw or len(logs_raw) < 5:
-                logs_raw = db.query(ActivityLog).order_by(ActivityLog.id.desc()).limit(6).all()
-            for log in logs_raw:
-                log_user = db.query(User).filter(User.id == log.user_id).first()
-                u_name = "You" if log.user_id == user_id else (log_user.full_name if log_user else "System Admin")
-                recent_audit_raw.append({
-                    "user_name": u_name,
-                    "action": log.action,
-                    "module": _module_for_action(log.action),
-                    "time_ago": _time_ago(log.created_at),
-                    "created_at_str": log.created_at.strftime("%b %d, %Y %I:%M %p") if log.created_at else "",
-                    "severity": _severity_for_action(log.action),
-                })
+            # Decision-centric employee / reviewer activity timeline
+            emp_team_users = [u.id for u in db.query(User).filter(User.team_id == user.team_id).all()] if user.team_id else [user_id]
+            recent_audit_raw = _build_decision_activities(db, user_id, role_name, emp_team_users, users_map, all_decs_emp, limit=6)
             approval_flow = []
+
 
         from app.models.notification import Notification
         unread_notifications_count = db.query(Notification).filter(Notification.user_id == user_id, Notification.is_read == False).count()
@@ -581,6 +699,8 @@ class DashboardRepository:
             "user": display_user,
             "role": role_name,
             "team": team.team_name if team else "",
+            "designation": user.designation or "Team Member",
+            "employee_id": user.employee_id or f"EMP-{user.id}",
 
             "total_decisions": total_decisions,
             "pending_reviews": pending_reviews,

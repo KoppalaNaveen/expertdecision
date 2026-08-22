@@ -7,6 +7,7 @@ from app.database.connection import get_db
 from app.schemas.user import (
     UserRegister,
     AdminUserCreate,
+    AdminUserUpdateCredentials,
     UserResponse,
     UserLogin,
     Token,
@@ -18,6 +19,10 @@ from app.schemas.user import (
     SaveEmployeeIDRequest,
     AdminApprovalAction
 )
+
+from app.models.user import User
+from app.models.role import Role
+from app.models.team import Team
 from app.services.user_service import UserService
 
 router = APIRouter(
@@ -78,6 +83,11 @@ def approve_user(action: AdminApprovalAction, db: Session = Depends(get_db)):
 def reject_user(action: AdminApprovalAction, db: Session = Depends(get_db)):
     return UserService.admin_approval_action(db, action.user_id, "reject", action.actor_name or "Administrator")
 
+@router.post("/pending-approvals/action")
+@router.post("/approval-action")
+def pending_approval_action(action: AdminApprovalAction, db: Session = Depends(get_db)):
+    return UserService.admin_approval_action(db, action.user_id, action.action, action.actor_name or "Administrator")
+
 # -------------------------------
 # Register User (Legacy)
 # -------------------------------
@@ -88,9 +98,19 @@ def reject_user(action: AdminApprovalAction, db: Session = Depends(get_db)):
 )
 def get_all_users(db: Session = Depends(get_db)):
     import hashlib
-    users = UserService.get_all_users(db)
+    from sqlalchemy.orm import joinedload
+    users = db.query(User).options(joinedload(User.role), joinedload(User.team)).order_by(User.id.asc()).all()
     result = []
+    seen_ids = set()
+    needs_commit = False
+
+    role_fallback = {1: "Administrator", 2: "Manager", 3: "Employee", 4: "Reviewer"}
+
     for u in users:
+        if not u or u.id in seen_ids:
+            continue
+        seen_ids.add(u.id)
+
         # Resolve human-readable email
         orig_email = (u.email_original or "").strip().lower()
         if not orig_email and u.email and "@" in u.email:
@@ -102,34 +122,43 @@ def get_all_users(db: Session = Depends(get_db)):
 
         if orig_email and u.email_original != orig_email:
             u.email_original = orig_email
-            try:
-                db.commit()
-            except Exception:
-                db.rollback()
+            needs_commit = True
+
+        r_name = u.role.role_name if u.role else role_fallback.get(u.role_id, "User")
+        t_name = u.team.team_name if u.team else "Not Assigned"
+        created_val = str(u.created_at) if u.created_at is not None else None
 
         result.append(UserResponse(
             id=u.id,
-            full_name=u.full_name,
-            email=orig_email or "—",
+            full_name=u.full_name or f"User #{u.id}",
+            email=orig_email or u.email or "—",
             email_hash=hash_val,
-            display_email=orig_email or "—",
-            email_original=orig_email or "—",
+            display_email=orig_email or u.email or "—",
+            email_original=orig_email or u.email or "—",
             employee_id=u.employee_id,
             role_id=u.role_id,
-            role_name=u.role.role_name if u.role else "User",
+            role_name=r_name,
             team_id=u.team_id,
+            team_name=t_name,
             designation=u.designation,
             phone=u.phone,
-            is_active=u.is_active,
-            email_verified=u.email_verified,
-            approved=u.approved,
-            status=u.status,
+            is_active=bool(u.is_active) if u.is_active is not None else True,
+            email_verified=bool(u.email_verified) if u.email_verified is not None else False,
+            approved=bool(u.approved) if u.approved is not None else False,
+            status=u.status or "Active",
             approved_by=u.approved_by,
             approved_at=u.approved_at,
             rejected_by=u.rejected_by,
             rejected_at=u.rejected_at,
-            created_at=u.created_at,
+            created_at=created_val,
         ))
+
+    if needs_commit:
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+
     return result
 
 @router.post(
@@ -233,6 +262,20 @@ def delete_user(
     return UserService.delete_user(db, user_id)
 
 
+# -------------------------------
+# Admin Update User Credentials & Profile
+# -------------------------------
+@router.post("/admin_update_credentials")
+@router.put("/admin_update_credentials")
+@router.put("/{user_id}/credentials")
+def admin_update_credentials(
+    req: AdminUserUpdateCredentials,
+    db: Session = Depends(get_db)
+):
+    return UserService.admin_update_user_credentials(db, req)
+
+
+
 class UpdateUserRoleRequest(BaseModel):
     role_id: int
     actor_role: str = "Administrator"
@@ -307,3 +350,14 @@ def update_user_status(user_id: int, req: UpdateUserStatusRequest, db: Session =
         ).start()
 
     return {"message": f"User account has been {status_str} successfully"}
+
+
+
+# -------------------------------
+# Get User's Assigned Team
+# -------------------------------
+@router.get("/{user_id}/team")
+def get_user_team(user_id: int, db: Session = Depends(get_db)):
+    from app.services.team_service import TeamService
+    return TeamService.get_my_team(db, user_id=user_id)
+

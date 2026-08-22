@@ -1,8 +1,10 @@
 import os
 import smtplib
+import socket
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
+import dns.resolver
 
 load_dotenv()
 
@@ -12,49 +14,88 @@ SMTP_APP_PASSWORD = _raw_password.replace(" ", "") if _raw_password else ""
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
-DUMMY_DOMAINS = {
-    "corp.com", "edrp.org", "example.com", "example.org", "example.net",
-    "test.com", "test.org", "domain.com", "fake.com", "dummy.com",
-    "invalid.com", "invalid", "localhost", "local", "internal", "test",
-    "sample.com", "company.com", "organization.com"
+# Global toggles to silence unsolicited automated/routine emails
+ENABLE_ROUTINE_EMAILS = os.getenv("ENABLE_ROUTINE_EMAILS", "false").strip().lower() in ("true", "1", "yes")
+ENABLE_SECURITY_EMAILS = os.getenv("ENABLE_SECURITY_EMAILS", "false").strip().lower() in ("true", "1", "yes")
+ENABLE_NOTIFICATION_EMAILS = os.getenv("ENABLE_NOTIFICATION_EMAILS", "false").strip().lower() in ("true", "1", "yes")
+
+# In-memory deliverability cache for domain MX lookups
+_DOMAIN_MX_CACHE: dict[str, bool] = {}
+
+_KNOWN_VALID_DOMAINS = {
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "yahoo.co.uk", "yahoo.ca", "yahoo.com.au",
+    "outlook.com", "hotmail.com", "live.com", "msn.com", "icloud.com", "me.com", "mac.com",
+    "proton.me", "protonmail.com", "zoho.com", "aol.com", "mail.com", "gmx.com", "yandex.com", "fastmail.com"
 }
 
-DUMMY_TLDS = (".test", ".example", ".invalid", ".localhost", ".local", ".corp")
+_BLOCKED_MOCK_DOMAINS = {
+    "localhost", "invalid", "test.invalid", "rw.com", "emp.com", "mgr.com", "adm.com",
+    "rev.com", "usr.com", "org.com", "dev.com", "qa.com", "test.com", "example.com",
+    "example.org", "example.net", "sample.com", "dummy.com", "mock.com", "fake.com",
+    "temp.com", "xyz.com", "domain.com", "company.com", "mailinator.com", "yopmail.com",
+    "trashmail.com", "guerrillamail.com", "10minutemail.com", "tempmail.com", "dispostable.com",
+    "sharklasers.com", "getairmail.com", "none.com", "null.com"
+}
+
+_BLOCKED_TLDS = (
+    ".test", ".invalid", ".localhost", ".example", ".local", ".internal",
+    ".mock", ".fake", ".dummy", ".sample", ".localdomain", ".lan"
+)
+
+def _has_valid_mx_records(domain: str) -> bool:
+    """
+    Checks if a domain has valid, active Mail Exchange (MX) DNS records.
+    Prevents SMTP transmission to non-existent or unresolvable domains (which cause Mail Delivery Subsystem bounce emails).
+    """
+    d = (domain or "").strip().lower()
+    if not d or "." not in d:
+        return False
+    if d in _KNOWN_VALID_DOMAINS:
+        return True
+    if d in _BLOCKED_MOCK_DOMAINS or any(d.endswith(tld) for tld in _BLOCKED_TLDS):
+        return False
+    if d in _DOMAIN_MX_CACHE:
+        return _DOMAIN_MX_CACHE[d]
+
+    try:
+        resolver = dns.resolver.Resolver()
+        resolver.nameservers = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+        resolver.lifetime = 2.5
+        resolver.timeout = 2.5
+        answers = resolver.resolve(d, 'MX')
+        if len(answers) > 0:
+            _DOMAIN_MX_CACHE[d] = True
+            return True
+    except Exception:
+        pass
+
+    _DOMAIN_MX_CACHE[d] = False
+    return False
 
 def is_deliverable_email(email_str: str) -> bool:
     """
-    Validates if an email address belongs to a real, deliverable domain
-    and filters out test/mock/dummy corporate domains to prevent bounce-back
-    'Delivery Incomplete' emails from reaching developer inboxes.
+    Validates if an email address has a valid recipient structure AND a resolvable, deliverable mail domain.
+    Prevents Gmail Mail Delivery Subsystem DNS timeout / DEADLINE_EXCEEDED bounces.
     """
     if not email_str or not isinstance(email_str, str):
         return False
     clean = email_str.strip().lower()
-    if "@" not in clean:
+    if "@" not in clean or "." not in clean:
         return False
     parts = clean.split("@")
     if len(parts) != 2:
         return False
-    user_part, domain_part = parts[0], parts[1]
-    
+    user_part, domain_part = parts[0].strip(), parts[1].strip()
     if not domain_part or not user_part:
         return False
-    
-    # Check dummy domains
-    if domain_part in DUMMY_DOMAINS:
+    if len(user_part) < 1 or len(domain_part) < 4:
         return False
-    if any(domain_part.endswith(tld) for tld in DUMMY_TLDS):
+    # Check for invalid characters
+    if any(c in user_part for c in " \t\r\n<>(),;:[]\\\""):
         return False
-    if not ("." in domain_part) or domain_part.startswith(".") or domain_part.endswith("."):
+    if any(c in domain_part for c in " \t\r\n<>(),;:[]\\\""):
         return False
-    
-    # Check test prefix patterns
-    if user_part.startswith(("test", "mock", "dummy", "fake", "security_test", "promo_test", "sample")):
-        major_providers = ("gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com", "proton.me", "protonmail.com")
-        if not any(domain_part == prov or domain_part.endswith("." + prov) for prov in major_providers):
-            return False
-            
-    return True
+    return _has_valid_mx_records(domain_part)
 
 def send_otp_email(to_email: str, otp: str):
     """
@@ -164,19 +205,18 @@ def get_recipient_email(user) -> str:
     """
     Safely extracts the human-readable registered email address for a User object.
     Prefers email_original if available, or email if it contains '@'.
-    Filters out dummy/mock non-deliverable addresses.
     """
     if not user:
         return None
     orig = getattr(user, 'email_original', None)
     if orig and '@' in str(orig):
         candidate = str(orig).strip().lower()
-        if is_deliverable_email(candidate):
+        if candidate and '@' in candidate and '.' in candidate:
             return candidate
     em = getattr(user, 'email', None)
     if em and '@' in str(em):
         candidate = str(em).strip().lower()
-        if is_deliverable_email(candidate):
+        if candidate and '@' in candidate and '.' in candidate:
             return candidate
     return None
 
@@ -184,34 +224,86 @@ def get_recipient_email(user) -> str:
 def send_account_approved_email(to_email: str, employee_id: str, full_name: str = "") -> bool:
     """
     Automated Account Email -> Sent when an Administrator approves a pending account.
+    Notifies the user that their account is verified and approved, and they can login with their credentials.
     """
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
+        return False
+
     name_str = f" {full_name}" if full_name else ""
-    subject = "Your EDRP account has been approved"
+    subject = "Your Account is Verified and Approved - EDRP Platform"
+    
     body_html = f"""
     <!DOCTYPE html>
     <html>
-    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6;">
-        <div style="max-width: 580px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-            <div style="background: #16a34a; color: #ffffff; padding: 20px;">
-                <h2 style="margin: 0; font-size: 18px;">Account Approved</h2>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6; background-color: #f8fafc; margin: 0; padding: 20px; }}
+            .card {{ max-width: 580px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }}
+            .header {{ background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: #ffffff; padding: 28px 24px; text-align: center; }}
+            .content {{ padding: 28px 24px; }}
+            .badge-box {{ background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 5px solid #16a34a; border-radius: 8px; padding: 16px; margin: 20px 0; }}
+            .btn-login {{ display: inline-block; background: #16a34a; color: #ffffff !important; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; margin: 16px 0; }}
+            .footer {{ border-top: 1px solid #f1f5f9; padding: 16px 24px; background: #f8fafc; font-size: 12px; color: #64748b; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="header">
+                <div style="font-size: 28px; margin-bottom: 6px;">🎉</div>
+                <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #ffffff;">Account Verified & Approved</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9; color: #dcfce7;">Expert Decision Replay Platform</p>
             </div>
-            <div style="padding: 24px;">
-                <p>Hello{name_str},</p>
-                <p>Your account on the <strong>Expert Decision Replay Platform (EDRP)</strong> has been approved by the Administrator.</p>
-                <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
-                    <div><strong>Approval Status:</strong> Approved & Verified</div>
-                    <div style="margin-top: 4px;"><strong>Employee ID / Login ID:</strong> {employee_id}</div>
+            <div class="content">
+                <p style="font-size: 15px; margin-top: 0;">Hello<strong>{name_str}</strong>,</p>
+                <p style="color: #334155;">Great news! <strong>Your account has been verified and approved by the Administrator.</strong></p>
+                <p style="color: #334155;">You can now log in to the platform through your login credentials.</p>
+                
+                <div class="badge-box">
+                    <div style="font-size: 11px; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Your Account Credentials</div>
+                    <div style="margin-bottom: 6px;"><strong>Full Name:</strong> {full_name or 'User'}</div>
+                    <div style="margin-bottom: 6px;"><strong>Employee ID / Login ID:</strong> <span style="background: #ffffff; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #15803d;">{employee_id}</span></div>
+                    <div style="margin-bottom: 6px;"><strong>Registered Email:</strong> {clean_email}</div>
+                    <div style="margin-bottom: 0;"><strong>Status:</strong> <span style="color: #16a34a; font-weight: 700;">✓ Verified & Active</span></div>
                 </div>
-                <p>You can now sign in to the platform using your Employee ID and password.</p>
-                <br>
-                <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>EDRP Administration & Support Team</strong></p>
+
+                <div style="text-align: center;">
+                    <a href="http://localhost:5000/login" class="btn-login">Log In to Your Account →</a>
+                </div>
+
+                <p style="font-size: 13px; color: #64748b; margin-top: 16px;">
+                    Use your <strong>Employee ID</strong> (or registered email) along with your password to access your dashboard.
+                </p>
+            </div>
+            <div class="footer">
+                <p style="margin: 0;">Need assistance? Contact your System Administrator or Support Team.</p>
+                <p style="margin: 4px 0 0; font-weight: 600; color: #475569;">Expert Decision Replay Platform (EDRP)</p>
             </div>
         </div>
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nYour EDRP account has been approved by the Administrator.\nEmployee ID / Login ID: {employee_id}\n\nYou can now sign in to the platform using your credentials.\n\nRegards,\nEDRP Administration & Support Team"
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Support")
+    
+    body_text = f"""Hello{name_str},
+
+Great news! Your account has been verified and approved by the Administrator.
+You can now log in to your account through your login credentials.
+
+Account Details:
+- Employee ID / Login ID: {employee_id}
+- Registered Email: {clean_email}
+- Status: Verified & Active
+
+Login URL: http://localhost:5000/login
+
+Please sign in using your Employee ID (or registered email) and password.
+
+Regards,
+EDRP Administration & Support Team
+"""
+
+    return _dispatch_original_gmail(clean_email, subject, body_html, body_text, "EDRP Support")
 
 
 def _dispatch_original_gmail(to_email: str, subject: str, body_html: str, body_text: str, sender_label: str = "EDRP Security") -> bool:
@@ -221,13 +313,25 @@ def _dispatch_original_gmail(to_email: str, subject: str, body_html: str, body_t
 
     # Block mock / non-deliverable email domains from triggering real SMTP network calls
     if not is_deliverable_email(clean_email):
-        print(f"[{sender_label.upper()} - MOCK RECIPIENT SKIPPED] Prevented sending '{subject}' to non-deliverable dummy address: {clean_email}")
+        print(f"[{sender_label.upper()} - MOCK RECIPIENT SKIPPED] Prevented sending '{subject}' to dummy address: {clean_email}")
         return True
 
-    # Check system setting
-    if not _is_email_enabled_in_settings() and "Verification" not in subject and "Password Reset" not in subject:
+    # Essential account emails (OTP, password reset, account approval/credentials) are always permitted
+    is_essential_account_email = any(k.lower() in subject.lower() for k in [
+        "verification", "password reset", "credentials", "security notice", 
+        "approved", "verified", "account application", "account status", "registration"
+    ])
+
+    # If security and routine emails are disabled, silence non-essential background emails
+    if not is_essential_account_email and not ENABLE_SECURITY_EMAILS and not ENABLE_ROUTINE_EMAILS:
+        print(f"[{sender_label.upper()} - AUTOMATED EMAIL SILENCED] Prevented sending '{subject}' to {clean_email}")
+        return True
+
+    # Check system setting for non-essential emails
+    if not is_essential_account_email and not _is_email_enabled_in_settings():
         print(f"[{sender_label.upper()} - EMAIL DISABLED IN SETTINGS] Skipping '{subject}' to {clean_email}")
         return True
+
 
     if not SMTP_EMAIL or not SMTP_APP_PASSWORD or "your_" in str(SMTP_EMAIL).lower() or "your_" in str(SMTP_APP_PASSWORD).lower():
         print(f"[{sender_label.upper()} LOG] To: {clean_email} | Subject: {subject}\n{body_text}")
@@ -244,31 +348,7 @@ def _dispatch_original_gmail(to_email: str, subject: str, body_html: str, body_t
     msg.attach(MIMEText(body_html, 'html'))
 
     try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5)
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"[ORIGINAL GMAIL DELIVERED] Successfully sent '{subject}' to {clean_email}")
-        return True
-    except Exception as e:
-        print(f"[ORIGINAL GMAIL ERROR] Failed to send '{subject}' to {clean_email}: {e}")
-        return False
-        print(f"[{sender_label.upper()} LOG] To: {clean_email} | Subject: {subject}\n{body_text}")
-        return True
-
-    import email.utils
-    msg = MIMEMultipart("alternative")
-    msg['From'] = email.utils.formataddr((sender_label, SMTP_EMAIL))
-    msg['To'] = clean_email
-    msg['Subject'] = subject
-    msg['Date'] = email.utils.formatdate(localtime=True)
-    msg['Auto-Submitted'] = 'auto-generated'
-    msg.attach(MIMEText(body_text, 'plain'))
-    msg.attach(MIMEText(body_html, 'html'))
-
-    try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5)
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15)
         server.starttls()
         server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
         server.send_message(msg)
@@ -294,6 +374,10 @@ def send_critical_security_email(to_email: str, recipient_name: str, subject: st
     """
     Critical/System Email -> Sends security alerts and administrative notices via Original Gmail.
     """
+    if not ENABLE_SECURITY_EMAILS:
+        print(f"[SECURITY EMAIL SILENCED] Security alert skipped for {to_email}: {subject}")
+        return True
+
     clean_email = (to_email or "").strip()
     if not clean_email or "@" not in clean_email:
         return False
@@ -328,6 +412,10 @@ def send_password_changed_email(to_email: str, recipient_name: str, change_time:
     """
     Automated Security Email -> Sent after successful password update.
     """
+    if not ENABLE_SECURITY_EMAILS:
+        print(f"[PASSWORD CHANGED LOG - SILENCED] Password change email skipped for {to_email}")
+        return True
+
     from datetime import datetime, timezone
     time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
@@ -365,6 +453,10 @@ def send_password_reset_confirmation_email(to_email: str, recipient_name: str, r
     """
     Automated Security Email -> Sent after successful password reset completion.
     """
+    if not ENABLE_SECURITY_EMAILS:
+        print(f"[PASSWORD RESET LOG - SILENCED] Password reset email skipped for {to_email}")
+        return True
+
     from datetime import datetime, timezone
     time_str = reset_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
@@ -402,6 +494,10 @@ def send_new_login_email(to_email: str, recipient_name: str, login_time: str = N
     """
     Automated Security Email -> Sent upon successful login detection.
     """
+    if not ENABLE_SECURITY_EMAILS:
+        print(f"[LOGIN ALERT SILENCED] Login notification email skipped for {to_email}")
+        return True
+
     from datetime import datetime, timezone
     time_str = login_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
@@ -442,6 +538,10 @@ def send_account_rejected_email(to_email: str, recipient_name: str, reason: str 
     """
     Automated Account Email -> Sent when an Administrator rejects a pending account.
     """
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
+        return False
+
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = "Your EDRP account request was rejected"
     reason_html = f"<div><strong>Reason:</strong> {reason}</div>" if reason else ""
@@ -478,6 +578,10 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
     """
     Automated Account Email -> Sent when an account is permanently deleted.
     """
+    if not ENABLE_ROUTINE_EMAILS:
+        print(f"[ACCOUNT DELETED LOG - SILENCED] Account deleted email skipped for {to_email}")
+        return True
+
     from datetime import datetime, timezone
     time_str = deletion_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
@@ -513,6 +617,10 @@ def send_role_changed_email(to_email: str, recipient_name: str, prev_role: str, 
     """
     Automated Account Email -> Sent when an Administrator changes/promotes a user's role and assigns a new Employee ID.
     """
+    if not ENABLE_ROUTINE_EMAILS:
+        print(f"[ROLE CHANGED LOG - SILENCED] Role changed email skipped for {to_email} ({prev_role} -> {new_role})")
+        return True
+
     from datetime import datetime, timezone
     time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
@@ -570,6 +678,10 @@ def send_decision_outcome_email(to_email: str, recipient_name: str, decision_id:
     Decision Outcome Email -> Sent when a decision is Accepted (Approved) or Rejected by reviewers/managers.
     Delivers directly to user's registered Gmail account.
     """
+    if not ENABLE_NOTIFICATION_EMAILS or not _is_email_enabled_in_settings():
+        print(f"[DECISION OUTCOME LOG - SILENCED] Outcome email skipped for DEC-{decision_id} to {to_email}")
+        return True
+
     clean_email = (to_email or "").strip()
     if not clean_email or "@" not in clean_email:
         return False
@@ -663,6 +775,10 @@ def send_account_status_email(to_email: str, recipient_name: str, is_active: boo
     """
     Automated Account Email -> Sent when an Administrator activates or deactivates an account.
     """
+    if not ENABLE_ROUTINE_EMAILS:
+        print(f"[ACCOUNT STATUS LOG - SILENCED] Status email skipped for {to_email} (Active={is_active})")
+        return True
+
     from datetime import datetime, timezone
     time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
@@ -798,8 +914,8 @@ def send_notification_email(to_email: str, recipient_name: str, subject: str, me
     """
     Sends a rich, production-grade HTML notification email to the user's real email address via SMTP.
     """
-    if not _is_email_enabled_in_settings():
-        print(f"[EMAIL NOTIFICATIONS DISABLED IN SETTINGS] Skipping email to {to_email}")
+    if not ENABLE_NOTIFICATION_EMAILS or not _is_email_enabled_in_settings():
+        print(f"[NOTIFICATION LOG - SILENCED] Skipping email to {to_email} for subject: {subject}")
         return True
 
     clean_email = (to_email or "").strip()
@@ -875,3 +991,116 @@ def send_notification_email(to_email: str, recipient_name: str, subject: str, me
     except Exception as e:
         print(f"SMTP notification delivery note: {e}")
         return False
+
+
+def send_credentials_updated_email(
+    to_email: str,
+    full_name: str,
+    employee_id: str,
+    email_changed: bool = False,
+    old_email: str = "",
+    new_email: str = "",
+    password_changed: bool = False,
+    new_password: str = "",
+    is_old_inbox: bool = False
+) -> bool:
+    """
+    Dispatches security notifications when an Administrator updates a user's email or password.
+    Sent to both old and new email addresses with updated credential details.
+    """
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
+        return False
+
+    name_str = f" {full_name}" if full_name else ""
+    subject = "Security Notice: EDRP Account Credentials Updated by Administrator"
+
+    changes_html = ""
+    changes_text = ""
+
+    if email_changed:
+        changes_html += f"""
+        <li style="margin-bottom: 8px;">
+            <strong>Email Address Updated:</strong><br>
+            <span style="color: #64748b;">Previous Email:</span> <code style="background: #f1f5f9; padding: 2px 4px; border-radius: 3px;">{old_email}</code><br>
+            <span style="color: #059669; font-weight: 600;">New Primary Email:</span> <strong style="color: #059669;">{new_email}</strong>
+        </li>
+        """
+        changes_text += f"\n- Email Address Updated: Previous: {old_email} -> New: {new_email}"
+
+    if password_changed:
+        pwd_display = f'<code style="background: #eef2ff; color: #4338ca; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 13.5px; border: 1px solid #c7d2fe;">{new_password}</code>' if new_password else '<em>(Reset by Administrator)</em>'
+        changes_html += f"""
+        <li style="margin-bottom: 8px;">
+            <strong>Password Updated by Administrator:</strong><br>
+            <span style="color: #64748b;">Previous Password:</span> <span style="font-family: monospace; color: #94a3b8;">•••••••• (Overwritten)</span><br>
+            <span style="color: #4338ca; font-weight: 600;">New Login Password:</span> {pwd_display}
+        </li>
+        """
+        changes_text += f"\n- Password: Previous: [Overwritten] -> New Password: {new_password if new_password else '[Reset]'}"
+
+
+    notice_box = ""
+    if is_old_inbox and email_changed:
+        notice_box = f"""
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-size: 13px; color: #92400e;">
+            <strong>Notice for Previous Email Address:</strong> This inbox ({old_email}) will no longer receive routine account communications. Future notifications will be sent to <strong>{new_email}</strong>.
+        </div>
+        """
+
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6; background-color: #f8fafc; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+            <div style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #ffffff; padding: 24px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; font-weight: 700;">Security Notification</div>
+                <h2 style="margin: 6px 0 0 0; font-size: 20px; font-weight: 700; color: #ffffff;">Account Credentials Updated</h2>
+            </div>
+            <div style="padding: 24px;">
+                <p style="font-size: 15px;">Hello<strong>{name_str}</strong>,</p>
+                <p>An <strong>Administrator</strong> has updated the credentials and access details for your account on the <strong>Expert Decision Replay Platform (EDRP)</strong>.</p>
+                
+                <div style="background: #f1f5f9; border-radius: 8px; padding: 16px; margin: 18px 0;">
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 8px;">Account Details</div>
+                    <div style="margin-bottom: 6px;"><strong>Employee ID / Login ID:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #0f172a;">{employee_id}</code></div>
+                    <div style="margin-top: 10px;">
+                        <strong>Applied Changes:</strong>
+                        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                            {changes_html}
+                        </ul>
+                    </div>
+                </div>
+
+                {notice_box}
+
+                <p style="margin-top: 20px; font-size: 13.5px;">You can now sign in to your dashboard using your Employee ID <code>{employee_id}</code> or updated email address along with your updated credentials.</p>
+                
+                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+                    <p style="margin: 0 0 6px 0;"><strong>Security Note:</strong> If you did not authorize or expect this change, please immediately contact your platform system administrator.</p>
+                    <p style="margin: 0;">Regards,<br><strong>EDRP Platform Security Team</strong></p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    body_text = f"""Hello{name_str},
+
+An Administrator has updated the credentials for your account on the Expert Decision Replay Platform (EDRP).
+
+Account Details:
+- Employee ID / Login ID: {employee_id}
+Applied Changes:{changes_text}
+
+You can now sign in using your Employee ID ({employee_id}) or new email with your updated credentials.
+
+Security Note: If you did not authorize or expect this change, please contact your platform administrator immediately.
+
+Regards,
+EDRP Platform Security Team
+"""
+
+    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Security")
+

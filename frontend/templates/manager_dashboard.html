@@ -328,9 +328,19 @@
             <div style="font-size: 14px; font-weight: 800; color: #0F172A;">Manager Dashboard</div>
             <div style="font-size: 11px; color: #64748B; margin-top: 2px;">Team supervision — approvals, decisions and discussions assigned to your team.</div>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px; background: #F0FDFA; padding: 6px 14px; border-radius: 8px; border: 1px solid #CCFBF1;">
-            <div style="width: 7px; height: 7px; border-radius: 50%; background: #14B8A6;"></div>
-            <span style="font-size: 11px; font-weight: 800; color: #14B8A6;">• Manager</span>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 6px; background: #F0FDFA; padding: 6px 14px; border-radius: 8px; border: 1px solid #99F6E4;">
+                <i data-lucide="briefcase" style="width: 14px; height: 14px; color: #0D9488;"></i>
+                <span style="font-size: 11.5px; font-weight: 600; color: #115E59;">Designation: <strong style="color: #0F766E;">{{ session.get('designation') or (dashboard.designation if dashboard is mapping else '') or 'Engineering Manager' }}</strong></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; background: #F8FAFC; padding: 6px 14px; border-radius: 8px; border: 1px solid #E2E8F0;">
+                <i data-lucide="users" style="width: 14px; height: 14px; color: #64748B;"></i>
+                <span style="font-size: 11.5px; font-weight: 600; color: #475569;">Team: <strong style="color: #0D9488;">{{ (dashboard.team if dashboard is mapping else '') or team or session.get('team_name') or 'Not Assigned' }}</strong></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; background: #F0FDFA; padding: 6px 14px; border-radius: 8px; border: 1px solid #CCFBF1;">
+                <div style="width: 7px; height: 7px; border-radius: 50%; background: #14B8A6;"></div>
+                <span style="font-size: 11px; font-weight: 800; color: #14B8A6;">• Manager</span>
+            </div>
         </div>
     </div>
 
@@ -494,19 +504,12 @@
                 <div class="timeline-line"></div>
                 {% if recent_audit_logs %}
                     {% for log in recent_audit_logs %}
-                    {% set log_icon = 'alert-triangle' if log.severity == 'Critical' else ('eye' if log.severity == 'Warning' else 'activity') %}
                     <div class="timeline-item" {% if loop.last %}style="margin-bottom: 0;"{% endif %}>
-                        {% if log.severity == 'Critical' %}
-                        <div class="timeline-icon" style="color: #EF4444;">
-                        {% elif log.severity == 'Warning' %}
-                        <div class="timeline-icon" style="color: #F59E0B;">
-                        {% else %}
-                        <div class="timeline-icon" style="color: #2563EB;">
-                        {% endif %}
-                            <i data-lucide="{{ log_icon }}" style="width: 14px; height: 14px;"></i>
+                        <div class="timeline-icon" style="--bg: {{ log.bg_color or '#EFF6FF' }}; --c: {{ log.icon_color or '#2563EB' }}; background: var(--bg); color: var(--c); border: 1px solid var(--c);">
+                            <i data-lucide="{{ log.icon or 'activity' }}" style="width: 14px; height: 14px;"></i>
                         </div>
                         <div>
-                            <div style="font-size: 13px; color: #334155;"><b style="color: #0D9488;">{{ log.user_name }}</b> {{ log.action }}</div>
+                            <div style="font-size: 13px; color: #334155;"><b style="--c: {{ log.icon_color or '#0D9488' }}; color: var(--c);">{{ log.user_name }}</b> {{ log.action }}</div>
                             <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">{{ log.time_ago }}</div>
                         </div>
                     </div>
@@ -904,25 +907,26 @@
                     // 7. Recent Team Activities
                     const timelineEl = document.getElementById('manager-team-activities');
                     if (timelineEl && auditLogs.length > 0) {
-                        timelineEl.innerHTML = `<div class="timeline-line"></div>` + auditLogs.slice(0, 5).map((log, idx) => {
-                            let iconName = 'activity';
-                            let iconColor = '#2563EB';
-                            if (log.severity === 'Critical') { iconName = 'alert-triangle'; iconColor = '#EF4444'; }
-                            else if (log.severity === 'Warning') { iconName = 'eye'; iconColor = '#F59E0B'; }
-                            else if (log.module === 'Decisions') { iconName = 'send'; iconColor = '#2563EB'; }
-                            else if (log.module === 'Reviews') { iconName = 'edit-3'; iconColor = '#10B981'; }
+                        timelineEl.innerHTML = `<div class="timeline-line"></div>` + auditLogs.slice(0, 6).map((log, idx) => {
+                            const iconName = log.icon || 'activity';
+                            const iconColor = log.icon_color || '#2563EB';
+                            const bgColor = log.bg_color || '#EFF6FF';
 
                             return `
                             <div class="timeline-item" ${idx === auditLogs.length - 1 ? 'style="margin-bottom: 0;"' : ''}>
-                                <div class="timeline-icon" style="color: ${iconColor};"><i data-lucide="${iconName}" style="width: 14px; height: 14px;"></i></div>
+                                <div class="timeline-icon" style="background: ${bgColor}; color: ${iconColor}; border: 1px solid ${iconColor}25;">
+                                    <i data-lucide="${iconName}" style="width: 14px; height: 14px;"></i>
+                                </div>
                                 <div>
-                                    <div style="font-size: 13px; color: #334155;"><b style="color: #0D9488;">${log.user_name || 'Team Member'}</b> ${log.action}</div>
+                                    <div style="font-size: 13px; color: #334155;"><b style="color: ${iconColor};">${log.user_name || 'Team Member'}</b> ${log.action}</div>
                                     <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">${log.time_ago || 'Recently'}</div>
                                 </div>
                             </div>
                             `;
                         }).join('');
+                        if (window.lucide) lucide.createIcons();
                     }
+
 
                     // 8. Discussion Updates
                     const discEl = document.getElementById('manager-discussion-updates');

@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from typing import List, Dict, Any, Optional
 
 from app.database.connection import get_db
 
 from app.schemas.team import (
     TeamCreate,
     TeamUpdate,
-    TeamResponse
+    TeamResponse,
+    TeamMemberResponse,
+    UserTeamResponse
 )
 
 from app.services.team_service import TeamService
@@ -32,12 +35,48 @@ def create_team(
 
 @router.get(
     "/",
-    response_model=list[TeamResponse]
+    response_model=List[TeamResponse]
 )
 def get_all_teams(
     db: Session = Depends(get_db)
 ):
     return TeamService.get_all_teams(db)
+
+
+@router.get(
+    "/assignable-employees",
+    response_model=List[Dict[str, Any]]
+)
+def get_assignable_employees(
+    db: Session = Depends(get_db)
+):
+    """Returns active users for team member selection."""
+    return TeamService.get_active_employees_for_assignment(db)
+
+
+@router.get(
+    "/my-team",
+    response_model=UserTeamResponse
+)
+def get_my_team(
+    user_id: Optional[int] = Query(None),
+    employee_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Returns the team info and team members for the requested employee."""
+    return TeamService.get_my_team(db, user_id=user_id, employee_id=employee_id)
+
+
+@router.get(
+    "/user/{user_id}",
+    response_model=UserTeamResponse
+)
+def get_team_by_user(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """Returns team information for a given user ID."""
+    return TeamService.get_my_team(db, user_id=user_id)
 
 
 @router.get(
@@ -49,6 +88,17 @@ def get_team(
     db: Session = Depends(get_db)
 ):
     return TeamService.get_team(db, team_id)
+
+
+@router.get(
+    "/{team_id}/employees",
+    response_model=List[TeamMemberResponse]
+)
+def get_team_employees(
+    team_id: int,
+    db: Session = Depends(get_db)
+):
+    return TeamService.get_team_employees(db, team_id)
 
 
 @router.put(

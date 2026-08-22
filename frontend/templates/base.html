@@ -1863,24 +1863,24 @@
 
     <!-- Right Side AI Copilot Drawer -->
     <div id="edrpAiSidePanel" class="edrp-ai-side-panel closed">
-        <!-- Panel Header -->
+        <!-- Panel Header (Modern Glassmorphic Dark Slate/Indigo) -->
         <div class="ai-panel-header">
             <div class="d-flex align-items-center gap-2.5">
                 <div class="ai-header-icon-box">
-                    <i class="bi bi-stars fs-5"></i>
+                    <i class="bi bi-stars fs-5 text-warning"></i>
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2">
-                        <h6 class="mb-0 fw-bold text-white" style="font-size: 15px; letter-spacing: -0.2px;">EDRP AI Copilot</h6>
-                        <span class="badge rounded-pill text-xs fw-medium px-2.5 py-0.5" style="background: rgba(255,255,255,0.2); color: #ffffff; border: 1px solid rgba(255,255,255,0.3); font-size: 10.5px;">
+                        <h6 class="mb-0 fw-bold text-white fs-6" style="letter-spacing: -0.2px;">EDRP AI Copilot</h6>
+                        <span class="badge rounded-pill text-xs fw-semibold px-2.5 py-0.5 d-inline-flex align-items-center" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.25); font-size: 11px;">
                             <span class="ai-pulse-dot"></span> Groq Llama 3.3
                         </span>
                     </div>
-                    <small class="text-white-50" style="font-size: 11px;">Intelligent page reader & decision assistant</small>
+                    <small class="text-white-50" style="font-size: 11px;">Intelligent page reader &amp; decision assistant</small>
                 </div>
             </div>
-            <!-- Window Action Buttons (Minimize, Close, Clear) with generous spacing -->
-            <div class="d-flex align-items-center gap-2 ms-auto">
+            <!-- Window Action Buttons (Minimize, Close, Clear) -->
+            <div class="d-flex align-items-center gap-1.5 ms-auto">
                 <button type="button" class="ai-window-ctrl-btn ai-btn-clear" title="Clear Conversation" onclick="clearAiChatConversation()">
                     <i class="bi bi-arrow-counterclockwise"></i>
                 </button>
@@ -1895,14 +1895,14 @@
 
         <!-- Live Page Reader Context Strip -->
         <div class="ai-page-reader-strip">
-            <div class="d-flex align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center justify-content-between gap-2.5">
                 <div class="d-flex align-items-center gap-2 text-truncate" style="font-size: 12px;">
                     <span class="ai-reader-pulse"><i class="bi bi-broadcast"></i></span>
-                    <span class="fw-semibold text-secondary text-nowrap">Reading Page:</span>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 text-truncate fw-bold" id="aiActivePageBadge" style="max-width: 180px;">Loading current page...</span>
+                    <span class="fw-semibold text-secondary text-nowrap">Reading:</span>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 text-truncate fw-bold" id="aiActivePageBadge" style="max-width: 190px;">Active Page</span>
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-primary py-1 px-3 rounded-pill fw-bold text-xs text-nowrap shadow-2xs" onclick="summarizeCurrentPage()">
-                    <i class="bi bi-file-earmark-text me-1.5"></i>Summarize
+                <button type="button" class="btn btn-sm btn-primary py-1 px-3 rounded-pill fw-bold text-xs text-nowrap shadow-sm d-flex align-items-center gap-1.5" onclick="summarizeCurrentPage()">
+                    <i class="bi bi-file-earmark-text-fill"></i> Summarize
                 </button>
             </div>
 
@@ -1916,23 +1916,23 @@
             </div>
         </div>
 
-        <!-- Quick Prompts Wrap Bar (Fully visible, No cutting off) -->
+        <!-- Quick Prompts Horizontal Chip Bar -->
         <div class="ai-quick-prompts-container">
             <div class="d-flex flex-wrap align-items-center gap-1.5 py-2 px-3">
-                <button type="button" class="btn btn-sm btn-light border text-dark rounded-pill py-1 px-2.5 text-xs fw-semibold d-inline-flex align-items-center gap-1 shadow-2xs ai-chip-btn" onclick="triggerAiQuickAction('what_can_i_do')">
-                    <i class="bi bi-compass-fill text-primary"></i>Page Guide
+                <button type="button" class="btn btn-sm ai-chip-btn" onclick="triggerAiQuickAction('what_can_i_do')">
+                    <i class="bi bi-compass-fill text-primary"></i> Page Guide
                 </button>
-                <button type="button" class="btn btn-sm btn-light border text-dark rounded-pill py-1 px-2.5 text-xs fw-semibold d-inline-flex align-items-center gap-1 shadow-2xs ai-chip-btn" onclick="triggerAiQuickAction('explain_details')">
-                    <i class="bi bi-lightbulb-fill text-warning"></i>Explain Details
+                <button type="button" class="btn btn-sm ai-chip-btn" onclick="triggerAiQuickAction('explain_details')">
+                    <i class="bi bi-lightbulb-fill text-warning"></i> Explain Details
                 </button>
-                <button type="button" class="btn btn-sm btn-light border text-dark rounded-pill py-1 px-2.5 text-xs fw-semibold d-inline-flex align-items-center gap-1 shadow-2xs ai-chip-btn" onclick="triggerAiQuickAction('pros_cons')">
-                    <i class="bi bi-scale text-info"></i>Pros & Cons
+                <button type="button" class="btn btn-sm ai-chip-btn" onclick="triggerAiQuickAction('pros_cons')">
+                    <i class="bi bi-scale text-info"></i> Pros &amp; Cons
                 </button>
-                <button type="button" class="btn btn-sm btn-light border text-dark rounded-pill py-1 px-2.5 text-xs fw-semibold d-inline-flex align-items-center gap-1 shadow-2xs ai-chip-btn" onclick="triggerAiQuickAction('draft_content')">
-                    <i class="bi bi-pencil-square text-success"></i>Draft Content
+                <button type="button" class="btn btn-sm ai-chip-btn" onclick="triggerAiQuickAction('draft_content')">
+                    <i class="bi bi-pencil-square text-success"></i> Draft Content
                 </button>
-                <button type="button" class="btn btn-sm btn-light border text-dark rounded-pill py-1 px-2.5 text-xs fw-semibold d-inline-flex align-items-center gap-1 shadow-2xs ai-chip-btn" onclick="triggerAiQuickAction('audit_risks')">
-                    <i class="bi bi-shield-exclamation text-danger"></i>Audit & Risks
+                <button type="button" class="btn btn-sm ai-chip-btn" onclick="triggerAiQuickAction('audit_risks')">
+                    <i class="bi bi-shield-exclamation text-danger"></i> Audit &amp; Risks
                 </button>
             </div>
         </div>
@@ -1942,18 +1942,18 @@
             <!-- Dynamic chat messages go here -->
         </div>
 
-        <!-- Footer Input Bar -->
+        <!-- Footer Input Bar (ChatGPT-style Composer) -->
         <div class="ai-panel-footer">
-            <form id="aiSidePanelChatForm" onsubmit="handleAiSidePanelSubmit(event)">
+            <form id="aiSidePanelChatForm" onsubmit="handleAiSidePanelSubmit(event)" class="w-100 m-0">
                 <div class="ai-input-card">
-                    <textarea id="aiSidePanelInput" class="form-control ai-textarea border-0" rows="1" placeholder="Ask anything about this page or any general question... (Enter to send)"></textarea>
-                    <button type="submit" id="btnSendAiSidePanel" class="btn btn-primary btn-sm rounded-circle ai-send-btn shadow-sm ms-2" title="Send Message">
+                    <textarea id="aiSidePanelInput" class="ai-textarea" rows="1" placeholder="Ask anything about this page or general decisions..."></textarea>
+                    <button type="submit" id="btnSendAiSidePanel" class="ai-send-btn" title="Send (Enter)">
                         <i class="bi bi-arrow-up fs-6"></i>
                     </button>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mt-2 px-1 text-muted" style="font-size: 10.5px;">
-                    <span><i class="bi bi-keyboard me-1"></i><kbd class="ai-kbd">Enter</kbd> to send · <kbd class="ai-kbd">Shift+Enter</kbd> newline</span>
-                    <span><i class="bi bi-shield-check text-success me-1"></i>Active EDRP Assistant</span>
+                    <span><i class="bi bi-keyboard me-1"></i><kbd class="ai-kbd">Enter</kbd> to send &bull; <kbd class="ai-kbd">Shift+Enter</kbd> newline</span>
+                    <span><i class="bi bi-shield-check text-success me-1"></i>Active Copilot</span>
                 </div>
             </form>
         </div>
@@ -2089,45 +2089,46 @@
             pointer-events: none;
         }
         .ai-panel-header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            padding: 14px 18px;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #312e81 100%);
+            padding: 13px 18px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             color: #ffffff;
-            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
             flex-shrink: 0;
         }
         .ai-header-icon-box {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(4px);
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
             display: flex;
             align-items: center;
             justify-content: center;
             color: #ffffff;
-            box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.2);
         }
         .ai-window-ctrl-btn {
-            background: rgba(255, 255, 255, 0.16);
-            border: 1px solid rgba(255, 255, 255, 0.28);
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             color: #ffffff;
-            width: 32px;
-            height: 32px;
-            border-radius: 9px;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             padding: 0;
-            font-size: 13.5px;
+            font-size: 13px;
             backdrop-filter: blur(4px);
         }
         .ai-window-ctrl-btn:hover {
-            transform: translateY(-1px) scale(1.08);
+            transform: translateY(-1px) scale(1.06);
             color: #ffffff;
         }
         .ai-btn-clear:hover {
@@ -2148,7 +2149,7 @@
             height: 6px;
             border-radius: 50%;
             background: #10b981;
-            margin-right: 3px;
+            margin-right: 4px;
             box-shadow: 0 0 6px #10b981;
             animation: edrpPulse 1.5s infinite;
         }
@@ -2186,19 +2187,24 @@
         .ai-chip-btn {
             background: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
-            color: #334155 !important;
+            color: #1e293b !important;
             font-size: 11.5px !important;
             font-weight: 600 !important;
+            border-radius: 20px !important;
+            padding: 4px 11px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 4px !important;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
         }
         .ai-chip-btn:hover {
-            background: #f5f3ff !important;
-            border-color: #c7d2fe !important;
-            color: #4f46e5 !important;
+            background: #f8fafc !important;
+            border-color: #6366f1 !important;
+            color: #4338ca !important;
             transform: translateY(-1px);
-            box-shadow: 0 3px 8px rgba(79, 70, 229, 0.12);
+            box-shadow: 0 3px 8px rgba(99, 102, 241, 0.15);
         }
         .ai-chat-thread {
             flex: 1;
@@ -2211,27 +2217,27 @@
         }
         .ai-msg-user {
             align-self: flex-end;
-            background: linear-gradient(135deg, #4f46e5, #6366f1);
-            color: #ffffff;
-            border-radius: 16px 16px 4px 16px;
-            padding: 10px 14px;
+            background: #f4f4f5;
+            color: #18181b;
+            border-radius: 18px 18px 4px 18px;
+            padding: 10px 16px;
             max-width: 85%;
             font-size: 13px;
-            line-height: 1.45;
-            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.18);
+            line-height: 1.5;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
             word-break: break-word;
         }
         .ai-msg-assistant {
             align-self: flex-start;
             background: #ffffff;
-            border: 1px solid #e2e8f0;
-            color: #1e293b;
-            border-radius: 16px 16px 16px 4px;
+            border: 1px solid #e5e7eb;
+            color: #1f2937;
+            border-radius: 18px 18px 18px 4px;
             padding: 14px 16px;
             max-width: 95%;
             font-size: 13px;
             line-height: 1.6;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
             word-break: break-word;
         }
         .ai-msg-assistant pre {
@@ -2285,50 +2291,55 @@
         }
         .ai-panel-footer {
             background: #ffffff;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid #e5e7eb;
             padding: 12px 16px;
             flex-shrink: 0;
         }
         .ai-input-card {
             display: flex;
             align-items: center;
-            background: #f8fafc;
-            border: 1.5px solid #cbd5e1;
+            background: #ffffff;
+            border: 1.5px solid #e5e7eb;
             border-radius: 24px;
-            padding: 6px 8px 6px 14px;
+            padding: 6px 8px 6px 16px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
             transition: all 0.2s ease;
         }
         .ai-input-card:focus-within {
             background: #ffffff;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+            border-color: #0f172a;
+            box-shadow: 0 4px 18px rgba(15, 23, 42, 0.08);
         }
         .ai-textarea {
             background: transparent !important;
             border: none !important;
+            outline: none !important;
             box-shadow: none !important;
             resize: none !important;
-            overflow: hidden !important;
-            max-height: 100px;
-            padding: 4px 0;
-            font-size: 12.5px;
-            line-height: 1.4;
+            overflow-y: auto !important;
+            max-height: 110px;
+            padding: 6px 0;
+            font-size: 13.5px;
+            line-height: 1.45;
             color: #1e293b;
             flex: 1;
         }
         .ai-send-btn {
             width: 32px;
             height: 32px;
+            border-radius: 50% !important;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+            background: #0f172a !important;
+            color: #ffffff !important;
             border: none !important;
             flex-shrink: 0;
-            transition: transform 0.15s ease;
+            transition: all 0.15s ease;
         }
-        .ai-send-btn:hover {
-            transform: scale(1.08);
+        .ai-send-btn:hover:not(:disabled) {
+            background: #4338ca !important;
+            transform: scale(1.06);
         }
         .ai-kbd {
             background: #f1f5f9;

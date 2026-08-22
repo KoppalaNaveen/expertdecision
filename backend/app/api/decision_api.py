@@ -28,8 +28,14 @@ def create_decision_full(decision: DecisionFullCreate, db: Session = Depends(get
     return DecisionService.create_decision_full(db, decision)
 
 @router.get("/", response_model=List[DecisionResponse])
-def get_all_decisions(user_id: int = None, role_name: str = None, db: Session = Depends(get_db)):
-    return DecisionService.get_all_decisions(db, user_id=user_id, role_name=role_name)
+def get_all_decisions(
+    user_id: int = None,
+    role_name: str = None,
+    status: str = None,
+    scope: str = None,
+    db: Session = Depends(get_db)
+):
+    return DecisionService.get_all_decisions(db, user_id=user_id, role_name=role_name, status=status, scope=scope)
 
 @router.get("/{decision_id}", response_model=DecisionFullResponse)
 def get_decision(decision_id: int, user_id: int = None, db: Session = Depends(get_db)):
@@ -43,7 +49,7 @@ def get_decision_versions(decision_id: int, user_id: int = None, db: Session = D
     return DecisionService.get_decision_versions(db, decision_id, user_id=user_id)
 
 @router.post("/{decision_id}/versions/{version_number}/restore", response_model=DecisionResponse)
-def restore_decision_version(decision_id: int, version_number: int, user_id: int = 1, db: Session = Depends(get_db)):
+def restore_decision_version(decision_id: int, version_number: int, user_id: int = None, db: Session = Depends(get_db)):
     restored = DecisionService.restore_decision_version(db, decision_id, version_number, user_id)
     if not restored:
         raise HTTPException(status_code=404, detail="Decision or Version not found")

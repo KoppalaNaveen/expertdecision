@@ -85,32 +85,33 @@ function renderTrendChart(data) {
     const ctx = document.getElementById("trendChart")?.getContext("2d");
     if (!ctx) return;
 
-    const total    = data.total_decisions    || 0;
-    const approved = data.approved_decisions || 0;
-    const pending  = data.pending_reviews    || 0;
-
-    // Generate realistic-looking mock monthly distribution from actuals
-    const labels = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-    const seed   = total || 10;
-    const mkData = (base, variance) => labels.map((_, i) =>
-        Math.max(0, Math.round(base * (0.5 + i * 0.1) + (Math.random() * variance - variance / 2))));
+    // Use live decision trends directly from backend database
+    const trends = data.decision_trends || {};
+    const labels = trends.labels && trends.labels.length > 0 ? trends.labels : ["Mar", "Apr", "May", "Jun", "Jul", "Aug"];
+    const created  = trends.submitted || [0, 0, 0, 0, 0, 0];
+    const approved = trends.approved  || [0, 0, 0, 0, 0, 0];
+    const pending  = trends.pending   || [0, 0, 0, 0, 0, 0];
 
     trendChartInstance = new Chart(ctx, {
         type: "bar",
         data: {
             labels,
             datasets: [
-                { label: "Created",  data: mkData(seed * 0.35, seed * 0.15), backgroundColor: "#BFDBFE", borderRadius: 6, borderSkipped: false },
-                { label: "Approved", data: mkData(approved * 0.35, approved * 0.1), backgroundColor: "#6EE7B7", borderRadius: 6, borderSkipped: false },
-                { label: "Pending",  data: mkData(pending * 0.35, pending * 0.1),  backgroundColor: "#FDE68A", borderRadius: 6, borderSkipped: false },
+                { label: "Created",  data: created,  backgroundColor: "#93C5FD", borderRadius: 6, borderSkipped: false },
+                { label: "Approved", data: approved, backgroundColor: "#34D399", borderRadius: 6, borderSkipped: false },
+                { label: "Pending",  data: pending,  backgroundColor: "#FBBF24", borderRadius: 6, borderSkipped: false },
             ]
         },
         options: {
             responsive: true,
-            plugins   : { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
-            scales    : {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: { mode: "index", intersect: false }
+            },
+            scales: {
                 x: { grid: { display: false } },
-                y: { grid: { color: "#F1F5F9" }, ticks: { precision: 0 } }
+                y: { grid: { color: "#F1F5F9" }, ticks: { precision: 0, stepSize: 1, beginAtZero: true } }
             }
         }
     });

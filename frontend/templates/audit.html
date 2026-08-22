@@ -18,21 +18,38 @@
     flex-shrink: 0;
 }
 .filter-bar { background: #F8FAFC; border-radius: 10px; padding: 12px 16px; border: 1px solid #E2E8F0; }
+.live-dot {
+    width: 8px; height: 8px;
+    background-color: #10B981;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse-green 2s infinite;
+}
+@keyframes pulse-green {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h2 class="fw-bold text-dark mb-1">Audit Logs</h2>
-        <p class="text-muted mb-0">Full audit trail of all system events, changes, and user actions.</p>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h2 class="fw-bold text-dark mb-0">Audit Logs</h2>
+            <span class="badge bg-light text-dark border px-2.5 py-1.5 d-flex align-items-center gap-1.5" style="font-size: 11px; font-weight: 600;">
+                <span class="live-dot"></span> Live Real-Time Audit
+            </span>
+        </div>
+        <p class="text-muted mb-0">Full administrative audit trail capturing every user event, security action, and system change in real time.</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center">
         <button class="btn btn-light border shadow-sm d-flex align-items-center gap-2" onclick="exportCSV()">
             <i data-lucide="download" style="width:15px;height:15px;"></i> Export CSV
         </button>
-        <button class="btn btn-primary d-flex align-items-center gap-2" onclick="fetchAuditLogs()">
-            <i data-lucide="refresh-cw" style="width:15px;height:15px;"></i> Refresh
+        <button class="btn btn-primary d-flex align-items-center gap-2" onclick="fetchAuditLogs(true)">
+            <i data-lucide="refresh-cw" id="auditRefreshIcon" style="width:15px;height:15px;"></i> Refresh
         </button>
     </div>
 </div>
@@ -55,7 +72,7 @@
                 <div style="width:40px;height:40px;border-radius:10px;background:#ECFDF5;display:flex;align-items:center;justify-content:center;">
                     <i data-lucide="info" style="width:18px;height:18px;color:#059669;"></i>
                 </div>
-                <div><div id="auditInfo" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Info</div></div>
+                <div><div id="auditInfo" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Info / Success</div></div>
             </div>
         </div>
     </div>
@@ -75,7 +92,7 @@
                 <div style="width:40px;height:40px;border-radius:10px;background:#FEF2F2;display:flex;align-items:center;justify-content:center;">
                     <i data-lucide="alert-octagon" style="width:18px;height:18px;color:#DC2626;"></i>
                 </div>
-                <div><div id="auditCritical" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Critical</div></div>
+                <div><div id="auditCritical" class="fw-bold fs-5 lh-1">—</div><div class="text-muted" style="font-size:11px;">Critical / Alerts</div></div>
             </div>
         </div>
     </div>
@@ -83,22 +100,25 @@
 
 <!-- Filter Bar -->
 <div class="filter-bar d-flex gap-3 mb-4 align-items-center flex-wrap">
-    <div class="input-group" style="width:240px;">
+    <div class="input-group" style="width:260px;">
         <span class="input-group-text bg-white border-end-0">
             <i data-lucide="search" style="width:14px;height:14px;color:#94a3b8;"></i>
         </span>
-        <input type="text" id="auditSearch" class="form-control border-start-0 ps-0" placeholder="Search logs..." oninput="filterAudit()">
+        <input type="text" id="auditSearch" class="form-control border-start-0 ps-0" placeholder="Search user, action, module..." oninput="filterAudit()">
     </div>
     <select id="severityFilter" class="form-select" style="width:150px;" onchange="filterAudit()">
         <option value="">All Severities</option>
         <option value="Info">Info</option>
+        <option value="Success">Success</option>
         <option value="Warning">Warning</option>
         <option value="Critical">Critical</option>
-        <option value="Success">Success</option>
     </select>
     <select id="moduleFilter" class="form-select" style="width:160px;" onchange="filterAudit()">
         <option value="">All Modules</option>
     </select>
+    <div class="ms-auto text-muted small d-none d-md-block" id="auditLastUpdated">
+        Last updated: Just now
+    </div>
 </div>
 
 <!-- Audit Table -->
@@ -107,11 +127,11 @@
         <table class="table align-middle mb-0" style="font-size:0.875rem;">
             <thead class="table-light text-secondary" style="font-size:0.72rem;text-transform:uppercase;">
                 <tr>
-                    <th class="px-4 py-3 border-bottom-0">Time</th>
-                    <th class="px-4 py-3 border-bottom-0">User</th>
-                    <th class="px-4 py-3 border-bottom-0">Action</th>
-                    <th class="px-4 py-3 border-bottom-0">Module</th>
-                    <th class="px-4 py-3 border-bottom-0">Severity</th>
+                    <th class="px-4 py-3 border-bottom-0" style="min-width: 170px;">Exact Time</th>
+                    <th class="px-4 py-3 border-bottom-0" style="min-width: 180px;">User & Role</th>
+                    <th class="px-4 py-3 border-bottom-0">Action & Event Details</th>
+                    <th class="px-4 py-3 border-bottom-0" style="min-width: 120px;">Module</th>
+                    <th class="px-4 py-3 border-bottom-0" style="min-width: 100px;">Severity</th>
                 </tr>
             </thead>
             <tbody id="auditTableBody">
@@ -127,6 +147,49 @@
             <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-outline-secondary px-3" id="auditBtnPrev" onclick="prevPage()" disabled>Previous</button>
                 <button class="btn btn-sm btn-outline-secondary px-3" id="auditBtnNext" onclick="nextPage()" disabled>Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Log Details Modal -->
+<div class="modal fade" id="auditDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom px-4 py-3">
+                <h5 class="modal-title fw-bold text-dark fs-6" id="detailModalTitle">Audit Log Record Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <div class="text-muted small fw-semibold">Action</div>
+                    <div class="fw-bold text-dark fs-6" id="detailModalAction">—</div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <div class="text-muted small fw-semibold">Actor</div>
+                        <div class="fw-medium text-dark" id="detailModalUser">—</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small fw-semibold">Module</div>
+                        <div class="fw-medium text-dark" id="detailModalModule">—</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small fw-semibold">Exact Timestamp</div>
+                        <div class="fw-medium text-dark" id="detailModalTime">—</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small fw-semibold">Severity</div>
+                        <div id="detailModalSeverity">—</div>
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <div class="text-muted small fw-semibold mb-1">Details & Payload</div>
+                    <div class="bg-light p-3 rounded-3 font-monospace small text-dark border" style="word-break: break-all; max-height: 200px; overflow-y: auto;" id="detailModalPayload">—</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-0">
+                <button type="button" class="btn btn-secondary px-4 w-100 rounded-3 fw-semibold" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

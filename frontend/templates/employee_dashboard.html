@@ -293,9 +293,19 @@
                     <div style="font-size: 14px; font-weight: 800; color: #0F172A;">Employee Dashboard</div>
                     <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Your personal workspace — decisions, tasks and submissions created by you.</div>
                 </div>
-                <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; background: #EFF6FF; padding: 6px 14px; border-radius: 20px; border: 1px solid #BFDBFE;">
-                    <div style="width: 6px; height: 6px; border-radius: 50%; background: #2563EB;"></div>
-                    <span style="font-size: 11px; font-weight: 700; color: #2563EB;">Employee</span>
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 6px; background: #EEF2FF; padding: 6px 14px; border-radius: 20px; border: 1px solid #C7D2FE;">
+                        <i data-lucide="briefcase" style="width: 14px; height: 14px; color: #4F46E5;"></i>
+                        <span style="font-size: 11.5px; font-weight: 600; color: #3730A3;">Designation: <strong style="color: #4338CA;">{{ session.get('designation') or (dashboard.designation if dashboard is mapping else '') or 'Senior Software Engineer' }}</strong></span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; background: #F8FAFC; padding: 6px 14px; border-radius: 20px; border: 1px solid #E2E8F0;">
+                        <i data-lucide="users" style="width: 14px; height: 14px; color: #64748B;"></i>
+                        <span style="font-size: 11.5px; font-weight: 600; color: #475569;">Team: <strong style="color: #2563EB;">{{ (dashboard.team if dashboard is mapping else '') or team or session.get('team_name') or 'Not Assigned' }}</strong></span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; background: #EFF6FF; padding: 6px 14px; border-radius: 20px; border: 1px solid #BFDBFE;">
+                        <div style="width: 6px; height: 6px; border-radius: 50%; background: #2563EB;"></div>
+                        <span style="font-size: 11px; font-weight: 700; color: #2563EB;">Employee</span>
+                    </div>
                 </div>
             </div>
 
@@ -422,32 +432,6 @@
                 </div>
             </div>
 
-            <!-- Section 3: Recent Activities -->
-            <div class="section-card">
-                <div class="section-header">
-                    <div>
-                        <div class="section-title">Recent Activities</div>
-                        <div class="section-subtitle">Your activity timeline</div>
-                    </div>
-                    <a href="{{ url_for('dashboard') }}" class="view-all">View All →</a>
-                </div>
-
-                <div class="timeline" id="recent-activities-timeline">
-                    {% if recent_audit_logs and recent_audit_logs|length > 0 %}
-                        {% for log in recent_audit_logs %}
-                        <div class="timeline-item">
-                            <div class="timeline-icon bg-blue-light"><i data-lucide="activity" style="width: 16px; height: 16px; color: #2563EB;"></i></div>
-                            <div>
-                                <div style="font-size: 13px; color: #334155;"><b class="text-blue">{{ log.user_name }}</b> {{ log.action }}</div>
-                                <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">{{ log.time_ago }}</div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="text-center py-4 text-muted" style="font-size: 13px;">No recent activity recorded</div>
-                    {% endif %}
-                </div>
-            </div>
 
             <!-- Section 4: Recent Decisions Table -->
             <div class="section-card">
@@ -702,23 +686,8 @@
                             }
                         }
 
-                        // Live update Recent Activities
-                        const activitiesTimeline = document.getElementById('recent-activities-timeline');
-                        if (activitiesTimeline) {
-                            if (data.recent_audit_logs && data.recent_audit_logs.length > 0) {
-                                activitiesTimeline.innerHTML = data.recent_audit_logs.map(log => `
-                                    <div class="timeline-item">
-                                        <div class="timeline-icon bg-blue-light"><i data-lucide="activity" style="width: 16px; height: 16px; color: #2563EB;"></i></div>
-                                        <div>
-                                            <div style="font-size: 13px; color: #334155;"><b class="text-blue">${log.user_name}</b> ${log.action}</div>
-                                            <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">${log.time_ago}</div>
-                                        </div>
-                                    </div>
-                                `).join('');
-                            } else {
-                                activitiesTimeline.innerHTML = `<div class="text-center py-4 text-muted" style="font-size: 13px;">No recent activity recorded</div>`;
-                            }
-                        }
+
+
 
                         // Live update Recent Decisions Table
                         const decisionsTbody = document.getElementById('employee-recent-decisions-tbody');

@@ -143,9 +143,9 @@
         <div class="row g-4 mb-4">
             <div class="col-md-6">
                 <label class="form-label fw-semibold text-dark text-sm">Category <span class="text-danger">*</span></label>
-                <select id="cdCategory" class="form-select  text-dark">
+                <select id="cdCategory" class="form-select text-dark" onchange="renderTagsUI()">
                     <option value="1">Finance</option>
-                    <option value="2">Technology</option>
+                    <option value="2" selected>Technology</option>
                     <option value="3">Operations</option>
                     <option value="4">HR</option>
                 </select>
@@ -1812,10 +1812,83 @@ Return ONLY a valid JSON array of objects with the following exact keys:
             .replace(/'/g, "&#039;");
     }
 
-    const defaultTagBank = ["Budget", "Finance", "Q4", "Technology", "Operations", "Strategy", "Policy", "Security", "HR", "Urgent", "Compliance"];
+    const categoryTagBanks = {
+        "1": [ // Finance
+            "Budget Allocation", "CapEx", "OpEx", "Cost Optimization", "ROI Analysis", 
+            "Financial Audit", "Q4 Budget", "Vendor Pricing", "Revenue Growth", 
+            "Expense Control", "Forecasting", "Asset Management", "Tax & Compliance", "Procurement"
+        ],
+        "2": [ // Technology
+            "Cloud Architecture", "AI & Machine Learning", "Cybersecurity", "Infrastructure", 
+            "DevOps", "Database Migration", "API Integration", "Scalability", 
+            "Software Upgrade", "System Automation", "Microservices", "Data Pipeline", "SaaS", "Tech Stack"
+        ],
+        "3": [ // Operations
+            "Process Automation", "Workflow Optimization", "Supply Chain", "SLA Management", 
+            "Quality Assurance", "Vendor Management", "Facility & Logistics", "Resource Allocation", 
+            "Operational Risk", "Continuous Improvement", "Business Continuity", "SOP Guidelines"
+        ],
+        "4": [ // HR
+            "Employee Work Policy", "Remote & Hybrid", "Talent Acquisition", "Performance Review", 
+            "Employee Benefits", "Compensation & Payroll", "Training & Development", "Workplace Culture", 
+            "Onboarding Process", "Diversity & Inclusion", "Retention Strategy", "Health & Safety"
+        ],
+        "finance": [
+            "Budget Allocation", "CapEx", "OpEx", "Cost Optimization", "ROI Analysis", 
+            "Financial Audit", "Q4 Budget", "Vendor Pricing", "Revenue Growth", 
+            "Expense Control", "Forecasting", "Asset Management", "Tax & Compliance", "Procurement"
+        ],
+        "technology": [
+            "Cloud Architecture", "AI & Machine Learning", "Cybersecurity", "Infrastructure", 
+            "DevOps", "Database Migration", "API Integration", "Scalability", 
+            "Software Upgrade", "System Automation", "Microservices", "Data Pipeline", "SaaS", "Tech Stack"
+        ],
+        "operations": [
+            "Process Automation", "Workflow Optimization", "Supply Chain", "SLA Management", 
+            "Quality Assurance", "Vendor Management", "Facility & Logistics", "Resource Allocation", 
+            "Operational Risk", "Continuous Improvement", "Business Continuity", "SOP Guidelines"
+        ],
+        "hr": [
+            "Employee Work Policy", "Remote & Hybrid", "Talent Acquisition", "Performance Review", 
+            "Employee Benefits", "Compensation & Payroll", "Training & Development", "Workplace Culture", 
+            "Onboarding Process", "Diversity & Inclusion", "Retention Strategy", "Health & Safety"
+        ],
+        "general": [
+            "Strategic Initiative", "Executive Decision", "Risk Assessment", "Quarterly Goals", 
+            "Milestone Delivery", "Organizational Change", "Stakeholder Alignment", "Efficiency Gains", 
+            "High Impact", "Policy Enforcement", "Urgent", "Compliance"
+        ]
+    };
+
     let selectedTags = [];
 
+    function getCurrentCategoryTagBank() {
+        const catSelect = document.getElementById("cdCategory");
+        if (!catSelect) return categoryTagBanks["2"];
+        const val = (catSelect.value || "").trim();
+        const text = (catSelect.options[catSelect.selectedIndex]?.text || "").trim().toLowerCase();
+
+        if (categoryTagBanks[val]) {
+            return categoryTagBanks[val];
+        }
+        if (categoryTagBanks[text]) {
+            return categoryTagBanks[text];
+        }
+        for (const key of Object.keys(categoryTagBanks)) {
+            if (text.includes(key) || key.includes(text)) {
+                return categoryTagBanks[key];
+            }
+        }
+        return categoryTagBanks["general"];
+    }
+
     function initTagsUI() {
+        const catSelect = document.getElementById("cdCategory");
+        if (catSelect) {
+            catSelect.addEventListener("change", () => {
+                renderTagsUI();
+            });
+        }
         renderTagsUI();
         setupTagDragAndDrop();
     }
@@ -1840,9 +1913,10 @@ Return ONLY a valid JSON array of objects with the following exact keys:
         }
 
         bankContainer.innerHTML = "";
-        const available = defaultTagBank.filter(t => !selectedTags.includes(t));
+        const currentBank = getCurrentCategoryTagBank();
+        const available = currentBank.filter(t => !selectedTags.includes(t));
         if (available.length === 0) {
-            bankContainer.innerHTML = `<span class="text-muted small" style="font-size: 12px;">All default tags selected!</span>`;
+            bankContainer.innerHTML = `<span class="text-muted small" style="font-size: 12px;">All predefined tags for this category selected! You can also type custom tags above.</span>`;
         } else {
             available.forEach(tag => {
                 bankContainer.innerHTML += `

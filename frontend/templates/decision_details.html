@@ -210,9 +210,10 @@
                 <li class="breadcrumb-item active fw-bold text-dark" aria-current="page">DEC-{{ decision_id }}</li>
             </ol>
         </nav>
-        <div class="d-flex align-items-center mt-2">
-            <h2 class="fw-bold mb-0 me-3 text-dark" id="detailTitle">Loading...</h2>
+        <div class="d-flex align-items-center mt-2 flex-wrap gap-2">
+            <h2 class="fw-bold mb-0 me-2 text-dark" id="detailTitle">Loading...</h2>
             <span id="decisionStatusBadge" class="badge rounded-pill bg-light text-dark border px-3 py-2 fw-semibold">...</span>
+            <span id="decisionVersionBadge" class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 fw-semibold ms-2 d-none"><i class="bi bi-clock-history me-1"></i><span id="decisionVersionText">Version 1</span></span>
         </div>
     </div>
     <div class="d-flex gap-2">
@@ -293,6 +294,14 @@
 
             <!-- Context Card -->
             <div class="premium-card mb-4 p-4">
+                <div id="overviewRestoredBanner" class="alert alert-success border-success-subtle bg-success-subtle bg-opacity-25 d-flex align-items-center py-2.5 px-3 mb-3 rounded-3 text-dark text-sm d-none">
+                    <i class="bi bi-arrow-counterclockwise text-success fs-5 me-2.5"></i>
+                    <div>
+                        <strong id="overviewRestoredTitle">Active Snapshot: Version 3</strong>
+                        <span id="overviewRestoredSubtitle" class="text-muted ms-1">(Restored from Version 1)</span>
+                    </div>
+                </div>
+
                 <h5 class="fw-bold text-dark mb-3">Decision Context</h5>
                 <p class="text-muted" id="detailDescription" style="line-height: 1.7;"></p>
                 
@@ -318,14 +327,19 @@
 
             <!-- Alternatives Evaluation (Workflow 3b) -->
             <div class="premium-card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                     <div>
                         <h5 class="fw-bold text-dark mb-1">Alternatives Considered</h5>
                         <p class="text-muted text-sm mb-0">Evaluate and compare the options for this decision.</p>
                     </div>
-                    <button class="btn btn-outline-primary btn-sm fw-semibold" onclick="openAlternativeModal()">
-                        <i class="bi bi-plus"></i> Add Option
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-outline-secondary btn-sm fw-semibold shadow-2xs d-flex align-items-center gap-1.5" id="btnViewAlternatives" onclick="openAlternativesViewModal()" title="View Employee Alternatives">
+                            <i class="bi bi-eye text-primary"></i> <span>View Options</span>
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm fw-semibold shadow-2xs d-flex align-items-center gap-1" onclick="openAlternativeModal()">
+                            <i class="bi bi-plus"></i> Add Option
+                        </button>
+                    </div>
                 </div>
                 
                 <div id="alternativesEvaluatorList">
@@ -340,6 +354,15 @@
             <div class="premium-card p-4 mb-4">
                 <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Decision Info</h6>
                 
+                <div class="mb-3" id="infoVersionSection">
+                    <small class="text-muted d-block mb-1">Active Version</small>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 fw-bold" id="infoVersionBadge" style="font-size: 12px;">Version 1</span>
+                        <span id="infoRestoredBadge" class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 fw-semibold d-none" style="font-size: 10px;">Restored</span>
+                    </div>
+                    <small class="text-muted d-block mt-1 text-xs" id="infoVersionReason" style="font-size: 11px;"></small>
+                </div>
+
                 <div class="mb-3">
                     <small class="text-muted d-block mb-1">Category</small>
                     <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" id="infoCategory">General</span>
@@ -399,7 +422,7 @@
         <div class="col-lg-8">
             <div class="premium-card p-4 mb-4">
                 <h5 class="fw-bold text-dark mb-3">Reason for Decision</h5>
-                <p class="text-muted" style="line-height: 1.7;">
+                <p class="text-muted" id="rationaleReasonText" style="line-height: 1.7;">
                     The core justification for this decision aligns with the strategic imperative to optimize technology investments, reduce infrastructure constraints, and comply with regulatory security guidelines.
                 </p>
                 <div class="alert alert-info border-0 bg-light-subtle d-flex align-items-center mb-0 mt-3" style="border-radius: 8px;">
@@ -440,52 +463,52 @@
                 <div class="row g-3 text-center mb-3">
                     <div class="col-6">
                         <div class="border rounded p-3 bg-light">
-                            <h4 class="fw-bold text-primary mb-1">$2.4M</h4>
+                            <h4 class="fw-bold text-primary mb-1" id="rationaleInvestment">$120K</h4>
                             <small class="text-muted text-xs">Total Investment</small>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="border rounded p-3 bg-light">
-                            <h4 class="fw-bold text-success mb-1">$4.3M</h4>
+                            <h4 class="fw-bold text-success mb-1" id="rationaleSavings">$350K</h4>
                             <small class="text-muted text-xs">3-Year Savings</small>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="border rounded p-3 bg-light">
-                            <h4 class="fw-bold text-info mb-1">180%</h4>
+                            <h4 class="fw-bold text-info mb-1" id="rationaleROI">165%</h4>
                             <small class="text-muted text-xs">Expected ROI</small>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="border rounded p-3 bg-light">
-                            <h4 class="fw-bold text-warning mb-1">Q2 2025</h4>
+                            <h4 class="fw-bold text-warning mb-1" id="rationaleBreakeven">Q4 2026</h4>
                             <small class="text-muted text-xs">Break-even</small>
                         </div>
                     </div>
                 </div>
-                <p class="text-muted text-sm mb-0" style="line-height: 1.6;">
-                    Consolidation of licenses and shifting from capital expenses to an elastic operational model guarantees lower maintenance costs and standardizes security governance.
+                <p class="text-muted text-sm mb-0" id="rationaleBusinessNarrative" style="line-height: 1.6;">
+                    Consolidation of technology assets and implementing the recommended evaluation strategy guarantees lower maintenance costs, eliminates legacy technical debt, and standardizes security governance.
                 </p>
             </div>
 
             <div class="premium-card p-4">
                 <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Expected Outcome Timeline</h6>
-                <div class="timeline-vertical mt-3" style="padding-left: 20px;">
+                <div class="timeline-vertical mt-3" style="padding-left: 20px;" id="rationaleOutcomeTimeline">
                     <div class="timeline-item completed">
-                        <h6 class="fw-bold text-sm mb-0">Q1 2025 Planned</h6>
-                        <small class="text-muted">Infrastructure baseline deployed</small>
+                        <h6 class="fw-bold text-sm mb-0">Q3 2026 Planned</h6>
+                        <small class="text-muted">Requirements baseline & architecture sign-off</small>
                     </div>
                     <div class="timeline-item active">
-                        <h6 class="fw-bold text-sm mb-0">Q2 2025 Planned</h6>
-                        <small class="text-muted">Primary workloads migrated</small>
+                        <h6 class="fw-bold text-sm mb-0">Q4 2026 Planned</h6>
+                        <small class="text-muted">Primary workload & modernization rollout</small>
                     </div>
                     <div class="timeline-item">
-                        <h6 class="fw-bold text-sm mb-0">Q3 2025 Projected</h6>
-                        <small class="text-muted">Break-even achieved</small>
+                        <h6 class="fw-bold text-sm mb-0">Q1 2027 Projected</h6>
+                        <small class="text-muted">Operational break-even & ROI realization</small>
                     </div>
                     <div class="timeline-item">
-                        <h6 class="fw-bold text-sm mb-0">Q4 2025 Planned</h6>
-                        <small class="text-muted">Full legacy decommissioned</small>
+                        <h6 class="fw-bold text-sm mb-0">Q2 2027 Planned</h6>
+                        <small class="text-muted">Full production scaling & legacy decommission</small>
                     </div>
                 </div>
             </div>
@@ -858,23 +881,48 @@
     </div>
 </div>
 
-<!-- New Discussion Thread Modal -->
-<div class="modal fade" id="newThreadModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold">Start Discussion Thread</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-0">
-                    <label class="form-label fw-semibold text-secondary">Thread Topic</label>
-                    <input type="text" id="newThreadTopicInput" class="form-control" placeholder="E.g., Scalability considerations...">
+<!-- View Employee Alternatives Modal -->
+<div class="modal fade" id="viewAlternativesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header bg-light border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2.5">
+                    <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; font-size: 18px;">
+                        <i class="bi bi-eye-fill"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark fs-6 mb-0" id="viewAltModalTitle">Employee Alternatives & Analysis</h5>
+                        <div class="text-muted text-xs" id="viewAltModalSubtitle">Options proposed for this decision</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1.5" id="viewAltTotalCountBadge" style="font-size: 11px; font-weight: 600;">1 Option</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
             </div>
-            <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary px-4" onclick="submitNewThread()">Start Thread</button>
+            
+            <div class="modal-body p-4 bg-light bg-opacity-25" id="viewAltModalBody">
+                <!-- Navigation Tabs for multiple alternatives -->
+                <ul class="nav nav-pills gap-2 mb-4 border-bottom pb-3" id="viewAltTabsNav">
+                    <!-- Populated dynamically via JS -->
+                </ul>
+
+                <!-- Alternative Details Container -->
+                <div id="viewAltContentContainer">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <div class="modal-footer bg-white border-top py-2.5 px-4 d-flex justify-content-between align-items-center">
+                <div class="text-muted text-xs d-flex align-items-center gap-1.5" id="viewAltFooterMeta">
+                    <i class="bi bi-shield-check text-success"></i> <span>Recorded in Enterprise Decision Audit Log</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light fw-semibold text-secondary px-4 py-2 border" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary fw-semibold px-4 py-2 shadow-sm d-flex align-items-center gap-1.5" id="viewAltEditBtn" onclick="editCurrentViewedAlternative()">
+                        <i class="bi bi-pencil-square"></i> <span>Edit Option</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -990,12 +1038,216 @@
 </script>
 
 <script>
-
     function sendReminder() {
         showToast("Success", "A notification reminder has been successfully sent to the pending reviewers.");
     }
+
+    let currentlyViewingAltId = null;
+
+    function viewAlternativeDetail(id) {
+        openAlternativesViewModal(id);
+    }
+
+    function openAlternativesViewModal(selectedId = null) {
+        const list = (typeof currentAlternatives !== 'undefined' && currentAlternatives) ? currentAlternatives : [];
+        if (!list || list.length === 0) {
+            showToast("Info", "No alternatives have been submitted for this decision yet.");
+            return;
+        }
+
+        const totalCount = list.length;
+        const countBadge = document.getElementById('viewAltTotalCountBadge');
+        if (countBadge) countBadge.innerText = `${totalCount} ${totalCount === 1 ? 'Option' : 'Options'}`;
+        
+        if (selectedId && list.some(x => x.id === selectedId)) {
+            currentlyViewingAltId = selectedId;
+        } else {
+            currentlyViewingAltId = list[0].id;
+        }
+
+        renderViewAlternativesModalContent();
+        const modal = new bootstrap.Modal(document.getElementById("viewAlternativesModal"));
+        modal.show();
+    }
+
+    function renderViewAlternativesModalContent() {
+        const list = currentAlternatives || [];
+        const tabsNav = document.getElementById("viewAltTabsNav");
+        const container = document.getElementById("viewAltContentContainer");
+        if (!tabsNav || !container) return;
+
+        if (list.length > 1) {
+            tabsNav.classList.remove('d-none');
+            tabsNav.innerHTML = list.map((alt, idx) => {
+                const letter = String.fromCharCode(65 + idx);
+                const isActive = alt.id === currentlyViewingAltId;
+                const isRec = idx === 0;
+                return `
+                    <li class="nav-item">
+                        <button class="nav-link ${isActive ? 'active shadow-sm fw-bold' : 'text-secondary fw-semibold bg-white border'} rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5" 
+                                onclick="switchViewAlternativeTab(${alt.id})" style="font-size: 13px;">
+                            <span>Option ${letter}</span>
+                            ${isRec ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-1 px-1.5 py-0.5" style="font-size:9px;">Recommended</span>' : ''}
+                        </button>
+                    </li>
+                `;
+            }).join("");
+        } else {
+            tabsNav.classList.add('d-none');
+        }
+
+        const alt = list.find(x => x.id === currentlyViewingAltId) || list[0];
+        if (!alt) return;
+
+        const altIndex = list.findIndex(x => x.id === alt.id);
+        const letter = String.fromCharCode(65 + Math.max(0, altIndex));
+        const isRecommended = altIndex === 0;
+
+        let score = 50;
+        if (alt.feasibility_score !== null && alt.feasibility_score !== undefined && !isNaN(alt.feasibility_score)) {
+            let val = parseFloat(alt.feasibility_score);
+            if (val > 0 && val <= 1.0) score = val * 100;
+            else if (val > 1.0 && val <= 10.0) score = val * 10;
+            else score = val;
+            score = Math.min(100, Math.max(0, Math.round(score)));
+        }
+        const scoreColor = score >= 75 ? 'success' : (score >= 50 ? 'primary' : 'warning');
+
+        const risk = alt.risk_level || 'Medium';
+        let riskBadgeStyle = "background:#FEF3C7;color:#D97706;border:1px solid #FDE68A;";
+        let riskIcon = "bi-exclamation-triangle-fill";
+        if (risk.toLowerCase().includes('low')) {
+            riskBadgeStyle = "background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;";
+            riskIcon = "bi-shield-check";
+        } else if (risk.toLowerCase().includes('high')) {
+            riskBadgeStyle = "background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;";
+            riskIcon = "bi-exclamation-octagon-fill";
+        }
+
+        const costNum = (alt.cost !== null && alt.cost !== undefined) ? Number(alt.cost) : 0;
+        const costFormatted = `$${costNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        const parseList = (text) => {
+            if (!text || text === 'None' || text.trim() === '') return [];
+            return text.split(/[\n,;•]+/).map(s => s.trim()).filter(s => s.length > 0);
+        };
+
+        const prosList = parseList(alt.pros);
+        const consList = parseList(alt.cons);
+
+        const creatorName = (typeof currentDecision !== 'undefined' && currentDecision && currentDecision.creator_name) 
+            ? currentDecision.creator_name 
+            : (document.getElementById('detailOwner')?.innerText || 'Employee');
+
+        container.innerHTML = `
+            <div class="bg-white p-4 rounded-3 border shadow-2xs mb-3">
+                <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="badge bg-primary text-white rounded-pill px-2.5 py-1 fw-bold" style="font-size:12px;">Option ${letter}</span>
+                            ${isRecommended ? '<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1 fw-bold" style="font-size:11px;"><i class="bi bi-star-fill me-1"></i>Recommended by Employee</span>' : ''}
+                        </div>
+                        <h4 class="fw-bold text-dark mb-1 mt-2">${escapeHtml(alt.title)}</h4>
+                        <div class="text-muted text-xs d-flex align-items-center gap-2 mt-1">
+                            <span><i class="bi bi-person-fill text-primary"></i> Proposed by: <strong>${escapeHtml(creatorName)}</strong></span>
+                            <span>•</span>
+                            <span>Option ID: <code>ALT-${alt.id}</code></span>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-column align-items-end">
+                        <span class="text-muted text-xs mb-1">Risk Assessment</span>
+                        <span class="badge rounded-pill px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5" style="${riskBadgeStyle}">
+                            <i class="bi ${riskIcon}"></i> ${escapeHtml(risk)}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mb-4 pt-2 border-top">
+                    <label class="fw-bold text-dark text-sm mb-1.5 d-flex align-items-center gap-1.5">
+                        <i class="bi bi-file-text-fill text-primary"></i> Proposed Solution Description
+                    </label>
+                    <div class="p-3 bg-light rounded-3 border text-dark" style="font-size: 13.5px; line-height: 1.65; white-space: pre-wrap;">${escapeHtml(alt.description || 'No detailed description provided.')}</div>
+                </div>
+
+                <!-- Key Metrics Grid -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="p-3 rounded-3 border bg-light bg-opacity-50 h-100">
+                            <small class="text-muted d-block mb-1 text-xs fw-semibold">ESTIMATED INVESTMENT</small>
+                            <div class="fs-5 fw-bold text-primary">${costFormatted}</div>
+                            <small class="text-muted" style="font-size: 11px;">Capital & operational expenditure</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded-3 border bg-light bg-opacity-50 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-muted text-xs fw-semibold">STRATEGIC ALIGNMENT</small>
+                                <span class="fw-bold text-${scoreColor}" style="font-size: 13px;">${score}%</span>
+                            </div>
+                            <div class="progress my-2" style="height: 8px; border-radius: 4px;">
+                                <div class="progress-bar bg-${scoreColor}" role="progressbar" style="width: ${score}%;"></div>
+                            </div>
+                            <small class="text-muted" style="font-size: 11px;">Fit with company objectives</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded-3 border bg-light bg-opacity-50 h-100">
+                            <small class="text-muted d-block mb-1 text-xs fw-semibold">FEASIBILITY SCORE</small>
+                            <div class="fs-5 fw-bold text-dark">${alt.feasibility_score || 5} <span class="text-muted text-xs">/ 10</span></div>
+                            <small class="text-muted" style="font-size: 11px;">Implementation capability</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pros & Cons Comparison -->
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3 border h-100" style="background:#F0FDF4; border-color:#BBF7D0 !important;">
+                            <h6 class="fw-bold text-success mb-2 d-flex align-items-center gap-1.5" style="font-size: 13px;">
+                                <i class="bi bi-check-circle-fill"></i> Key Advantages (Pros)
+                            </h6>
+                            ${prosList.length > 0 ? `
+                                <ul class="mb-0 ps-3 text-dark text-xs" style="line-height: 1.7;">
+                                    ${prosList.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+                                </ul>
+                            ` : `
+                                <p class="text-muted text-xs mb-0">${escapeHtml(alt.pros || 'No specific advantages documented.')}</p>
+                            `}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded-3 border h-100" style="background:#FEF2F2; border-color:#FECACA !important;">
+                            <h6 class="fw-bold text-danger mb-2 d-flex align-items-center gap-1.5" style="font-size: 13px;">
+                                <i class="bi bi-x-circle-fill"></i> Considerations & Drawbacks (Cons)
+                            </h6>
+                            ${consList.length > 0 ? `
+                                <ul class="mb-0 ps-3 text-dark text-xs" style="line-height: 1.7;">
+                                    ${consList.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+                                </ul>
+                            ` : `
+                                <p class="text-muted text-xs mb-0">${escapeHtml(alt.cons || 'No specific drawbacks documented.')}</p>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function switchViewAlternativeTab(altId) {
+        currentlyViewingAltId = altId;
+        renderViewAlternativesModalContent();
+    }
+
+    function editCurrentViewedAlternative() {
+        if (!currentlyViewingAltId) return;
+        const viewModalEl = document.getElementById("viewAlternativesModal");
+        const modalInst = bootstrap.Modal.getInstance(viewModalEl);
+        if (modalInst) modalInst.hide();
+        editAlternative(currentlyViewingAltId);
+    }
     
-    // Override the displayAlternatives function from decision_details.js to render the new beautiful cards instead of a basic table
+    // Override the displayAlternatives function from decision_details.js to render cards with eye buttons
     window.addEventListener('load', function() {
         if(typeof renderAlternativesTable === 'function') {
             renderAlternativesTable = function() {
@@ -1027,7 +1279,7 @@
                         }
                         score = Math.min(100, Math.max(0, Math.round(score)));
                     }
-                    const isRecommended = index === 0; // Mark first as recommended
+                    const isRecommended = index === 0;
                     
                     let riskColor = alt.risk_level === 'High' ? 'danger' : (alt.risk_level === 'Medium' ? 'warning' : 'success');
                     
@@ -1038,15 +1290,16 @@
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div class="d-flex align-items-center">
                                 <i class="bi ${isRecommended ? 'bi-check-circle-fill text-primary' : 'bi-circle text-muted'} me-2"></i>
-                                <h6 class="fw-bold mb-0">${alt.title}</h6>
+                                <h6 class="fw-bold mb-0">${escapeHtml(alt.title)}</h6>
                             </div>
-                            <div>
+                            <div class="d-flex align-items-center">
                                 ${isRecommended ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill me-2">Recommended</span>' : ''}
-                                <button class="btn btn-sm btn-link text-muted p-0" onclick="editAlternative(${alt.id})"><i class="bi bi-pencil"></i></button>
-                                <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="deleteAlternative(${alt.id})"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="viewAlternativeDetail(${alt.id})" title="View Alternative Details"><i class="bi bi-eye fs-6"></i></button>
+                                <button class="btn btn-sm btn-link text-muted p-0 me-2" onclick="editAlternative(${alt.id})" title="Edit Option"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteAlternative(${alt.id})" title="Delete Option"><i class="bi bi-trash"></i></button>
                             </div>
                         </div>
-                        <p class="text-sm text-muted mb-3">${alt.description || 'No description provided.'}</p>
+                        <p class="text-sm text-muted mb-3">${escapeHtml(alt.description || 'No description provided.')}</p>
                         <div class="row align-items-center">
                             <div class="col-sm-5 mb-2 mb-sm-0">
                                 <small class="text-muted d-block mb-1" style="font-size: 11px;">Alignment Score</small>
@@ -1059,7 +1312,7 @@
                             </div>
                             <div class="col-sm-3 col-6">
                                 <small class="text-muted d-block mb-1" style="font-size: 11px;">Cost</small>
-                                <span class="fw-semibold" style="font-size: 13px;">$${alt.cost || '0.00'}</span>
+                                <span class="fw-semibold" style="font-size: 13px;">$${Number(alt.cost || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                             </div>
                             <div class="col-sm-4 col-6 text-end text-sm-start">
                                 <small class="text-muted d-block mb-1" style="font-size: 11px;">Risk</small>
@@ -1071,7 +1324,6 @@
                 });
             };
             
-            // Re-fetch to apply new rendering
             if (typeof fetchAlternatives === 'function') {
                 fetchAlternatives();
             }
