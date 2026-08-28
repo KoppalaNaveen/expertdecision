@@ -787,6 +787,7 @@
         loadMeetingNotes(currentDecisionId);
         loadSupportingFiles(currentDecisionId);
         loadDecisionTimeline();
+        loadTeamPresence(currentDecisionId);
         if (currentActiveTab === 'chat') {
             initWebSocket(currentDecisionId);
         }
@@ -1398,28 +1399,61 @@
         } catch(e){}
     }
 
-    // --- 7. TEAM PRESENCE ---
-    async function loadTeamPresence() {
+    // --- 7. REAL-TIME TEAM PRESENCE & PARTICIPANTS ---
+    async function loadTeamPresence(decisionId) {
         const container = document.getElementById('teamPresenceContainer');
-        if (!isCurrentlyOnline) return;
+        if (!container || !isCurrentlyOnline) return;
+        
+        const decId = decisionId || currentDecisionId || 0;
         try {
-            const res = await fetch(`${API_URL}/users/`);
+            const res = await fetch(`${API_URL}/decisions/${decId}/participants?current_user_id=${CURRENT_USER_ID}`);
             if (!res.ok) return;
-            const users = await res.json();
-            container.innerHTML = '';
-            users.forEach((u, idx) => {
-                const isOnline = idx % 2 === 0;
-                container.innerHTML += `
-                    <div class="d-flex align-items-center justify-content-between p-1.5 mb-1 text-xs rounded-2 hover-bg">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="presence-dot ${isOnline ? 'bg-success' : 'bg-secondary'}"></span>
-                            <span class="fw-medium text-dark">${escapeHtml(u.full_name)}</span>
+            const participants = await res.json();
+            
+            if (!participants || participants.length === 0) {
+                container.innerHTML = '<div class="text-center py-2 text-muted small">No active team participants</div>';
+                return;
+            }
+
+            let html = '';
+            participants.forEach(p => {
+                const isOnline = p.is_online;
+                const statusBadgeClass = isOnline ? 'bg-success' : 'bg-secondary';
+                const statusTextClass = isOnline ? 'text-success fw-semibold' : 'text-muted';
+                const empIdBadge = p.employee_id ? `<span class="badge bg-light text-secondary border ms-1" style="font-size: 9px; font-family: monospace;">${escapeHtml(p.employee_id)}</span>` : '';
+                
+                let roleSubtext = '';
+                if (p.decision_roles && p.decision_roles.length > 0) {
+                    roleSubtext = `${escapeHtml(p.decision_roles[0])} &bull; ${escapeHtml(p.designation || p.role_name)}`;
+                } else {
+                    roleSubtext = `${escapeHtml(p.designation || p.role_name)}`;
+                }
+
+                html += `
+                    <div class="d-flex align-items-center justify-content-between p-1.5 mb-1 text-xs rounded-2 hover-bg" title="${escapeHtml(p.full_name)} (${escapeHtml(p.employee_id || '')}) - ${escapeHtml(p.designation || p.role_name)}">
+                        <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 175px;">
+                            <div class="position-relative flex-shrink-0">
+                                <div class="avatar-circle-xs bg-primary bg-opacity-10 text-primary fw-bold d-flex align-items-center justify-content-center" style="width: 26px; height: 26px; border-radius: 50%; font-size: 10px;">
+                                    ${escapeHtml(p.avatar_initials || 'U')}
+                                </div>
+                                <span class="presence-dot ${statusBadgeClass} position-absolute bottom-0 end-0 border border-white rounded-circle" style="width: 7px; height: 7px;"></span>
+                            </div>
+                            <div class="text-truncate">
+                                <div class="fw-medium text-dark text-truncate d-flex align-items-center" style="font-size: 11.5px;">
+                                    ${escapeHtml(p.full_name)} ${empIdBadge}
+                                </div>
+                                <div class="text-muted text-xs text-truncate" style="font-size: 9.5px; max-width: 140px;">${roleSubtext}</div>
+                            </div>
                         </div>
-                        <small class="text-muted text-xs">${isOnline ? 'Online' : 'Offline'}</small>
+                        <small class="${statusTextClass} text-xs flex-shrink-0 ms-1">${p.status_label || (isOnline ? 'Online' : 'Offline')}</small>
                     </div>
                 `;
             });
-        } catch(e){}
+
+            container.innerHTML = html;
+        } catch(e){
+            console.error("Error loading team presence:", e);
+        }
     }
 
     // --- 8. UNIFIED SEARCH ---

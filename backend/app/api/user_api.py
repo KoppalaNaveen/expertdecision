@@ -77,7 +77,7 @@ def get_pending_users(db: Session = Depends(get_db)):
 # -------------------------------
 @router.post("/approve")
 def approve_user(action: AdminApprovalAction, db: Session = Depends(get_db)):
-    return UserService.admin_approval_action(db, action.user_id, "approve", action.actor_name or "Administrator")
+    return UserService.admin_approval_action(db, action.user_id, "approve", action.actor_name or "Administrator", action.team_id, action.designation)
 
 @router.post("/reject")
 def reject_user(action: AdminApprovalAction, db: Session = Depends(get_db)):
@@ -86,7 +86,7 @@ def reject_user(action: AdminApprovalAction, db: Session = Depends(get_db)):
 @router.post("/pending-approvals/action")
 @router.post("/approval-action")
 def pending_approval_action(action: AdminApprovalAction, db: Session = Depends(get_db)):
-    return UserService.admin_approval_action(db, action.user_id, action.action, action.actor_name or "Administrator")
+    return UserService.admin_approval_action(db, action.user_id, action.action, action.actor_name or "Administrator", action.team_id, action.designation)
 
 # -------------------------------
 # Register User (Legacy)
@@ -360,4 +360,21 @@ def update_user_status(user_id: int, req: UpdateUserStatusRequest, db: Session =
 def get_user_team(user_id: int, db: Session = Depends(get_db)):
     from app.services.team_service import TeamService
     return TeamService.get_my_team(db, user_id=user_id)
+
+
+class UserHeartbeatReq(BaseModel):
+    user_id: int
+
+@router.post("/heartbeat")
+def user_presence_heartbeat(req: UserHeartbeatReq):
+    from app.services.presence_service import PresenceService
+    PresenceService.heartbeat(req.user_id)
+    return {"status": "ok", "online_count": len(PresenceService.get_online_user_ids())}
+
+@router.post("/logout-presence")
+def user_logout_presence(req: UserHeartbeatReq):
+    from app.services.presence_service import PresenceService
+    PresenceService.set_offline(req.user_id)
+    return {"status": "offline"}
+
 

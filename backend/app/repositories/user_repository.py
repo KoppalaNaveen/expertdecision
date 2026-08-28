@@ -79,7 +79,7 @@ class UserRepository:
         return db.query(User).filter(User.status == "Pending Approval").order_by(User.id.desc()).all()
 
     @staticmethod
-    def update_user_approval(db: Session, user_id: int, action: str, actor_name: str = "Administrator"):
+    def update_user_approval(db: Session, user_id: int, action: str, actor_name: str = "Administrator", team_id: int = None, designation: str = None):
         from datetime import datetime
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
@@ -89,8 +89,13 @@ class UserRepository:
         if action == "approve":
             user.approved = True
             user.status = "Active"
+            user.is_active = True
             user.approved_by = actor_name
             user.approved_at = now_str
+            if team_id is not None:
+                user.team_id = team_id
+            if designation:
+                user.designation = designation
         elif action == "reject":
             user.approved = False
             user.status = "Rejected"

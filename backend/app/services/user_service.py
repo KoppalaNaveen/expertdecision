@@ -245,6 +245,12 @@ class UserService:
 
         UserService._log_activity(db, db_user.id, f"User login successful: {db_user.full_name} ({db_user.employee_id})", f"Role: {db_user.role.role_name if db_user.role else 'User'}")
 
+        try:
+            from app.services.presence_service import PresenceService
+            PresenceService.heartbeat(db_user.id)
+        except Exception:
+            pass
+
         return {
             "access_token": access_token,
             "token_type": "bearer",
@@ -278,15 +284,15 @@ class UserService:
         return res
 
     @staticmethod
-    def admin_approval_action(db: Session, user_id: int, action: str, actor_name: str = "Administrator"):
-        updated_user = UserRepository.update_user_approval(db, user_id, action, actor_name)
+    def admin_approval_action(db: Session, user_id: int, action: str, actor_name: str = "Administrator", team_id: int = None, designation: str = None):
+        updated_user = UserRepository.update_user_approval(db, user_id, action, actor_name, team_id, designation)
         if not updated_user:
             raise HTTPException(status_code=404, detail="User not found.")
 
         # 1. In-App Notification (Independent)
         try:
             status_msg = (
-                f"Your account has been verified and approved by the Administrator. You can now login with Employee ID {updated_user.employee_id}."
+                f"Your account has been verified and approved by {actor_name}. You can now login with Employee ID {updated_user.employee_id}."
                 if action == "approve"
                 else "Your account registration application was not approved."
             )
@@ -308,6 +314,8 @@ class UserService:
                 admin_user = db.query(User).filter(User.role_id == 1).first()
                 sender_id = admin_user.id if admin_user else user_id
                 user_role_str = updated_user.role.role_name if (updated_user.role and updated_user.role.role_name) else "Employee"
+                user_team_str = updated_user.team.team_name if (updated_user.team and updated_user.team.team_name) else "Not Assigned"
+                user_desig_str = updated_user.designation or user_role_str
 
                 in_app_mail = InternalEmail(
                     sender_id=sender_id,
@@ -317,10 +325,13 @@ class UserService:
                     priority="High",
                     message=(
                         f"Hello {updated_user.full_name},\n\n"
-                        f"Your account on the Expert Decision Replay Platform (EDRP) has been verified and approved by the Administrator.\n\n"
-                        f"You can now access your dashboard and all platform features using your login credentials:\n"
+                        f"Your account on the Expert Decision Replay Platform (EDRP) has been verified and approved by {actor_name}.\n\n"
+                        f"You can now access your dashboard and all platform features using your assigned corporate credentials:\n"
                         f"• Employee ID / Login ID: {updated_user.employee_id}\n"
                         f"• Role: {user_role_str}\n"
+                        f"• Team: {user_team_str}\n"
+                        f"• Designation: {user_desig_str}\n"
+                        f"• Approved By: {actor_name}\n"
                         f"• Status: Verified & Active\n\n"
                         f"If you have any questions or need help, please reach out to the Support team.\n\n"
                         f"Best regards,\n"
@@ -339,10 +350,22 @@ class UserService:
         # 3. Automated External Email via Gmail SMTP (Async post-commit)
         user_email = get_recipient_email(updated_user) or (updated_user.email_original if (updated_user.email_original and "@" in updated_user.email_original) else (updated_user.email if (updated_user.email and "@" in updated_user.email) else None))
         if user_email:
-            def _async_status_email(target_email, emp_id, name, act):
+            role_n = updated_user.role.role_name if updated_user.role else "Employee"
+            team_n = updated_user.team.team_name if updated_user.team else "Not Assigned"
+            desig_n = updated_user.designation or role_n
+
+            def _async_status_email(target_email, emp_id, name, act, r_name, t_name, d_name, approver):
                 try:
                     if act == "approve":
-                        send_account_approved_email(target_email, emp_id, name)
+                        send_account_approved_email(
+                            to_email=target_email,
+                            employee_id=emp_id,
+                            full_name=name,
+                            role_name=r_name,
+                            team_name=t_name,
+                            designation=d_name,
+                            approved_by=approver
+                        )
                     else:
                         send_account_rejected_email(target_email, name, "Administrative review")
                 except Exception as e:
@@ -350,7 +373,7 @@ class UserService:
 
             threading.Thread(
                 target=_async_status_email,
-                args=(user_email, updated_user.employee_id, updated_user.full_name, action),
+                args=(user_email, updated_user.employee_id, updated_user.full_name, action, role_n, team_n, desig_n, actor_name),
                 daemon=True
             ).start()
         else:

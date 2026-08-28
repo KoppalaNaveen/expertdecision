@@ -252,21 +252,33 @@ function renderApprovalChain() {
         `;
     }
 
-    // Final Node: Admin Approval / Sign-off
-    if (isOverallApproved) {
-        let approverName = currentDecision.approved_by_name;
-        let approverEmpId = currentDecision.approved_by_employee_id;
-        let approverRole = "Administrator";
-        let approvedDateStr = currentDecision.approved_at_str;
-
-        // If not set or if resolved to a non-admin account, normalize to Administrator
-        if (!approverName || (approverEmpId && approverEmpId.startsWith("EMP")) || (currentDecision.approved_by_role && currentDecision.approved_by_role.toLowerCase() !== 'administrator')) {
-            approverName = "Koppala Naveen";
-            approverEmpId = "AD030120";
+    // Final Node: Admin Approval / Sign-off (Only shown when an Administrator actually approves the decision)
+    let adminApprover = null;
+    if (currentDecision.approved_by_name && currentDecision.approved_by_employee_id) {
+        adminApprover = {
+            name: currentDecision.approved_by_name,
+            empId: currentDecision.approved_by_employee_id,
+            role: currentDecision.approved_by_role || "Administrator",
+            dateStr: currentDecision.approved_at_str
+        };
+    } else if (currentDecision.reviews && currentDecision.reviews.length > 0) {
+        const admRev = currentDecision.reviews.find(r => 
+            (r.status === "Approved" || r.status === "Accepted") && 
+            (r.role_id === 1 || (r.role_name && r.role_name.toLowerCase().includes("admin")) || (r.employee_id && r.employee_id.startsWith("AD")) || (r.reviewer_role && r.reviewer_role.toLowerCase().includes("admin")))
+        );
+        if (admRev) {
+            adminApprover = {
+                name: admRev.reviewer_name || admRev.full_name || "Administrator",
+                empId: admRev.employee_id || "",
+                role: admRev.role_name || admRev.reviewer_role || "Administrator",
+                dateStr: admRev.updated_at ? new Date(admRev.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null
+            };
         }
+    }
 
-        const empIdBadge = approverEmpId ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold" style="font-size: 10.5px; font-family: monospace;">${escapeHtml(approverEmpId)}</span>` : '';
-        const roleBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle fw-bold" style="font-size: 10px;"><i class="bi bi-shield-check me-1"></i>Administrator</span>`;
+    if (adminApprover && isOverallApproved) {
+        const empIdBadge = adminApprover.empId ? `<span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-semibold" style="font-size: 10.5px; font-family: monospace;">${escapeHtml(adminApprover.empId)}</span>` : '';
+        const roleBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle fw-bold" style="font-size: 10px;"><i class="bi bi-shield-check me-1"></i>${escapeHtml(adminApprover.role)}</span>`;
 
         html += `
             <div class="timeline-item completed" style="border-left: 2px solid #10B981;">
@@ -276,13 +288,13 @@ function renderApprovalChain() {
                             <i class="bi bi-patch-check-fill text-success"></i> Decision Approved by Admin
                         </h6>
                         <div class="text-dark mb-1" style="font-size: 12.5px;">
-                            Approved by: <strong class="text-dark">${escapeHtml(approverName)}</strong> ${empIdBadge} ${roleBadge}
+                            Approved by: <strong class="text-dark">${escapeHtml(adminApprover.name)}</strong> ${empIdBadge} ${roleBadge}
                         </div>
                         <div class="text-muted" style="font-size: 11px; line-height: 1.4;">
                             <i class="bi bi-check2-circle text-success me-1"></i>Official final sign-off authorized. Decision is published in the knowledge repository.
                         </div>
                     </div>
-                    <small class="text-success fw-bold" style="font-size: 11px;">${approvedDateStr || 'Approved'}</small>
+                    <small class="text-success fw-bold" style="font-size: 11px;">${adminApprover.dateStr || dateStr || 'Approved'}</small>
                 </div>
             </div>
         `;

@@ -32,6 +32,8 @@ class AdminApprovalAction(BaseModel):
     user_id: int
     action: str = Field(..., pattern="^(approve|reject)$")
     actor_name: Optional[str] = "Administrator"
+    team_id: Optional[int] = None
+    designation: Optional[str] = None
 
 class UserRegister(BaseModel):
     full_name: str = Field(..., min_length=3, max_length=100)

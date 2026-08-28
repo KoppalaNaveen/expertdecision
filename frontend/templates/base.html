@@ -3097,6 +3097,22 @@
             const isMin = orb.classList.toggle('orb-minimized');
             localStorage.setItem('edrp_ai_orb_minimized', isMin ? '1' : '0');
         }
+
+        // Continuous Real-Time User Presence Heartbeat
+        (function initPresenceHeartbeat() {
+            function sendHeartbeat() {
+                const uid = parseInt("{{ session.get('user_id', '') }}" || localStorage.getItem('user_id') || 0, 10);
+                if (uid && uid > 0 && navigator.onLine) {
+                    fetch('/api/users/heartbeat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_id: uid })
+                    }).catch(() => {});
+                }
+            }
+            sendHeartbeat();
+            setInterval(sendHeartbeat, 25000);
+        })();
     </script>
 
     {% block js %}{% endblock %}

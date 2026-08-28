@@ -221,10 +221,10 @@ def get_recipient_email(user) -> str:
     return None
 
 
-def send_account_approved_email(to_email: str, employee_id: str, full_name: str = "") -> bool:
+def send_account_approved_email(to_email: str, employee_id: str, full_name: str = "", role_name: str = "", team_name: str = "", designation: str = "", approved_by: str = "Administrator") -> bool:
     """
     Automated Account Email -> Sent when an Administrator approves a pending account.
-    Notifies the user that their account is verified and approved, and they can login with their credentials.
+    Notifies the user that their account is verified and approved, and includes their team, designation, and admin details.
     """
     clean_email = (to_email or "").strip()
     if not clean_email or "@" not in clean_email:
@@ -233,6 +233,11 @@ def send_account_approved_email(to_email: str, employee_id: str, full_name: str 
     name_str = f" {full_name}" if full_name else ""
     subject = "Your Account is Verified and Approved - EDRP Platform"
     
+    role_item = f'<div style="margin-bottom: 6px;"><strong>Assigned Role:</strong> {role_name}</div>' if role_name else ''
+    team_item = f'<div style="margin-bottom: 6px;"><strong>Assigned Team:</strong> {team_name}</div>' if team_name else ''
+    desig_item = f'<div style="margin-bottom: 6px;"><strong>Designation:</strong> {designation}</div>' if designation else ''
+    approver_item = f'<div style="margin-bottom: 6px;"><strong>Approved By:</strong> {approved_by}</div>' if approved_by else ''
+
     body_html = f"""
     <!DOCTYPE html>
     <html>
@@ -258,14 +263,18 @@ def send_account_approved_email(to_email: str, employee_id: str, full_name: str 
             <div class="content">
                 <p style="font-size: 15px; margin-top: 0;">Hello<strong>{name_str}</strong>,</p>
                 <p style="color: #334155;">Great news! <strong>Your account has been verified and approved by the Administrator.</strong></p>
-                <p style="color: #334155;">You can now log in to the platform through your login credentials.</p>
+                <p style="color: #334155;">You can now log in to the platform through your assigned corporate credentials.</p>
                 
                 <div class="badge-box">
-                    <div style="font-size: 11px; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Your Account Credentials</div>
+                    <div style="font-size: 11px; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Your Official Profile & Assignment</div>
                     <div style="margin-bottom: 6px;"><strong>Full Name:</strong> {full_name or 'User'}</div>
                     <div style="margin-bottom: 6px;"><strong>Employee ID / Login ID:</strong> <span style="background: #ffffff; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #15803d;">{employee_id}</span></div>
                     <div style="margin-bottom: 6px;"><strong>Registered Email:</strong> {clean_email}</div>
-                    <div style="margin-bottom: 0;"><strong>Status:</strong> <span style="color: #16a34a; font-weight: 700;">✓ Verified & Active</span></div>
+                    {role_item}
+                    {team_item}
+                    {desig_item}
+                    {approver_item}
+                    <div style="margin-bottom: 0;"><strong>Account Status:</strong> <span style="color: #16a34a; font-weight: 700;">✓ Verified & Active</span></div>
                 </div>
 
                 <div style="text-align: center;">

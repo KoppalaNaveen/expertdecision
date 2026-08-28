@@ -383,7 +383,13 @@ def pending_approvals():
     except Exception:
         pending_users = []
 
-    return render_template("pending_approvals.html", pending_users=pending_users)
+    try:
+        teams_res = make_backend_request("GET", "/teams/", timeout=5)
+        teams = teams_res.json() if (teams_res is not None and teams_res.status_code == 200) else []
+    except Exception:
+        teams = []
+
+    return render_template("pending_approvals.html", pending_users=pending_users, teams=teams)
 
 
 @app.route("/api/pending-approvals/action", methods=["POST"])
@@ -1349,6 +1355,12 @@ def email_service():
 
 @app.route("/logout")
 def logout():
+    uid = session.get("user_id")
+    if uid:
+        try:
+            make_backend_request("POST", "/users/logout-presence", json={"user_id": uid}, timeout=2)
+        except Exception:
+            pass
     session.clear()
     session.permanent = False
     flash("Logged Out Successfully", "info")

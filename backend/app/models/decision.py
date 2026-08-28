@@ -77,14 +77,28 @@ class Decision(Base):
         return self.category.name if self.category else None
 
     def _resolve_approver(self):
+        # 1. Direct approved_by_user relationship
         try:
             if self.approved_by_user:
                 r_name = getattr(self.approved_by_user.role, 'role_name', '') if getattr(self.approved_by_user, 'role', None) else ''
-                if 'admin' in r_name.lower() or getattr(self.approved_by_user, 'role_id', None) == 1:
+                if 'admin' in r_name.lower() or getattr(self.approved_by_user, 'role_id', None) == 1 or (self.approved_by_user.employee_id and self.approved_by_user.employee_id.startswith('AD')):
                     return self.approved_by_user
         except Exception:
             pass
 
+        # 2. Check reviews for an Administrator who approved this decision
+        try:
+            if self.reviews:
+                for rev in self.reviews:
+                    if rev.status in ["Approved", "Accepted"] and rev.reviewer:
+                        u = rev.reviewer
+                        r_name = getattr(u.role, 'role_name', '') if getattr(u, 'role', None) else ''
+                        if 'admin' in r_name.lower() or getattr(u, 'role_id', None) == 1 or (u.employee_id and u.employee_id.startswith('AD')):
+                            return u
+        except Exception:
+            pass
+
+        # 3. Check version snapshots for an Administrator who recorded the Approved status
         if self.status == "Approved" and self.versions:
             for v in self.versions:
                 if v.status == "Approved":
@@ -97,20 +111,6 @@ class Decision(Base):
                     except Exception:
                         pass
 
-        # Fallback: Query administrator user
-        if self.status == "Approved":
-            try:
-                from sqlalchemy.orm import object_session
-                from app.models.user import User
-                from app.models.role import Role
-                sess = object_session(self)
-                if sess:
-                    admin_u = sess.query(User).join(Role, User.role_id == Role.id).filter(Role.role_name.ilike('%admin%')).first()
-                    if admin_u:
-                        return admin_u
-            except Exception:
-                pass
-
         return None
 
     @property
@@ -121,7 +121,7 @@ class Decision(Base):
                 return u.full_name
         except Exception:
             pass
-        return "Koppala Naveen" if self.status == "Approved" else None
+        return None
 
     @property
     def approved_by_employee_id(self):
@@ -131,11 +131,17 @@ class Decision(Base):
                 return u.employee_id
         except Exception:
             pass
-        return "AD030120" if self.status == "Approved" else None
+        return None
 
     @property
     def approved_by_role(self):
-        return "Administrator" if self.status == "Approved" else None
+        try:
+            u = self._resolve_approver()
+            if u:
+                return u.role.role_name if getattr(u, 'role', None) else "Administrator"
+        except Exception:
+            pass
+        return None
 
     @property
     def approved_at_str(self):

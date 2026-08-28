@@ -705,3 +705,102 @@ def unified_search(q: str = Query(...), user_id: Optional[int] = None, db: Sessi
         "files": [{"id": f.id, "filename": f.filename, "decision_id": f.decision_id} for f in files],
         "rationale": [{"id": r.id, "title": r.title} for r in rationale]
     }
+
+# --- 9. REAL-TIME TEAM PARTICIPANTS API ---
+@router.get("/participants/realtime")
+@router.get("/{decision_id}/participants")
+def get_decision_participants(
+    decision_id: Optional[int] = 0,
+    current_user_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    from app.services.presence_service import PresenceService
+    from app.models.comment import Comment, DiscussionThread
+    from app.models.decision import Decision
+    from app.models.user import User
+
+    # Register current user's live heartbeat
+    if current_user_id:
+        try:
+            PresenceService.heartbeat(int(current_user_id))
+        except Exception:
+            pass
+
+    participants_map = {}
+
+    def add_user(u, role_context=None):
+        if not u:
+            return
+        
+        # Exclude placeholder test accounts
+        if u.full_name in ["Reviewer", "Manager"] and (not u.email or "@company" not in u.email):
+            return
+
+        if u.id in participants_map:
+            if role_context and role_context not in participants_map[u.id]["decision_roles"]:
+                participants_map[u.id]["decision_roles"].append(role_context)
+            return
+
+        # Real-time presence check: strictly True if user has active session / heartbeat
+        is_online = PresenceService.is_online(u.id)
+        if current_user_id and u.id == current_user_id:
+            is_online = True
+
+        status_label = "Online" if is_online else "Offline"
+
+        r_name = u.role.role_name if u.role else "Employee"
+        emp_id = u.employee_id or f"EMP{u.id:04d}"
+        desig = u.designation or r_name
+
+        participants_map[u.id] = {
+            "id": u.id,
+            "full_name": u.full_name,
+            "employee_id": emp_id,
+            "role_name": r_name,
+            "designation": desig,
+            "decision_roles": [role_context] if role_context else [],
+            "is_online": is_online,
+            "status_label": status_label,
+            "avatar_initials": "".join([p[0].upper() for p in u.full_name.split()])[:2] if u.full_name else "U"
+        }
+
+    # If decision_id > 0, get specific decision stakeholders
+    if decision_id and decision_id > 0:
+        db_decision = db.query(Decision).filter(Decision.id == decision_id).first()
+        if db_decision:
+            if db_decision.creator:
+                add_user(db_decision.creator, "Decision Owner")
+            if db_decision.reviews:
+                for rev in db_decision.reviews:
+                    if rev.reviewer:
+                        r_str = "Reviewer" if rev.reviewer.role_id == 4 else ("Manager" if rev.reviewer.role_id == 2 else "Reviewer")
+                        add_user(rev.reviewer, r_str)
+            if getattr(db_decision, 'approved_by_user', None):
+                add_user(db_decision.approved_by_user, "Administrator")
+            
+            thread_users = db.query(User).join(DiscussionThread, DiscussionThread.created_by == User.id).filter(DiscussionThread.decision_id == decision_id).all()
+            for tu in thread_users:
+                add_user(tu, "Topic Contributor")
+
+            comment_users = db.query(User).join(Comment, Comment.user_id == User.id).join(DiscussionThread, Comment.thread_id == DiscussionThread.id).filter(DiscussionThread.decision_id == decision_id).all()
+            for cu in comment_users:
+                add_user(cu, "Collaborator")
+
+            if getattr(db_decision, 'creator', None) and getattr(db_decision.creator, 'team_id', None):
+                team_members = db.query(User).filter(User.team_id == db_decision.creator.team_id, User.is_active == True).all()
+                for tm in team_members:
+                    add_user(tm, "Team Member")
+
+    # If no specific decision participants or list is small, add real organizational team members
+    active_users = db.query(User).filter(
+        User.is_active == True,
+        User.full_name.notin_(["Reviewer", "Manager"])
+    ).all()
+    for u in active_users:
+        add_user(u, u.role.role_name if u.role else "Team Member")
+
+    sorted_participants = sorted(
+        list(participants_map.values()),
+        key=lambda p: (not p["is_online"], p["full_name"])
+    )
+    return sorted_participants
