@@ -35,7 +35,7 @@ generate_ai_response = _load_ai_support_generator()
 app = Flask(__name__)
 
 # Secret Key & Session Config
-app.secret_key = "expert_decision_platform"
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "development-only-secret-key")
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=72)
 # Maximum upload size set to 200 MB
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
@@ -64,7 +64,7 @@ def _resolve_backend_url():
             return "http://127.0.0.1:8000"
     return env_url
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = _resolve_backend_url()
 
 def make_backend_request(method, path, **kwargs):
     """
@@ -91,7 +91,8 @@ def inject_global_stats():
     base_data = {
         "contact_config": CONTACT_CONFIG,
         "unread_notifications_count": 0,
-        "pending_reviews": 0
+        "pending_reviews": 0,
+        "backend_ws_url": API_URL.replace("http://", "ws://").replace("https://", "wss://")
     }
     if not session.get("logged_in"):
         return base_data

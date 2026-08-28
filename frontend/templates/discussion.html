@@ -799,7 +799,7 @@
             ws.close();
         }
         try {
-            ws = new WebSocket(`ws://127.0.0.1:8000/decisions/ws/${decisionId}`);
+            ws = new WebSocket(`{{ backend_ws_url }}/decisions/ws/${decisionId}`);
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === 'NEW_COMMENT' && data.thread_id === currentThreadId) {

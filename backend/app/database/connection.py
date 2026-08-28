@@ -20,23 +20,17 @@ if not DATABASE_URL or "sqlite" in DATABASE_URL:
     DATABASE_URL = _get_local_sqlite_url() if (not DATABASE_URL or DATABASE_URL == "sqlite:///./edrp.db") else DATABASE_URL
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    try:
-        test_engine = create_engine(
-            DATABASE_URL,
-            pool_size=15,
-            max_overflow=25,
-            pool_timeout=10,
-            pool_recycle=300,
-            pool_pre_ping=True,
-            connect_args={"connect_timeout": 10}
-        )
-        with test_engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        engine = test_engine
-    except Exception as db_err:
-        print(f"Notice: Remote database unreachable ({db_err}). Switching to local SQLite database.")
-        DATABASE_URL = _get_local_sqlite_url()
-        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=15,
+        max_overflow=25,
+        pool_timeout=10,
+        pool_recycle=300,
+        pool_pre_ping=True,
+        connect_args={"connect_timeout": 10}
+    )
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
 
 
 SessionLocal = sessionmaker(
