@@ -94,33 +94,89 @@ def is_deliverable_email(email_str: str) -> bool:
 
 def send_email(to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
     """
-    Core reusable email dispatch service using the official Resend HTTPS API (POST https://api.resend.com/emails).
-    Strictly reads RESEND_API_KEY and MAIL_FROM from environment variables.
+    Core reusable email dispatch service using HTTPS REST APIs (Brevo / Resend).
+    Operates 100% over HTTPS (Port 443) without SMTP/smtplib.
     Never exposes secrets in logs or responses.
     """
     clean_email = (to_email or "").strip()
     if not clean_email or "@" not in clean_email:
-        print(f"[RESEND EMAIL ERROR] Invalid recipient email address: '{to_email}'")
+        print(f"[EMAIL SERVICE ERROR] Invalid recipient email address: '{to_email}'")
         return False
 
-    resend_api_key = os.getenv("RESEND_API_KEY")
-    mail_from = os.getenv("MAIL_FROM")
+    brevo_api_key = os.getenv("BREVO_API_KEY", "").strip()
+    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+    mail_from = os.getenv("MAIL_FROM", "").strip()
 
-    if not resend_api_key or not resend_api_key.strip():
-        print("[RESEND EMAIL CONFIG ERROR] RESEND_API_KEY is not configured in environment variables.")
+    if not mail_from:
+        print("[EMAIL SERVICE CONFIG ERROR] MAIL_FROM is not configured in environment variables.")
         return False
 
-    if not mail_from or not mail_from.strip():
-        print("[RESEND EMAIL CONFIG ERROR] MAIL_FROM is not configured in environment variables.")
+    if not brevo_api_key and not resend_api_key:
+        print("[EMAIL SERVICE CONFIG ERROR] Neither BREVO_API_KEY nor RESEND_API_KEY is configured.")
         return False
 
     # Block mock / non-deliverable email domains from triggering real API calls
     if not is_deliverable_email(clean_email):
-        print(f"[RESEND EMAIL - MOCK RECIPIENT SKIPPED] Prevented sending '{subject}' to dummy address: {clean_email}")
+        print(f"[EMAIL SERVICE - MOCK RECIPIENT SKIPPED] Prevented sending '{subject}' to dummy address: {clean_email}")
         return True
 
+    # 1. Brevo HTTPS API (Supports free Gmail sender to ANY recipient without domain)
+    if brevo_api_key:
+        sender_email = mail_from
+        sender_name = "EDRP Support"
+        if "<" in mail_from and ">" in mail_from:
+            sender_name = mail_from.split("<")[0].strip()
+            sender_email = mail_from.split("<")[1].replace(">", "").strip()
+
+        payload = {
+            "sender": {
+                "name": sender_name or "EDRP Support",
+                "email": sender_email
+            },
+            "to": [{"email": clean_email}],
+            "subject": subject,
+            "htmlContent": html_content
+        }
+        if text_content and text_content.strip():
+            payload["textContent"] = text_content.strip()
+
+        headers = {
+            "api-key": brevo_api_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+
+        try:
+            response = requests.post("https://api.brevo.com/v3/smtp/email", headers=headers, json=payload, timeout=10.0)
+            if response.status_code in (200, 201):
+                try:
+                    res_data = response.json()
+                    msg_id = res_data.get("messageId", "N/A")
+                except Exception:
+                    msg_id = "N/A"
+                print(f"[BREVO HTTPS DELIVERED] Successfully sent '{subject}' to {clean_email} (Message ID: {msg_id})")
+                return True
+            else:
+                try:
+                    err_data = response.json()
+                    err_msg = err_data.get("message") or err_data.get("code") or str(err_data)
+                except Exception:
+                    err_msg = response.text[:200]
+                print(f"[BREVO HTTPS ERROR] Brevo API failed (Status {response.status_code}): {err_msg}")
+                return False
+        except requests.exceptions.Timeout:
+            print(f"[BREVO TIMEOUT] Request timed out while sending '{subject}' to {clean_email}")
+            return False
+        except requests.exceptions.RequestException as req_err:
+            print(f"[BREVO NETWORK ERROR] Connection error sending '{subject}' to {clean_email}: {req_err}")
+            return False
+        except Exception as e:
+            print(f"[BREVO UNEXPECTED ERROR] Failed to send '{subject}' to {clean_email}: {e}")
+            return False
+
+    # 2. Resend HTTPS API
     payload = {
-        "from": mail_from.strip(),
+        "from": mail_from,
         "to": [clean_email],
         "subject": subject,
         "html": html_content
@@ -129,7 +185,7 @@ def send_email(to_email: str, subject: str, html_content: str, text_content: str
         payload["text"] = text_content.strip()
 
     headers = {
-        "Authorization": f"Bearer {resend_api_key.strip()}",
+        "Authorization": f"Bearer {resend_api_key}",
         "Content-Type": "application/json"
     }
 
@@ -141,7 +197,7 @@ def send_email(to_email: str, subject: str, html_content: str, text_content: str
                 email_id = res_data.get("id", "N/A")
             except Exception:
                 email_id = "N/A"
-            print(f"[RESEND EMAIL DELIVERED] Successfully sent '{subject}' to {clean_email} (ID: {email_id})")
+            print(f"[RESEND HTTPS DELIVERED] Successfully sent '{subject}' to {clean_email} (ID: {email_id})")
             return True
         else:
             try:
@@ -149,16 +205,10 @@ def send_email(to_email: str, subject: str, html_content: str, text_content: str
                 err_msg = err_data.get("message") or err_data.get("name") or str(err_data)
             except Exception:
                 err_msg = response.text[:200]
-            print(f"[RESEND EMAIL ERROR] Resend API failed (Status {response.status_code}): {err_msg}")
+            print(f"[RESEND HTTPS ERROR] Resend API failed (Status {response.status_code}): {err_msg}")
             return False
-    except requests.exceptions.Timeout:
-        print(f"[RESEND EMAIL TIMEOUT] Request timed out while sending '{subject}' to {clean_email}")
-        return False
-    except requests.exceptions.RequestException as req_err:
-        print(f"[RESEND EMAIL NETWORK ERROR] Connection error sending '{subject}' to {clean_email}: {req_err}")
-        return False
     except Exception as e:
-        print(f"[RESEND EMAIL UNEXPECTED ERROR] Failed to send '{subject}' to {clean_email}: {e}")
+        print(f"[RESEND ERROR] Failed to send '{subject}' to {clean_email}: {e}")
         return False
 
 
