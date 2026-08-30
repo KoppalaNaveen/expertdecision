@@ -84,8 +84,9 @@ EDRP is an enterprise-grade platform for creating, evaluating, reviewing, approv
    - Formal Support Tickets (SUP-xxxx) with priority SLAs (1-Hour Resolution for Urgent requests).
 
 === Response Guidelines ===
-- Always provide accurate, structured, and enterprise-grade answers.
-- Use clean Markdown with bold titles, bullet points, structured comparison tables, code spans, and clickable links [DEC-xx](/decisions/xx).
+- Always provide accurate, clear, and professional plain-text answers.
+- Do NOT use markdown decorative syntax such as asterisks (** or *), blockquotes (> ❝), backticks (`), hashtags (###), emojis, or markdown pipe tables (|---|).
+- Format all replies in clean, natural, professional plain text with standard paragraphs and simple clean bullet points (-).
 - When asked to create, draft, write, or generate problem statements or alternatives, generate rich, professional enterprise content ready to use.
 """
 
@@ -95,11 +96,129 @@ Your mission is to answer user questions strictly grounded in the institutional 
 When answering:
 1. Ground your response in the actual institutional decision records (e.g. DEC-45, DEC-12, etc.).
 2. Detail the exact problem statements, approved budgets/costs, evaluated alternatives with Pros/Cons and feasibility scores, and reviewer conclusions.
-3. Structure your reply cleanly using Markdown with bold headings, bullet points, structured comparison tables, and direct links like [Open Decision DEC-xx Details & Replay](/decisions/xx).
-4. If a decision is not found in the repository, summarize what is available in related departments/categories and suggest creating a new decision or checking other keywords.
+3. Do NOT use markdown decorative syntax such as asterisks (** or *), blockquotes (> ❝), backticks, hashtags (###), emojis, or markdown pipe tables.
+4. Structure your reply in clean, readable plain text with standard paragraphs and clean bullet points (-).
 """
 
+def _clean_ai_output_text(text: str) -> str:
+    """
+    Cleans raw AI generated output so it looks like a normal, natural, professional human response:
+    - Strips quote brackets and decorative blockquotes (> ❝, ❞, etc.)
+    - Strips asterisks (**, *), underscores (__), and backticks (`)
+    - Strips markdown heading hashes (###, ####, etc.)
+    - Strips decorative emojis
+    - Converts markdown table syntax into clean, readable text lines
+    - Preserves clean paragraphs and standard bullet points (-)
+    """
+    if not text:
+        return ""
+    
+    lines = text.splitlines()
+    cleaned_lines = []
+    
+    in_table = False
+    
+    for line in lines:
+        raw = line.strip()
+        
+        # Check if line is a markdown table separator (e.g. |---|:---:|)
+        if re.match(r'^[\|\s\:\-]+$', raw) and raw.count('|') >= 2:
+            in_table = True
+            continue
+            
+        # Check if line is a markdown table row (e.g. | Option | Cost | ...)
+        if raw.startswith('|') and raw.endswith('|'):
+            cells = [c.strip() for c in raw.strip('|').split('|')]
+            clean_cells = []
+            for c in cells:
+                c_clean = re.sub(r'[*_`#~❝❞"\'\>]+', '', c).strip()
+                c_clean = re.sub(r'[\U00010000-\U0010ffff\u2600-\u27ff\u2300-\u23ff\u2b50\u2b55\ufe0f]', '', c_clean).strip()
+                clean_cells.append(c_clean)
+            
+            if not in_table and any(h in clean_cells[0].lower() for h in ["option", "title", "metric", "item"]):
+                in_table = True
+                continue
+            else:
+                if len(clean_cells) >= 4:
+                    opt_title = clean_cells[0]
+                    cost = clean_cells[1] if len(clean_cells) > 1 else ""
+                    score = clean_cells[2] if len(clean_cells) > 2 else ""
+                    risk = clean_cells[3] if len(clean_cells) > 3 else ""
+                    rec = clean_cells[4] if len(clean_cells) > 4 else ""
+                    
+                    row_text = f"Option {opt_title}" if not opt_title.lower().startswith("option") else opt_title
+                    if rec and "rec" in rec.lower():
+                        row_text += " [Recommended]"
+                    row_text += f"\n- Estimated Cost: {cost} | Feasibility: {score} | Risk Level: {risk}"
+                    cleaned_lines.append(row_text)
+                    continue
+                else:
+                    cleaned_lines.append(" - ".join(c for c in clean_cells if c))
+                    continue
+
+        in_table = False
+        
+        # Remove blockquotes > ❝ or > or ❝ or ❞
+        raw = re.sub(r'^[ \t]*>[ \t]*[❝“"\']?[ \t]*', '', raw)
+        raw = raw.replace("❝", "").replace("❞", "").replace("“", "\"").replace("”", "\"")
+        
+        # Remove header hashes (###, ####, ##, #)
+        raw = re.sub(r'^[ \t]*#{1,6}[ \t]*', '', raw)
+        
+        # Remove decorative emojis
+        raw = re.sub(r'[\U00010000-\U0010ffff\u2600-\u27ff\u2300-\u23ff\u2b50\u2b55\ufe0f]', '', raw)
+        
+        # Remove bold / italics asterisks and underscores (**word**, *word*, etc.)
+        raw = re.sub(r'\*\*(.*?)\*\*', r'\1', raw)
+        raw = re.sub(r'(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)', r'\1', raw)
+        raw = re.sub(r'\_\_(.*?)\_\_', r'\1', raw)
+        
+        # Remove backticks (`code`)
+        raw = re.sub(r'`([^`]+)`', r'\1', raw)
+        
+        # Replace special dot separators '·' with '|'
+        raw = raw.replace('·', '|')
+        
+        # Normalize bullet points (* Item -> - Item, • Item -> - Item)
+        raw = re.sub(r'^[ \t]*[\*•][ \t]+', '- ', raw)
+        raw = re.sub(r'^[ \t]*\*[ \t]*\*[ \t]*', '- ', raw)
+        
+        # Strip extra whitespace
+        raw = re.sub(r'[ \t]+', ' ', raw).strip()
+        
+        cleaned_lines.append(raw)
+
+    result = "\n".join(cleaned_lines)
+    result = re.sub(r'\n{3,}', '\n\n', result).strip()
+    return result
+
 def generate_ai_response(
+    user_message: str,
+    user_name: str = "User",
+    user_id: Optional[int] = None,
+    conversation_history: List[dict] = None,
+    page_context: Optional[str] = None,
+    page_title: Optional[str] = None,
+    page_url: Optional[str] = None,
+    mode: Optional[str] = "standard",
+    use_knowledge_repository: Optional[bool] = False
+) -> Dict[str, Any]:
+    res = _generate_ai_response_internal(
+        user_message=user_message,
+        user_name=user_name,
+        user_id=user_id,
+        conversation_history=conversation_history,
+        page_context=page_context,
+        page_title=page_title,
+        page_url=page_url,
+        mode=mode,
+        use_knowledge_repository=use_knowledge_repository
+    )
+    if res and isinstance(res, dict) and "reply" in res:
+        res["reply"] = _clean_ai_output_text(res["reply"])
+    return res
+
+def _generate_ai_response_internal(
     user_message: str,
     user_name: str = "User",
     user_id: Optional[int] = None,
@@ -474,7 +593,7 @@ def _call_groq_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], c
                 messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
 
-    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192", "llama3-8b-8192", "gemma2-9b-it"]
     for model in models:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -1083,38 +1202,33 @@ def _generate_tailored_decision_description(title: str, category: str = "General
             {"title": "Minimal Policy-Only Update", "cost": 8000, "score": 4, "risk": "High", "pros": "Lowest direct expense.", "cons": "Fails to provide automated tooling needed for long-term scalability."}
         ]
 
-    # Assemble structured response
+    # Assemble clean plain-text response
     output_lines = [
-        f"### 🎯 Tailored Decision Formulation: **\"{t_clean}\"**\n",
-        f"- **Category**: `{c_clean}` · **Department**: `{d_clean}` · **Target Priority**: `High`\n",
-        "#### 1. Executive Problem Statement & Rationale *(Ready to paste into EDRP)*:",
-        f"> ❝ *{exec_summary}* ❞\n",
-        "#### 2. Root Operational Challenges & Friction:",
+        f"Tailored Decision Formulation: \"{t_clean}\"\n",
+        f"- Category: {c_clean} | Department: {d_clean} | Target Priority: High\n",
+        "1. Executive Problem Statement & Rationale (Ready to paste into EDRP):",
+        f"{exec_summary}\n",
+        "2. Root Operational Challenges & Friction:",
         f"- {friction}\n",
-        "#### 3. Strategic Risks & Business Exposure:",
+        "3. Strategic Risks & Business Exposure:",
         f"- {risks}\n",
-        "#### 4. Measurable Success Criteria & Target KPIs:",
+        "4. Measurable Success Criteria & Target KPIs:",
         f"- {kpis}\n",
-        "#### 5. Recommended Alternative Evaluation Matrix (3 Options):",
-        "| Option | Estimated Cost | Feasibility | Risk Level | Recommendation |",
-        "|---|:---:|:---:|:---:|:---:|"
+        "5. Recommended Alternative Evaluation Options:"
     ]
 
     for idx, alt in enumerate(alts, 1):
-        rec_str = "⭐ **Recommended**" if idx == 1 else "Viable Alternative"
-        output_lines.append(f"| **{idx}. {alt['title']}** | `${alt['cost']:,}` | `{alt['score']}/10` | `{alt['risk']}` | {rec_str} |")
-
-    output_lines.append("\n**Detailed Pros & Cons Breakdown:**")
-    for idx, alt in enumerate(alts, 1):
-        output_lines.append(f"- **Option {idx}: {alt['title']}**")
-        output_lines.append(f"  * **Pros**: {alt['pros']}")
-        output_lines.append(f"  * **Cons**: {alt['cons']}")
+        rec_tag = " [Recommended]" if idx == 1 else ""
+        output_lines.append(f"Option {idx}: {alt['title']}{rec_tag}")
+        output_lines.append(f"- Estimated Cost: ${alt['cost']:,} | Feasibility: {alt['score']}/10 | Risk Level: {alt['risk']}")
+        output_lines.append(f"- Pros: {alt['pros']}")
+        output_lines.append(f"- Cons: {alt['cons']}\n")
 
     output_lines.extend([
-        "\n💡 **Next Steps in EDRP**:",
-        "1. Click **'Create Decision'** in the sidebar navigation.",
-        "2. Copy and paste the **Executive Problem Statement** above into the *Problem Statement* field.",
-        "3. Add the 3 evaluated alternatives into the *Alternative Evaluation Matrix* and click **'Submit Decision'** to start the approval review chain."
+        "Next Steps in EDRP:",
+        "1. Click 'Create Decision' in the sidebar navigation.",
+        "2. Copy and paste the Executive Problem Statement above into the Problem Statement field.",
+        "3. Add the 3 evaluated alternatives into the Alternative Evaluation Matrix and click 'Submit Decision' to start the approval review chain."
     ])
 
     return "\n".join(output_lines)

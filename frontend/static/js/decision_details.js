@@ -15,16 +15,21 @@ async function fetchDecisionDetails() {
     try {
         const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
         let response = await fetch(`/api/decisions/${DECISION_ID}?user_id=${userIdParam}`);
-        if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
-            response = await fetch(`${API_URL}/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        if (!response.ok) {
+            let errorMsg = "Failed to load decision details";
+            try {
+                const errData = await response.json();
+                errorMsg = errData.detail || errorMsg;
+            } catch (_) {}
+            throw new Error(errorMsg);
         }
-        if (!response.ok) throw new Error("Failed to load decision");
         
-        currentDecision = await response.json();
+        currentDecision = await response.json().catch(() => null);
+        if (!currentDecision) throw new Error("Invalid response format received from decision API");
         renderDecisionDetails();
         loadHistory();
     } catch (error) {
-        showToast("Danger", error.message);
+        showToast("Danger", error.message || "Failed to load decision");
     }
 }
 
@@ -32,11 +37,9 @@ async function fetchDecisionDetailsSilent() {
     try {
         const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
         let response = await fetch(`/api/decisions/${DECISION_ID}?user_id=${userIdParam}`);
-        if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
-            response = await fetch(`${API_URL}/decisions/${DECISION_ID}?user_id=${userIdParam}`);
-        }
         if (!response.ok) return;
-        const newData = await response.json();
+        const newData = await response.json().catch(() => null);
+        if (!newData) return;
         
         const hasChanged = JSON.stringify(newData.reviews) !== JSON.stringify(currentDecision?.reviews) || newData.status !== currentDecision?.status;
         currentDecision = newData;
@@ -394,13 +397,21 @@ async function updateStatus() {
 async function fetchAlternatives() {
     try {
         const response = await fetch(`${API_URL}/alternatives/decision/${DECISION_ID}`);
-        if (!response.ok) throw new Error("Failed to load alternatives");
+        if (!response.ok) {
+            let errorMsg = "Failed to load alternatives";
+            try {
+                const errData = await response.json();
+                errorMsg = errData.detail || errorMsg;
+            } catch (_) {}
+            console.warn("Alternatives load notice:", errorMsg);
+            return;
+        }
         
-        currentAlternatives = await response.json();
+        currentAlternatives = await response.json().catch(() => []);
         renderAlternativesTable();
         renderRationale();
     } catch (error) {
-        showToast("Danger", error.message);
+        console.warn("Alternatives load error:", error);
     }
 }
 
@@ -796,11 +807,19 @@ let threadsCache = [];
 async function loadThreads() {
     try {
         const res = await fetch(`${API_URL}/decisions/${DECISION_ID}/threads`);
-        if (!res.ok) throw new Error("Failed to load threads");
-        threadsCache = await res.json();
+        if (!res.ok) {
+            let errorMsg = "Failed to load threads";
+            try {
+                const errData = await res.json();
+                errorMsg = errData.detail || errorMsg;
+            } catch (_) {}
+            console.warn("Threads load notice:", errorMsg);
+            return;
+        }
+        threadsCache = await res.json().catch(() => []);
         renderThreadsList();
     } catch (err) {
-        showToast("Danger", err.message);
+        console.warn("Error loading discussion threads:", err);
     }
 }
 
