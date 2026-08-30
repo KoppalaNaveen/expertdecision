@@ -298,13 +298,13 @@ def _generate_ai_response_internal(
     if data_response is not None:
         return data_response
 
-    # 2b. Direct Decision Description / Rationale generator for specific decision title & category
-    is_gen_desc = (
-        ("generate" in clean_msg.lower() or "create" in clean_msg.lower() or "draft" in clean_msg.lower() or "suggest" in clean_msg.lower() or "auto-generate" in clean_msg.lower()) and
-        ("description" in clean_msg.lower() or "problem statement" in clean_msg.lower() or "rationale" in clean_msg.lower()) and
-        ("titled" in clean_msg.lower() or "under category" in clean_msg.lower() or "for decision" in clean_msg.lower())
+    # 2b. Direct Decision Component Generator for specific decision title & category
+    q_lower = clean_msg.lower()
+    is_generative_request = (
+        any(w in q_lower for w in ["generate", "create", "draft", "suggest", "auto-generate", "write", "propose", "recommend"]) and
+        any(w in q_lower for w in ["description", "problem statement", "rationale", "alternative", "options", "risk", "kpi", "metric", "decision for", "formulate", "titled", "category", "department"])
     )
-    if is_gen_desc:
+    if is_generative_request:
         title_m = re.search(r"titled\s+['\"]([^'\"]+)['\"]", clean_msg, re.IGNORECASE)
         cat_m = re.search(r"category\s+['\"]([^'\"]+)['\"]", clean_msg, re.IGNORECASE)
         dept_m = re.search(r"department\s+['\"]([^'\"]+)['\"]", clean_msg, re.IGNORECASE)
@@ -317,7 +317,19 @@ def _generate_ai_response_internal(
         target_dept = dept_m.group(1).strip() if dept_m else "Operations"
 
         if target_title:
-            gen_paragraph = _generate_tailored_decision_description(target_title, target_cat, target_dept)
+            intent_type = "description"
+            if any(w in q_lower for w in ["description", "problem statement", "rationale", "context"]):
+                intent_type = "description"
+            elif any(w in q_lower for w in ["alternative", "option"]):
+                intent_type = "alternatives"
+            elif any(w in q_lower for w in ["risk", "challenge", "friction"]):
+                intent_type = "risks"
+            elif any(w in q_lower for w in ["kpi", "metric", "success"]):
+                intent_type = "kpis"
+            elif any(w in q_lower for w in ["full proposal", "complete formulation", "all sections"]):
+                intent_type = "full"
+
+            gen_paragraph = _generate_tailored_decision_description(target_title, target_cat, target_dept, intent_type=intent_type)
             return {
                 "reply": gen_paragraph,
                 "suggested_actions": ["Evaluate alternatives", "Check feasibility score", "View approval workflow"],
@@ -613,7 +625,7 @@ def _call_groq_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], c
                 },
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=12.0) as resp:
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     choices = data.get("choices", [])
@@ -1135,7 +1147,7 @@ def _answer_decision_data_query(query: str, user_name: str, db_context: Dict[str
     return None
 
 
-def _generate_tailored_decision_description(title: str, category: str = "General", department: str = "Operations") -> str:
+def _generate_tailored_decision_description(title: str, category: str = "General", department: str = "Operations", intent_type: str = "description") -> str:
     t_clean = (title or "Strategic Business Initiative").strip()
     c_clean = (category or "General").strip()
     d_clean = (department or "Operations").strip()
@@ -1202,7 +1214,27 @@ def _generate_tailored_decision_description(title: str, category: str = "General
             {"title": "Minimal Policy-Only Update", "cost": 8000, "score": 4, "risk": "High", "pros": "Lowest direct expense.", "cons": "Fails to provide automated tooling needed for long-term scalability."}
         ]
 
-    # Assemble clean plain-text response
+    # Return ONLY what was requested
+    if intent_type == "description":
+        return f"{exec_summary}\n\n{friction}"
+
+    if intent_type == "alternatives":
+        lines = [f"Recommended Alternatives for \"{t_clean}\":\n"]
+        for idx, alt in enumerate(alts, 1):
+            rec_tag = " [Recommended]" if idx == 1 else ""
+            lines.append(f"Option {idx}: {alt['title']}{rec_tag}")
+            lines.append(f"- Estimated Cost: ${alt['cost']:,} | Feasibility: {alt['score']}/10 | Risk Level: {alt['risk']}")
+            lines.append(f"- Pros: {alt['pros']}")
+            lines.append(f"- Cons: {alt['cons']}\n")
+        return "\n".join(lines).strip()
+
+    if intent_type == "risks":
+        return f"Operational Challenges:\n- {friction}\n\nStrategic Risks:\n- {risks}"
+
+    if intent_type == "kpis":
+        return f"Target KPIs & Success Criteria:\n- {kpis}"
+
+    # Full formulation
     output_lines = [
         f"Tailored Decision Formulation: \"{t_clean}\"\n",
         f"- Category: {c_clean} | Department: {d_clean} | Target Priority: High\n",
@@ -1239,12 +1271,12 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
     # lifecycle states, approval tiers, audit trails, and troubleshooting steps.
     q = query.lower().strip()
 
-    # --- Direct Decision Description / Problem Statement Generation for specific title ---
-    is_gen_desc = (
-        ("generate" in q or "create" in q or "draft" in q or "write" in q or "suggest" in q or "auto-generate" in q) and
-        ("description" in q or "problem statement" in q or "rationale" in q or "decision titled" in q)
+    # --- Direct Decision Component Generation for specific title ---
+    is_generative_req = (
+        any(w in q for w in ["generate", "create", "draft", "write", "suggest", "auto-generate", "propose", "recommend"]) and
+        any(w in q for w in ["description", "problem statement", "rationale", "alternative", "options", "risk", "kpi", "metric", "decision titled", "for decision", "formulate"])
     )
-    if is_gen_desc:
+    if is_generative_req:
         title_m = re.search(r"titled\s+['\"]([^'\"]+)['\"]", query, re.IGNORECASE)
         cat_m = re.search(r"category\s+['\"]([^'\"]+)['\"]", query, re.IGNORECASE)
         dept_m = re.search(r"department\s+['\"]([^'\"]+)['\"]", query, re.IGNORECASE)
@@ -1259,7 +1291,19 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
         target_dept = dept_m.group(1).strip() if dept_m else "Operations"
 
         if target_title:
-            gen_paragraph = _generate_tailored_decision_description(target_title, target_cat, target_dept)
+            intent_type = "description"
+            if any(w in q for w in ["description", "problem statement", "rationale", "context"]):
+                intent_type = "description"
+            elif any(w in q for w in ["alternative", "option"]):
+                intent_type = "alternatives"
+            elif any(w in q for w in ["risk", "challenge", "friction"]):
+                intent_type = "risks"
+            elif any(w in q for w in ["kpi", "metric", "success"]):
+                intent_type = "kpis"
+            elif any(w in q for w in ["full proposal", "complete formulation", "all sections"]):
+                intent_type = "full"
+
+            gen_paragraph = _generate_tailored_decision_description(target_title, target_cat, target_dept, intent_type=intent_type)
             return {
                 "reply": gen_paragraph,
                 "suggested_actions": ["Evaluate alternatives", "Check feasibility score", "View approval workflow"],
