@@ -408,7 +408,7 @@ class UserService:
         db.query(VerificationCode).filter(
             VerificationCode.email == clean_email,
             VerificationCode.purpose == purpose
-        ).delete(synchronize_session=False)
+        ).delete(synchronize_session='fetch')
         
         vc = VerificationCode(
             email=clean_email,
@@ -417,17 +417,18 @@ class UserService:
             purpose=purpose
         )
         db.add(vc)
+        db.flush()
+
+        # Dispatch verification email via Resend HTTPS and verify acceptance
+        send_success = send_otp_email(clean_email, code)
+        if not send_success:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to send verification email. Please check your email address or email service configuration."
+            )
+
         db.commit()
-
-        # Send email in background thread to prevent HTTP timeouts
-        def _async_send(target_email, otp_code):
-            try:
-                send_otp_email(target_email, otp_code)
-            except Exception as e:
-                print(f"Async OTP send note: {e}")
-
-        threading.Thread(target=_async_send, args=(clean_email, code), daemon=True).start()
-            
         return {"message": "Verification code sent successfully"}
         
     @staticmethod

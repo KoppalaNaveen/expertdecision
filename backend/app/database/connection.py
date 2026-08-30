@@ -138,6 +138,8 @@ def ensure_user_schema_columns():
 
     # Ensure baseline roles exist if table is completely empty
     try:
+        from app.models.user import User
+        from app.models.team import Team
         from app.models.role import Role
         from app.models.category import Category
         inspector = inspect(engine)

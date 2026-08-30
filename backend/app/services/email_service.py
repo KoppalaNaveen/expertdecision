@@ -1,18 +1,11 @@
 import os
-import smtplib
-import socket
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 from dotenv import load_dotenv
 import dns.resolver
 
 load_dotenv()
 
-SMTP_EMAIL = os.getenv("SMTP_EMAIL")
-_raw_password = os.getenv("SMTP_APP_PASSWORD", "")
-SMTP_APP_PASSWORD = _raw_password.replace(" ", "") if _raw_password else ""
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
+RESEND_API_URL = "https://api.resend.com/emails"
 
 # Global toggles to silence unsolicited automated/routine emails
 ENABLE_ROUTINE_EMAILS = os.getenv("ENABLE_ROUTINE_EMAILS", "false").strip().lower() in ("true", "1", "yes")
@@ -42,10 +35,11 @@ _BLOCKED_TLDS = (
     ".mock", ".fake", ".dummy", ".sample", ".localdomain", ".lan"
 )
 
+
 def _has_valid_mx_records(domain: str) -> bool:
     """
     Checks if a domain has valid, active Mail Exchange (MX) DNS records.
-    Prevents SMTP transmission to non-existent or unresolvable domains (which cause Mail Delivery Subsystem bounce emails).
+    Prevents email transmission to non-existent or unresolvable domains.
     """
     d = (domain or "").strip().lower()
     if not d or "." not in d:
@@ -72,10 +66,10 @@ def _has_valid_mx_records(domain: str) -> bool:
     _DOMAIN_MX_CACHE[d] = False
     return False
 
+
 def is_deliverable_email(email_str: str) -> bool:
     """
     Validates if an email address has a valid recipient structure AND a resolvable, deliverable mail domain.
-    Prevents Gmail Mail Delivery Subsystem DNS timeout / DEADLINE_EXCEEDED bounces.
     """
     if not email_str or not isinstance(email_str, str):
         return False
@@ -97,108 +91,163 @@ def is_deliverable_email(email_str: str) -> bool:
         return False
     return _has_valid_mx_records(domain_part)
 
-def send_otp_email(to_email: str, otp: str):
+
+def send_email(to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
     """
-    Sends a 6-digit OTP to the user's email address using Gmail SMTP.
-    Fallback prints OTP to console if SMTP credentials are missing, deliverability fails, or server connection fails.
+    Core reusable email dispatch service using the official Resend HTTPS API (POST https://api.resend.com/emails).
+    Strictly reads RESEND_API_KEY and MAIL_FROM from environment variables.
+    Never exposes secrets in logs or responses.
     """
-    if not is_deliverable_email(to_email):
-        print(f"[OTP LOG - MOCK RECIPIENT] OTP Code for {to_email}: {otp}")
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
+        print(f"[RESEND EMAIL ERROR] Invalid recipient email address: '{to_email}'")
+        return False
+
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    mail_from = os.getenv("MAIL_FROM")
+
+    if not resend_api_key or not resend_api_key.strip():
+        print("[RESEND EMAIL CONFIG ERROR] RESEND_API_KEY is not configured in environment variables.")
+        return False
+
+    if not mail_from or not mail_from.strip():
+        print("[RESEND EMAIL CONFIG ERROR] MAIL_FROM is not configured in environment variables.")
+        return False
+
+    # Block mock / non-deliverable email domains from triggering real API calls
+    if not is_deliverable_email(clean_email):
+        print(f"[RESEND EMAIL - MOCK RECIPIENT SKIPPED] Prevented sending '{subject}' to dummy address: {clean_email}")
         return True
 
-    if not SMTP_EMAIL or not SMTP_APP_PASSWORD or "your_" in SMTP_EMAIL.lower() or "your_" in SMTP_APP_PASSWORD.lower():
-        print(f"[OTP LOG] OTP Code for {to_email}: {otp}")
-        return True
+    payload = {
+        "from": mail_from.strip(),
+        "to": [clean_email],
+        "subject": subject,
+        "html": html_content
+    }
+    if text_content and text_content.strip():
+        payload["text"] = text_content.strip()
 
-    subject = "EDRP Registration Verification"
+    headers = {
+        "Authorization": f"Bearer {resend_api_key.strip()}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(RESEND_API_URL, headers=headers, json=payload, timeout=10.0)
+        if response.status_code in (200, 201):
+            try:
+                res_data = response.json()
+                email_id = res_data.get("id", "N/A")
+            except Exception:
+                email_id = "N/A"
+            print(f"[RESEND EMAIL DELIVERED] Successfully sent '{subject}' to {clean_email} (ID: {email_id})")
+            return True
+        else:
+            try:
+                err_data = response.json()
+                err_msg = err_data.get("message") or err_data.get("name") or str(err_data)
+            except Exception:
+                err_msg = response.text[:200]
+            print(f"[RESEND EMAIL ERROR] Resend API failed (Status {response.status_code}): {err_msg}")
+            return False
+    except requests.exceptions.Timeout:
+        print(f"[RESEND EMAIL TIMEOUT] Request timed out while sending '{subject}' to {clean_email}")
+        return False
+    except requests.exceptions.RequestException as req_err:
+        print(f"[RESEND EMAIL NETWORK ERROR] Connection error sending '{subject}' to {clean_email}: {req_err}")
+        return False
+    except Exception as e:
+        print(f"[RESEND EMAIL UNEXPECTED ERROR] Failed to send '{subject}' to {clean_email}: {e}")
+        return False
+
+
+def send_otp_email(to_email: str, otp: str) -> bool:
+    """
+    Sends a 6-digit OTP to the user's email address using the Resend HTTPS API.
+    Returns True if successfully accepted by Resend, False otherwise.
+    """
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
+        return False
+
+    subject = "EDRP Email Verification Code"
     body_html = f"""
+    <!DOCTYPE html>
     <html>
-    <head></head>
-    <body style="font-family: sans-serif; font-size: 14px; color: #333;">
-        <p>Hello,</p>
-        <p>Thank you for registering on the Expert Decision Replay Platform.</p>
-        <p>Your verification code is: <strong>{otp}</strong></p>
-        <p>This code will expire in 2 minutes.</p>
-        <br>
-        <p>Best regards,<br>The EDRP Team</p>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6; background-color: #f8fafc; margin: 0; padding: 20px; }}
+            .card {{ max-width: 540px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }}
+            .header {{ background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #ffffff; padding: 24px; text-align: center; }}
+            .content {{ padding: 28px 24px; }}
+            .otp-box {{ background: #f0fdf4; border: 2px dashed #22c55e; border-radius: 8px; padding: 18px; text-align: center; margin: 20px 0; }}
+            .otp-code {{ font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #15803d; font-family: monospace; }}
+            .expiry-note {{ font-size: 12.5px; color: #64748b; margin-top: 6px; }}
+            .footer {{ border-top: 1px solid #f1f5f9; padding: 16px 24px; background: #f8fafc; font-size: 12px; color: #64748b; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="header">
+                <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #ffffff;">Expert Decision Replay Platform</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9; color: #cbd5e1;">Email Verification</p>
+            </div>
+            <div class="content">
+                <p style="font-size: 15px; margin-top: 0;">Hello,</p>
+                <p>Thank you for using the <strong>Expert Decision Replay Platform (EDRP)</strong>.</p>
+                <p>Please enter the following 6-digit verification code to verify your email address:</p>
+                
+                <div class="otp-box">
+                    <div class="otp-code">{otp}</div>
+                    <div class="expiry-note">⏱ This code will expire in <strong>2 minutes</strong>.</div>
+                </div>
+
+                <p style="font-size: 13px; color: #64748b;">
+                    If you did not request this verification code, you can safely ignore this email.
+                </p>
+            </div>
+            <div class="footer">
+                <p style="margin: 0;">&copy; 2026 Expert Decision Replay Platform (EDRP). All rights reserved.</p>
+            </div>
+        </div>
     </body>
     </html>
     """
-    body_text = f"Hello,\n\nThank you for registering on the Expert Decision Replay Platform.\n\nYour verification code is: {otp}\n\nThis code will expire in 2 minutes.\n\nBest regards,\nThe EDRP Team"
+    body_text = f"Hello,\n\nThank you for using the Expert Decision Replay Platform (EDRP).\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 2 minutes.\n\nIf you did not request this code, you can safely ignore this email.\n\nRegards,\nThe EDRP Team"
 
-    import email.utils
-    msg = MIMEMultipart("alternative")
-    msg['From'] = email.utils.formataddr(('EDRP Platform', SMTP_EMAIL))
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg['Date'] = email.utils.formatdate(localtime=True)
-    msg['Auto-Submitted'] = 'auto-generated'
-    msg['Reply-To'] = SMTP_EMAIL
-    
-    msg.attach(MIMEText(body_text, 'plain'))
-    msg.attach(MIMEText(body_html, 'html'))
+    return send_email(clean_email, subject, body_html, body_text)
 
-    try:
-        # Connect to Gmail SMTP server
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5)
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except Exception as e:
-        print(f"SMTP send note ({e}). Fallback [OTP LOG] OTP Code for {to_email}: {otp}")
-        return True
 
-def send_id_email(to_email: str, employee_id: str):
+def send_id_email(to_email: str, employee_id: str) -> bool:
     """
-    Sends the generated employee ID to the user's email address.
+    Sends the generated employee ID to the user's email address using Resend HTTPS.
     """
-    if not is_deliverable_email(to_email):
-        print(f"[ID LOG - MOCK RECIPIENT] Employee ID for {to_email}: {employee_id}")
-        return True
-
-    if not SMTP_EMAIL or not SMTP_APP_PASSWORD:
-        print("SMTP_EMAIL or SMTP_APP_PASSWORD not set in .env; skipping email notification.")
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
         return False
 
-    subject = "EDRP Account Information"
+    subject = "EDRP Account Information - Login ID"
     body_html = f"""
+    <!DOCTYPE html>
     <html>
-    <head></head>
-    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-        <p>Hello,</p>
-        <p>Your registration for the Expert Decision Replay Platform has been processed.</p>
-        <p>Your generated Login ID is: <strong>{employee_id}</strong></p>
-        <p>Please keep this ID safe as you will need it to access your account.</p>
-        <br>
-        <p>Best regards,<br>The EDRP Team</p>
+    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;">
+        <div style="max-width: 540px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;">
+            <h2 style="margin-top: 0; color: #1e293b;">EDRP Account Information</h2>
+            <p>Hello,</p>
+            <p>Your registration for the Expert Decision Replay Platform has been processed.</p>
+            <p>Your generated Login ID is: <strong style="font-size: 18px; color: #2563eb;">{employee_id}</strong></p>
+            <p>Please keep this ID safe as you will need it along with your password to access your account.</p>
+            <br>
+            <p>Best regards,<br>The EDRP Team</p>
+        </div>
     </body>
     </html>
     """
     body_text = f"Hello,\n\nYour registration for the Expert Decision Replay Platform has been processed.\n\nYour generated Login ID is: {employee_id}\n\nPlease keep this ID safe as you will need it to access your account.\n\nBest regards,\nThe EDRP Team"
 
-    import email.utils
-    msg = MIMEMultipart("alternative")
-    msg['From'] = email.utils.formataddr(('EDRP Support', SMTP_EMAIL))
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg['Date'] = email.utils.formatdate(localtime=True)
-    msg['Auto-Submitted'] = 'auto-generated'
-    
-    msg.attach(MIMEText(body_text, 'plain'))
-    msg.attach(MIMEText(body_html, 'html'))
-
-    try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=3.0)
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except Exception as e:
-        print(f"Failed to send ID email: {e}")
-        return False
+    return send_email(clean_email, subject, body_html, body_text)
 
 
 def get_recipient_email(user) -> str:
@@ -221,10 +270,44 @@ def get_recipient_email(user) -> str:
     return None
 
 
+def _dispatch_resend_email(to_email: str, subject: str, body_html: str, body_text: str, sender_label: str = "EDRP Security") -> bool:
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
+        return False
+
+    # Block mock / non-deliverable email domains from triggering real API calls
+    if not is_deliverable_email(clean_email):
+        print(f"[{sender_label.upper()} - MOCK RECIPIENT SKIPPED] Prevented sending '{subject}' to dummy address: {clean_email}")
+        return True
+
+    # Essential account emails (OTP, password reset, account approval/credentials) are always permitted
+    is_essential_account_email = any(k.lower() in subject.lower() for k in [
+        "verification", "password reset", "credentials", "security notice", 
+        "approved", "verified", "account application", "account status", "registration"
+    ])
+
+    # If security and routine emails are disabled, silence non-essential background emails
+    if not is_essential_account_email and not ENABLE_SECURITY_EMAILS and not ENABLE_ROUTINE_EMAILS:
+        print(f"[{sender_label.upper()} - AUTOMATED EMAIL SILENCED] Prevented sending '{subject}' to {clean_email}")
+        return True
+
+    # Check system setting for non-essential emails
+    if not is_essential_account_email and not _is_email_enabled_in_settings():
+        print(f"[{sender_label.upper()} - EMAIL DISABLED IN SETTINGS] Skipping '{subject}' to {clean_email}")
+        return True
+
+    return send_email(
+        to_email=clean_email,
+        subject=subject,
+        html_content=body_html,
+        text_content=body_text
+    )
+
+
 def send_account_approved_email(to_email: str, employee_id: str, full_name: str = "", role_name: str = "", team_name: str = "", designation: str = "", approved_by: str = "Administrator") -> bool:
     """
     Automated Account Email -> Sent when an Administrator approves a pending account.
-    Notifies the user that their account is verified and approved, and includes their team, designation, and admin details.
+    Notifies the user that their account is verified and approved.
     """
     clean_email = (to_email or "").strip()
     if not clean_email or "@" not in clean_email:
@@ -249,7 +332,6 @@ def send_account_approved_email(to_email: str, employee_id: str, full_name: str 
             .header {{ background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: #ffffff; padding: 28px 24px; text-align: center; }}
             .content {{ padding: 28px 24px; }}
             .badge-box {{ background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 5px solid #16a34a; border-radius: 8px; padding: 16px; margin: 20px 0; }}
-            .btn-login {{ display: inline-block; background: #16a34a; color: #ffffff !important; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; margin: 16px 0; }}
             .footer {{ border-top: 1px solid #f1f5f9; padding: 16px 24px; background: #f8fafc; font-size: 12px; color: #64748b; text-align: center; }}
         </style>
     </head>
@@ -277,10 +359,6 @@ def send_account_approved_email(to_email: str, employee_id: str, full_name: str 
                     <div style="margin-bottom: 0;"><strong>Account Status:</strong> <span style="color: #16a34a; font-weight: 700;">✓ Verified & Active</span></div>
                 </div>
 
-                <div style="text-align: center;">
-                    <a href="http://localhost:5000/login" class="btn-login">Log In to Your Account →</a>
-                </div>
-
                 <p style="font-size: 13px; color: #64748b; margin-top: 16px;">
                     Use your <strong>Employee ID</strong> (or registered email) along with your password to access your dashboard.
                 </p>
@@ -304,84 +382,37 @@ Account Details:
 - Registered Email: {clean_email}
 - Status: Verified & Active
 
-Login URL: http://localhost:5000/login
-
 Please sign in using your Employee ID (or registered email) and password.
 
 Regards,
 EDRP Administration & Support Team
 """
 
-    return _dispatch_original_gmail(clean_email, subject, body_html, body_text, "EDRP Support")
-
-
-def _dispatch_original_gmail(to_email: str, subject: str, body_html: str, body_text: str, sender_label: str = "EDRP Security") -> bool:
-    clean_email = (to_email or "").strip()
-    if not clean_email or "@" not in clean_email:
-        return False
-
-    # Block mock / non-deliverable email domains from triggering real SMTP network calls
-    if not is_deliverable_email(clean_email):
-        print(f"[{sender_label.upper()} - MOCK RECIPIENT SKIPPED] Prevented sending '{subject}' to dummy address: {clean_email}")
-        return True
-
-    # Essential account emails (OTP, password reset, account approval/credentials) are always permitted
-    is_essential_account_email = any(k.lower() in subject.lower() for k in [
-        "verification", "password reset", "credentials", "security notice", 
-        "approved", "verified", "account application", "account status", "registration"
-    ])
-
-    # If security and routine emails are disabled, silence non-essential background emails
-    if not is_essential_account_email and not ENABLE_SECURITY_EMAILS and not ENABLE_ROUTINE_EMAILS:
-        print(f"[{sender_label.upper()} - AUTOMATED EMAIL SILENCED] Prevented sending '{subject}' to {clean_email}")
-        return True
-
-    # Check system setting for non-essential emails
-    if not is_essential_account_email and not _is_email_enabled_in_settings():
-        print(f"[{sender_label.upper()} - EMAIL DISABLED IN SETTINGS] Skipping '{subject}' to {clean_email}")
-        return True
-
-
-    if not SMTP_EMAIL or not SMTP_APP_PASSWORD or "your_" in str(SMTP_EMAIL).lower() or "your_" in str(SMTP_APP_PASSWORD).lower():
-        print(f"[{sender_label.upper()} LOG] To: {clean_email} | Subject: {subject}\n{body_text}")
-        return True
-
-    import email.utils
-    msg = MIMEMultipart("alternative")
-    msg['From'] = email.utils.formataddr((sender_label, SMTP_EMAIL))
-    msg['To'] = clean_email
-    msg['Subject'] = subject
-    msg['Date'] = email.utils.formatdate(localtime=True)
-    msg['Auto-Submitted'] = 'auto-generated'
-    msg.attach(MIMEText(body_text, 'plain'))
-    msg.attach(MIMEText(body_html, 'html'))
-
-    try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15)
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"[ORIGINAL GMAIL DELIVERED] Successfully sent '{subject}' to {clean_email}")
-        return True
-    except Exception as e:
-        print(f"[ORIGINAL GMAIL ERROR] Failed to send '{subject}' to {clean_email}: {e}")
-        return False
+    return _dispatch_resend_email(clean_email, subject, body_html, body_text, "EDRP Support")
 
 
 def _send_smtp_mail(to_email: str, subject: str, body: str) -> bool:
-    return _dispatch_original_gmail(
-        to_email=to_email,
+    """
+    Preserved for backwards compatibility with settings_api.py and support_api.py.
+    Sends mail via the unified Resend HTTPS API.
+    """
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
+        return False
+    if not is_deliverable_email(clean_email):
+        print(f"[EDRP SUPPORT - MOCK RECIPIENT SKIPPED] Prevented sending '{subject}' to dummy address: {clean_email}")
+        return True
+    return send_email(
+        to_email=clean_email,
         subject=subject,
-        body_html=f"<div style='font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;'><p>{body.replace(chr(10), '<br>')}</p></div>",
-        body_text=body,
-        sender_label="EDRP Support"
+        html_content=f"<div style='font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;'><p>{body.replace(chr(10), '<br>')}</p></div>",
+        text_content=body
     )
 
 
 def send_critical_security_email(to_email: str, recipient_name: str, subject: str, message: str) -> bool:
     """
-    Critical/System Email -> Sends security alerts and administrative notices via Original Gmail.
+    Critical/System Email -> Sends security alerts and administrative notices via Resend HTTPS.
     """
     if not ENABLE_SECURITY_EMAILS:
         print(f"[SECURITY EMAIL SILENCED] Security alert skipped for {to_email}: {subject}")
@@ -414,7 +445,7 @@ def send_critical_security_email(to_email: str, recipient_name: str, subject: st
     </html>
     """
     body_text = f"Hello{name_str},\n\n[SECURITY ALERT]\n{message}\n\nExpert Decision Replay Platform"
-    return _dispatch_original_gmail(clean_email, full_subject, body_html, body_text, "EDRP Security")
+    return _dispatch_resend_email(clean_email, full_subject, body_html, body_text, "EDRP Security")
 
 
 def send_password_changed_email(to_email: str, recipient_name: str, change_time: str = None) -> bool:
@@ -445,7 +476,7 @@ def send_password_changed_email(to_email: str, recipient_name: str, change_time:
                     <div style="margin-top: 4px;"><strong>Date & Time:</strong> {time_str}</div>
                 </div>
                 <p style="color: #dc2626; font-size: 13px;">
-                    <strong>Security Warning:</strong> If you did not perform this change, please immediately contact your Administrator or EDRP Support via the Support Center to secure your account.
+                    <strong>Security Warning:</strong> If you did not perform this change, please immediately contact your Administrator or EDRP Support to secure your account.
                 </p>
                 <br>
                 <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>EDRP Security Team</strong></p>
@@ -455,7 +486,7 @@ def send_password_changed_email(to_email: str, recipient_name: str, change_time:
     </html>
     """
     body_text = f"Hello{name_str},\n\nYour EDRP account password was changed successfully.\nDate/Time: {time_str}\n\nIf you did not perform this change, please contact your Administrator or Support immediately.\n\nRegards,\nEDRP Security Team"
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Security")
+    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Security")
 
 
 def send_password_reset_confirmation_email(to_email: str, recipient_name: str, reset_time: str = None) -> bool:
@@ -496,7 +527,7 @@ def send_password_reset_confirmation_email(to_email: str, recipient_name: str, r
     </html>
     """
     body_text = f"Hello{name_str},\n\nYour EDRP password was reset successfully.\nDate/Time: {time_str}\n\nIf you did not perform this action, please contact your Administrator immediately.\n\nRegards,\nEDRP Security Team"
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Security")
+    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Security")
 
 
 def send_new_login_email(to_email: str, recipient_name: str, login_time: str = None, device_info: str = "Web Browser Session", ip_address: str = None) -> bool:
@@ -540,7 +571,7 @@ def send_new_login_email(to_email: str, recipient_name: str, login_time: str = N
     </html>
     """
     body_text = f"Hello{name_str},\n\nA new login was detected on your EDRP account.\nTime: {time_str}\nPlatform: EDRP\nSession: {device_info}\n{ip_text}\nIf this was not you, change your password immediately.\n\nRegards,\nEDRP Security Team"
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Security")
+    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Security")
 
 
 def send_account_rejected_email(to_email: str, recipient_name: str, reason: str = None) -> bool:
@@ -580,7 +611,7 @@ def send_account_rejected_email(to_email: str, recipient_name: str, reason: str 
     </html>
     """
     body_text = f"Hello{name_str},\n\nYour EDRP account request was rejected.{reason_text}\n\nPlease contact your Organization Administrator for assistance.\n\nRegards,\nEDRP Administration Team"
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Administration")
+    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Administration")
 
 
 def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time: str = None) -> bool:
@@ -619,7 +650,7 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
     </html>
     """
     body_text = f"Hello{name_str},\n\nYour account on the Expert Decision Replay Platform has been permanently deleted.\nDate/Time: {time_str}\n\nRegards,\nThe EDRP Team"
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Team")
+    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Team")
 
 
 def send_role_changed_email(to_email: str, recipient_name: str, prev_role: str, new_role: str, prev_emp_id: str = None, new_emp_id: str = None, change_time: str = None) -> bool:
@@ -679,13 +710,13 @@ def send_role_changed_email(to_email: str, recipient_name: str, prev_role: str, 
     </html>
     """
     body_text = f"Hello{name_str},\n\nYour EDRP account role has been updated by an Administrator.\nPrevious Role: {prev_role}\nNew Role: {new_role}\n{id_text_section}Date/Time: {time_str}\n\nRegards,\nEDRP Administration Team"
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Administration")
+    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Administration")
 
 
 def send_decision_outcome_email(to_email: str, recipient_name: str, decision_id: int, decision_title: str, status: str, reviewer_name: str = "Reviewer", comments: str = None, decision_date: str = None) -> bool:
     """
     Decision Outcome Email -> Sent when a decision is Accepted (Approved) or Rejected by reviewers/managers.
-    Delivers directly to user's registered Gmail account.
+    Delivers directly to user's registered account via Resend HTTPS.
     """
     if not ENABLE_NOTIFICATION_EMAILS or not _is_email_enabled_in_settings():
         print(f"[DECISION OUTCOME LOG - SILENCED] Outcome email skipped for DEC-{decision_id} to {to_email}")
@@ -702,7 +733,6 @@ def send_decision_outcome_email(to_email: str, recipient_name: str, decision_id:
 
     theme_color = "#16a34a" if is_accepted else "#dc2626"
     bg_light = "#f0fdf4" if is_accepted else "#fef2f2"
-    border_color = "#bbf7d0" if is_accepted else "#fecaca"
     status_label = "Accepted & Approved" if is_accepted else "Rejected"
     header_title = "Decision Accepted" if is_accepted else "Decision Rejected"
     subject = f"[EDRP] Decision {status_label}: DEC-{decision_id} - {decision_title}"
@@ -769,7 +799,7 @@ def send_decision_outcome_email(to_email: str, recipient_name: str, decision_id:
                 <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>Expert Decision Replay Platform (EDRP)</strong></p>
             </div>
             <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 24px; font-size: 11px; color: #94a3b8; text-align: center;">
-                This is an automated notification sent to your registered Gmail account.
+                This is an automated notification sent to your registered account.
             </div>
         </div>
     </body>
@@ -777,7 +807,7 @@ def send_decision_outcome_email(to_email: str, recipient_name: str, decision_id:
     """
 
     body_text = f"Hello{name_str},\n\nYour decision DEC-{decision_id}: '{decision_title}' has been {status_label.upper()}.\n\nReviewed By: {reviewer_name}\nStatus: {status_label}\nDate/Time: {time_str}\n{comment_text}\nNext Steps: {next_step_msg}\n\nExpert Decision Replay Platform"
-    return _dispatch_original_gmail(clean_email, subject, body_html, body_text, "EDRP Decisions")
+    return _dispatch_resend_email(clean_email, subject, body_html, body_text, "EDRP Decisions")
 
 
 def send_account_status_email(to_email: str, recipient_name: str, is_active: bool, change_time: str = None) -> bool:
@@ -819,14 +849,13 @@ def send_account_status_email(to_email: str, recipient_name: str, is_active: boo
     </html>
     """
     body_text = f"Hello{name_str},\n\nYour EDRP account has been {status_label.lower()}.\nDate/Time: {time_str}\n\nRegards,\nEDRP Administration Team"
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Administration")
+    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Administration")
 
 
 def send_smtp_service_email(to_email: str, sender_name: str, subject: str, message: str, priority: str = "Medium", delivery_method: str = "smtp") -> bool:
     """
-    User-Initiated Email -> Sends an internal user-composed email using the explicitly chosen delivery method:
-    - delivery_method == "gmail": Uses Original Gmail delivery
-    - delivery_method == "smtp": Uses Project SMTP Email Service delivery
+    Preserved for backwards compatibility with email_api.py and existing callers.
+    Sends user-composed internal email via the unified Resend HTTPS API.
     """
     clean_email = (to_email or "").strip()
     if not clean_email or "@" not in clean_email:
@@ -870,7 +899,7 @@ def send_smtp_service_email(to_email: str, sender_name: str, subject: str, messa
                 <div class="content">{message}</div>
             </div>
             <div class="footer">
-                Expert Decision Replay Platform · Sent via {'Original Gmail' if is_gmail else 'Project SMTP Email Service'}
+                Expert Decision Replay Platform · Sent via Resend HTTPS API
             </div>
         </div>
     </body>
@@ -879,31 +908,7 @@ def send_smtp_service_email(to_email: str, sender_name: str, subject: str, messa
 
     body_text = f"Message from {sender_name} via {from_tag}\n\nSubject: {subject}\nPriority: {priority}\n\n{message}\n\n---\nExpert Decision Replay Platform"
 
-    if not SMTP_EMAIL or not SMTP_APP_PASSWORD or "your_" in str(SMTP_EMAIL).lower() or "your_" in str(SMTP_APP_PASSWORD).lower():
-        print(f"[{from_tag.upper()} LOG] To: {clean_email} | Subject: {full_subject}\n{message}")
-        return True
-
-    import email.utils
-    msg = MIMEMultipart("alternative")
-    msg['From'] = email.utils.formataddr((from_tag, SMTP_EMAIL))
-    msg['To'] = clean_email
-    msg['Subject'] = full_subject
-    msg['Date'] = email.utils.formatdate(localtime=True)
-    msg['Auto-Submitted'] = 'auto-generated'
-    msg.attach(MIMEText(body_text, 'plain'))
-    msg.attach(MIMEText(body_html, 'html'))
-
-    try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5)
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"[{from_tag.upper()} DELIVERED] Successfully sent email to {clean_email}")
-        return True
-    except Exception as e:
-        print(f"[{from_tag.upper()} ERROR] Failed to send email to {clean_email}: {e}")
-        return False
+    return send_email(clean_email, full_subject, body_html, body_text)
 
 
 def _is_email_enabled_in_settings() -> bool:
@@ -915,13 +920,13 @@ def _is_email_enabled_in_settings() -> bool:
         enabled = setting.enable_email_notifications if setting else True
         db.close()
         return enabled
-    except Exception as e:
+    except Exception:
         return True
 
 
 def send_notification_email(to_email: str, recipient_name: str, subject: str, message: str, notification_type: str = "Notification") -> bool:
     """
-    Sends a rich, production-grade HTML notification email to the user's real email address via SMTP.
+    Sends a rich HTML notification email to the user's registered email address via Resend HTTPS.
     """
     if not ENABLE_NOTIFICATION_EMAILS or not _is_email_enabled_in_settings():
         print(f"[NOTIFICATION LOG - SILENCED] Skipping email to {to_email} for subject: {subject}")
@@ -932,7 +937,7 @@ def send_notification_email(to_email: str, recipient_name: str, subject: str, me
         return False
 
     if not is_deliverable_email(clean_email):
-        print(f"[NOTIFICATION SMTP - MOCK RECIPIENT SKIPPED] Prevented sending to non-deliverable address: {clean_email}")
+        print(f"[NOTIFICATION RESEND - MOCK RECIPIENT SKIPPED] Prevented sending to non-deliverable address: {clean_email}")
         return True
 
     name_str = f" {recipient_name}" if recipient_name else ""
@@ -974,32 +979,7 @@ def send_notification_email(to_email: str, recipient_name: str, subject: str, me
     """
 
     body_text = f"Hello{name_str},\n\n[{notification_type}]\n{message}\n\n---\nExpert Decision Replay Platform"
-
-    if not SMTP_EMAIL or not SMTP_APP_PASSWORD or "your_" in str(SMTP_EMAIL).lower() or "your_" in str(SMTP_APP_PASSWORD).lower():
-        print(f"[NOTIFICATION SMTP LOG] To: {clean_email} | Subject: {full_subject}\n{message}")
-        return True
-
-    import email.utils
-    msg = MIMEMultipart("alternative")
-    msg['From'] = email.utils.formataddr(('EDRP Notifications', SMTP_EMAIL))
-    msg['To'] = clean_email
-    msg['Subject'] = full_subject
-    msg['Date'] = email.utils.formatdate(localtime=True)
-    msg['Auto-Submitted'] = 'auto-generated'
-    msg.attach(MIMEText(body_text, 'plain'))
-    msg.attach(MIMEText(body_html, 'html'))
-
-    try:
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5)
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"[NOTIFICATION SMTP DELIVERED] Successfully sent {notification_type} email to {clean_email}")
-        return True
-    except Exception as e:
-        print(f"SMTP notification delivery note: {e}")
-        return False
+    return send_email(clean_email, full_subject, body_html, body_text)
 
 
 def send_credentials_updated_email(
@@ -1014,7 +994,7 @@ def send_credentials_updated_email(
     is_old_inbox: bool = False
 ) -> bool:
     """
-    Dispatches security notifications when an Administrator updates a user's email or password.
+    Dispatches security notifications when an Administrator updates a user's email or password via Resend HTTPS.
     Sent to both old and new email addresses with updated credential details.
     """
     clean_email = (to_email or "").strip()
@@ -1047,7 +1027,6 @@ def send_credentials_updated_email(
         </li>
         """
         changes_text += f"\n- Password: Previous: [Overwritten] -> New Password: {new_password if new_password else '[Reset]'}"
-
 
     notice_box = ""
     if is_old_inbox and email_changed:
@@ -1111,5 +1090,4 @@ Regards,
 EDRP Platform Security Team
 """
 
-    return _dispatch_original_gmail(to_email, subject, body_html, body_text, "EDRP Security")
-
+    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Security")
