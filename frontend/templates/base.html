@@ -38,6 +38,53 @@
                 }
             } catch (e) {}
         })();
+
+        // Universal resilient global stubs for table paginators & filters (prevents "... is not defined" error before scripts load)
+        window.changeDecisionPageSize = window.changeDecisionPageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 5);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderTable === 'function') renderTable();
+        };
+        window.changePageSize = window.changePageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 12);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderTable === 'function') renderTable();
+        };
+        window.changeTeamPageSize = window.changeTeamPageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 5);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderTable === 'function') renderTable();
+        };
+        window.changeRolePageSize = window.changeRolePageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 5);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderTable === 'function') renderTable();
+        };
+        window.changeReviewPageSize = window.changeReviewPageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 5);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderTable === 'function') renderTable();
+        };
+        window.changeRepoPageSize = window.changeRepoPageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 9);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderCards === 'function') renderCards();
+        };
+        window.changeAuditPageSize = window.changeAuditPageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 10);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderTable === 'function') renderTable();
+        };
+        window.changeAltPageSize = window.changeAltPageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 8);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderView === 'function') renderView();
+        };
+        window.changeReplayPageSize = window.changeReplayPageSize || function(val) {
+            if (typeof rowsPerPage !== 'undefined') rowsPerPage = (val === 'all') ? 999999 : (parseInt(val, 10) || 6);
+            if (typeof currentPage !== 'undefined') currentPage = 1;
+            if (typeof renderCards === 'function') renderCards();
+        };
     </script>
 
     <!-- Custom CSS -->

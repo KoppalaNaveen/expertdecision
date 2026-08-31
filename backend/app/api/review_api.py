@@ -17,6 +17,10 @@ router = APIRouter(
 
 
 @router.post(
+    "",
+    response_model=ReviewResponse
+)
+@router.post(
     "/",
     response_model=ReviewResponse
 )
@@ -30,6 +34,10 @@ def create_review(
     )
 
 
+@router.get(
+    "",
+    response_model=List[ReviewResponse]
+)
 @router.get(
     "/",
     response_model=List[ReviewResponse]

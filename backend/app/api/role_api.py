@@ -22,6 +22,10 @@ router = APIRouter(
 # =====================================
 
 @router.get(
+    "",
+    response_model=list[RoleResponse]
+)
+@router.get(
     "/",
     response_model=list[RoleResponse]
 )
@@ -53,6 +57,11 @@ def get_role(
 # Create Role
 # =====================================
 
+@router.post(
+    "",
+    response_model=RoleResponse,
+    status_code=status.HTTP_201_CREATED
+)
 @router.post(
     "/",
     response_model=RoleResponse,

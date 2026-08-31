@@ -654,9 +654,19 @@ def api_support_ai_chat():
 @app.route("/api/users", methods=["GET"])
 def proxy_get_users():
     try:
-        users = get_cached_data("all_users", "/users/", ttl=30)
-        return jsonify(users), 200
+        resp = make_backend_request("GET", "/users/", timeout=5)
+        if resp is not None and resp.status_code == 200:
+            data = resp.json()
+            _DATA_CACHE["all_users"] = {"data": data, "ts": time.time()}
+            return jsonify(data), 200
+        cached = _DATA_CACHE.get("all_users")
+        if cached:
+            return jsonify(cached["data"]), 200
+        return jsonify([]), 200
     except Exception as e:
+        cached = _DATA_CACHE.get("all_users")
+        if cached:
+            return jsonify(cached["data"]), 200
         return jsonify([]), 200
 
 
@@ -664,9 +674,19 @@ def proxy_get_users():
 @app.route("/roles/", methods=["GET"])
 def proxy_get_roles():
     try:
-        roles = get_cached_data("all_roles", "/roles", ttl=120)
-        return jsonify(roles), 200
+        resp = make_backend_request("GET", "/roles", timeout=5)
+        if resp is not None and resp.status_code == 200:
+            data = resp.json()
+            _DATA_CACHE["all_roles"] = {"data": data, "ts": time.time()}
+            return jsonify(data), 200
+        cached = _DATA_CACHE.get("all_roles")
+        if cached:
+            return jsonify(cached["data"]), 200
+        return jsonify([]), 200
     except Exception as e:
+        cached = _DATA_CACHE.get("all_roles")
+        if cached:
+            return jsonify(cached["data"]), 200
         return jsonify([]), 200
 
 
@@ -675,9 +695,19 @@ def proxy_get_roles():
 @app.route("/api/teams", methods=["GET"])
 def proxy_get_teams():
     try:
-        teams = get_cached_data("all_teams", "/teams/", ttl=60)
-        return jsonify(teams), 200
+        resp = make_backend_request("GET", "/teams/", timeout=5)
+        if resp is not None and resp.status_code == 200:
+            data = resp.json()
+            _DATA_CACHE["all_teams"] = {"data": data, "ts": time.time()}
+            return jsonify(data), 200
+        cached = _DATA_CACHE.get("all_teams")
+        if cached:
+            return jsonify(cached["data"]), 200
+        return jsonify([]), 200
     except Exception as e:
+        cached = _DATA_CACHE.get("all_teams")
+        if cached:
+            return jsonify(cached["data"]), 200
         return jsonify([]), 200
 
 
@@ -816,6 +846,21 @@ def proxy_send_decision_reminder(decision_id):
         return jsonify({"detail": f"Decision reminder error: {e}"}), 500
 
 
+@app.route("/api/dashboard", methods=["GET"])
+@app.route("/api/dashboard/", methods=["GET"])
+@app.route("/api/dashboard/<int:user_id>", methods=["GET"])
+def api_dashboard(user_id=None):
+    if not user_id:
+        user_id = session.get("user_id", 1)
+    try:
+        response = make_backend_request("GET", f"/dashboard/{user_id}", timeout=5)
+        if response is not None and response.status_code == 200:
+            return jsonify(response.json()), 200
+        return jsonify({"detail": "Error loading dashboard"}), response.status_code if response else 500
+    except Exception as e:
+        return jsonify({"detail": str(e)}), 500
+
+
 @app.route("/api/<path:endpoint>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 def universal_api_proxy(endpoint):
     try:
@@ -865,36 +910,9 @@ def universal_api_proxy(endpoint):
         return jsonify({"detail": f"Proxy error on /{endpoint}: {e}"}), 500
 
 
-
-
-@app.route("/api/pending-approvals/action", methods=["POST"])
-def api_pending_approval_action():
-    if "token" not in session:
-        return jsonify({"detail": "Unauthorized"}), 401
-    
-    role = session.get("role_name", "User")
-    if role not in ("Administrator", "Admin"):
-        return jsonify({"detail": "Forbidden: Admin access required"}), 403
-
-    data = request.json or {}
-    data["actor_name"] = session.get("full_name", "Administrator")
-    action = data.get('action')
-    
-    try:
-        headers = {}
-        if "token" in session:
-            headers["Authorization"] = f"Bearer {session['token']}"
-        response = make_backend_request("POST", f"/users/{action}", json=data, headers=headers, timeout=10)
-        if response is not None:
-            return jsonify(response.json()), response.status_code
-        return jsonify({"detail": "Error processing approval action"}), 500
-    except Exception:
-        return jsonify({"detail": "Error processing approval action"}), 500
-
 # ===========================
 # API PROXIES (Email Verification & Password Reset)
 # ===========================
-from flask import jsonify
 
 @app.route("/api/send-code", methods=["POST"])
 def send_code():
@@ -953,6 +971,7 @@ def admin_create_user_proxy():
         response = make_backend_request("POST", "/users/admin_create", json=data, headers=headers, timeout=10)
         if response is not None:
             try:
+                invalidate_cache_key("all_users")
                 return jsonify(response.json()), response.status_code
             except Exception:
                 return jsonify({"detail": response.text or "Error creating user"}), response.status_code
@@ -961,46 +980,6 @@ def admin_create_user_proxy():
         return jsonify({"detail": "Backend connection error. Ensure the FastAPI backend is running."}), 500
     except ValueError:
         return jsonify({"detail": "Received an invalid response from the backend server."}), 500
-
-# ===========================
-# DASHBOARD & DECISION API PROXIES
-# ===========================
-
-@app.route("/api/dashboard", methods=["GET"])
-def api_dashboard():
-    if not session.get("logged_in"):
-        return jsonify({"detail": "Unauthorized"}), 401
-    user_id = session.get("user_id", 1)
-    try:
-        response = make_backend_request("GET", f"/dashboard/{user_id}", timeout=5)
-        if response is not None and response.status_code == 200:
-            return jsonify(response.json()), 200
-        return jsonify({"detail": "Error loading dashboard"}), response.status_code if response else 500
-    except Exception as e:
-        return jsonify({"detail": str(e)}), 500
-
-@app.route("/api/decisions", methods=["GET"])
-def api_decisions():
-    try:
-        params = {}
-        user_id = request.args.get("user_id") or session.get("user_id")
-        role_name = request.args.get("role_name") or session.get("role_name") or "Employee"
-        if user_id:
-            params["user_id"] = user_id
-        if role_name:
-            params["role_name"] = role_name
-
-        headers = {}
-        if "token" in session:
-            headers["Authorization"] = f"Bearer {session['token']}"
-
-        response = make_backend_request("GET", "/decisions/", params=params, headers=headers, timeout=5)
-        if response is not None and response.status_code == 200:
-            return jsonify(response.json()), 200
-        return jsonify([]), response.status_code if response is not None else 500
-    except Exception as e:
-        print(f"Error fetching decisions in frontend proxy: {e}")
-        return jsonify([]), 500
 
 # ===========================
 # NOTIFICATIONS PROXIES
@@ -1044,20 +1023,6 @@ def clear_all_notifications(user_id):
         return jsonify({"detail": "Error"}), 500
     except Exception as e:
         return jsonify({"detail": "Error"}), 500
-
-@app.route("/api/dashboard")
-def api_get_dashboard():
-    if "token" not in session or "user_id" not in session:
-        return jsonify({}), 401
-    headers = {"Authorization": f"Bearer {session['token']}"}
-    user_id = session["user_id"]
-    try:
-        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=5)
-        if response is not None and response.status_code == 200:
-            return jsonify(response.json()), 200
-        return jsonify({}), response.status_code if response is not None else 500
-    except Exception:
-        return jsonify({}), 500
 
 # ===========================
 # DASHBOARD
@@ -1297,7 +1262,7 @@ def reviews():
 
     user_id = session.get("user_id", "")
     headers = {"Authorization": f"Bearer {session['token']}"} if "token" in session else {}
-    initial_reviews = get_cached_data(f"reviews_{user_id}", f"/reviews/?reviewer_id={user_id}", ttl=20, headers=headers)
+    initial_reviews = get_cached_data(f"reviews_{user_id}", f"/reviews/?user_id={user_id}", ttl=20, headers=headers)
 
     return render_template("reviews.html", initial_reviews=initial_reviews)
 
@@ -1341,7 +1306,7 @@ def audit():
         return redirect(url_for("dashboard"))
 
     headers = {"Authorization": f"Bearer {session['token']}"} if "token" in session else {}
-    initial_audit_logs = get_cached_data("all_audit_logs", "/audit/logs", ttl=20, headers=headers)
+    initial_audit_logs = get_cached_data("all_audit_logs", "/audit/?limit=500", ttl=20, headers=headers)
 
     return render_template("audit.html", initial_audit_logs=initial_audit_logs)
 

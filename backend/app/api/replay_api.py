@@ -12,6 +12,10 @@ router = APIRouter(
 
 
 @router.post(
+    "",
+    response_model=ReplayResponse
+)
+@router.post(
     "/",
     response_model=ReplayResponse
 )
@@ -25,6 +29,10 @@ def create_replay(
     )
 
 
+@router.get(
+    "",
+    response_model=list[ReplayResponse]
+)
 @router.get(
     "/",
     response_model=list[ReplayResponse]

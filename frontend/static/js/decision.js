@@ -39,6 +39,16 @@ let dateRangeState = {
     endDate: null
 };
 
+function hydrateInstantData() {
+    if (window.INITIAL_DECISIONS && Array.isArray(window.INITIAL_DECISIONS) && window.INITIAL_DECISIONS.length > 0) {
+        allDecisions = window.INITIAL_DECISIONS;
+        populateFilterDropdownOptions();
+        renderTable();
+        return true;
+    }
+    return false;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
@@ -50,7 +60,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    fetchDecisions();
+    const wasHydrated = hydrateInstantData();
+    if (!wasHydrated) {
+        fetchDecisions();
+    } else {
+        setTimeout(() => { fetchDecisions(); }, 300);
+    }
 
     const searchInput = document.getElementById("searchInput");
     if (searchInput) {

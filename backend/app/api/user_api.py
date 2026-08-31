@@ -92,6 +92,11 @@ def pending_approval_action(action: AdminApprovalAction, db: Session = Depends(g
 # Register User (Legacy)
 # -------------------------------
 @router.get(
+    "",
+    response_model=List[UserResponse],
+    status_code=200
+)
+@router.get(
     "/",
     response_model=List[UserResponse],
     status_code=200

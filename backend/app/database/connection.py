@@ -10,14 +10,19 @@ from sqlalchemy import text, inspect
 
 
 def _get_local_sqlite_url():
-    default_sqlite_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "edrp.db"))
-    return f"sqlite:///{default_sqlite_path}"
+    backend_db = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "edrp.db"))
+    if os.path.exists(backend_db) and os.path.getsize(backend_db) > 0:
+        return f"sqlite:///{backend_db}"
+    root_db = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "edrp.db"))
+    if os.path.exists(root_db) and os.path.getsize(root_db) > 0:
+        return f"sqlite:///{root_db}"
+    return f"sqlite:///{backend_db}"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Optimized Connection Pool for Remote PostgreSQL (Supabase) / Local SQLite
+# Optimized Connection Pool for Remote PostgreSQL / Local SQLite
 if not DATABASE_URL or "sqlite" in DATABASE_URL:
-    DATABASE_URL = _get_local_sqlite_url() if (not DATABASE_URL or DATABASE_URL == "sqlite:///./edrp.db") else DATABASE_URL
+    DATABASE_URL = _get_local_sqlite_url()
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
     try:
@@ -25,15 +30,15 @@ else:
             DATABASE_URL,
             pool_size=15,
             max_overflow=25,
-            pool_timeout=3,
+            pool_timeout=2,
             pool_recycle=300,
             pool_pre_ping=True,
-            connect_args={"connect_timeout": 3}
+            connect_args={"connect_timeout": 2}
         )
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
     except Exception as remote_db_err:
-        print(f"Remote DB connection failed ({remote_db_err}). Falling back immediately to local SQLite.")
+        print(f"Remote DB connection unreachable ({remote_db_err}). Falling back immediately to local SQLite.")
         DATABASE_URL = _get_local_sqlite_url()
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 

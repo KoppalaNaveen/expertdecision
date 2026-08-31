@@ -35,7 +35,9 @@ def create_audit_log(payload: AuditLogCreate, db: Session = Depends(get_db)):
         return {"status": "success", "id": log.id}
     return {"status": "error", "message": "Failed to write audit log"}
 
+@router.get("")
 @router.get("/")
+@router.get("/logs")
 def get_audit_logs(
     limit: int = Query(300, ge=1, le=1000),
     offset: int = Query(0, ge=0),

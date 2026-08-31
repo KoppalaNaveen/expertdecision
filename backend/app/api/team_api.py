@@ -22,6 +22,11 @@ router = APIRouter(
 
 
 @router.post(
+    "",
+    response_model=TeamResponse,
+    status_code=201
+)
+@router.post(
     "/",
     response_model=TeamResponse,
     status_code=201
@@ -33,6 +38,10 @@ def create_team(
     return TeamService.create_team(db, team)
 
 
+@router.get(
+    "",
+    response_model=List[TeamResponse]
+)
 @router.get(
     "/",
     response_model=List[TeamResponse]

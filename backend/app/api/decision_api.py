@@ -19,6 +19,7 @@ router = APIRouter(
     tags=["Decisions"]
 )
 
+@router.post("", response_model=DecisionResponse, status_code=201)
 @router.post("/", response_model=DecisionResponse, status_code=201)
 def create_decision(decision: DecisionCreate, db: Session = Depends(get_db)):
     return DecisionService.create_decision(db, decision)
@@ -27,6 +28,7 @@ def create_decision(decision: DecisionCreate, db: Session = Depends(get_db)):
 def create_decision_full(decision: DecisionFullCreate, db: Session = Depends(get_db)):
     return DecisionService.create_decision_full(db, decision)
 
+@router.get("", response_model=List[DecisionResponse])
 @router.get("/", response_model=List[DecisionResponse])
 def get_all_decisions(
     user_id: int = None,

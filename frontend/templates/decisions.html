@@ -246,6 +246,7 @@
     const USER_ID = parseInt("{{ session.get('user_id', '') }}" || localStorage.getItem('user_id') || 0, 10);
     const CURRENT_USER_ROLE = "{{ session.get('role_name', '') }}" || localStorage.getItem('role_name') || 'Employee';
     const CURRENT_USER_NAME = "{{ session.get('full_name', '') }}" || localStorage.getItem('full_name') || '';
+    window.INITIAL_DECISIONS = {{ (initial_decisions or []) | tojson | safe }};
 </script>
-<script src="{{ url_for('static', filename='js/decision.js') }}?v=20260822_filter_daterange_v2"></script>
+<script src="{{ url_for('static', filename='js/decision.js') }}?v={{ range(1, 100000) | random }}"></script>
 {% endblock %}

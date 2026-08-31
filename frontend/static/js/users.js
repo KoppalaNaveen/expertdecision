@@ -197,12 +197,18 @@ function renderTable() {
     const isAdmin    = typeof CURRENT_USER_ROLE !== 'undefined' && ['Administrator', 'Admin', 'System Administrator'].includes(CURRENT_USER_ROLE);
 
     const filtered = allUsers.filter(u => {
-        const roleName = (roleMap[u.role_id] || "").toLowerCase();
+        if (!u) return false;
+        const roleName = (roleMap[u.role_id] || u.role_name || "").toLowerCase();
+        const fName = (u.full_name || "").toLowerCase();
+        const mail = (u.email || u.email_original || u.display_email || "").toLowerCase();
+        const empId = (u.employee_id || "").toLowerCase();
+        const desig = (u.designation || "").toLowerCase();
+
         const matchSearch = !query ||
-            u.full_name.toLowerCase().includes(query) ||
-            (u.email || "").toLowerCase().includes(query) ||
-            (u.employee_id || "").toLowerCase().includes(query) ||
-            (u.designation || "").toLowerCase().includes(query);
+            fName.includes(query) ||
+            mail.includes(query) ||
+            empId.includes(query) ||
+            desig.includes(query);
         const matchRole = !roleFilter || roleName.includes(roleFilter);
         return matchSearch && matchRole;
     });
@@ -214,6 +220,8 @@ function renderTable() {
     const pageData = filtered.slice(start, start + rowsPerPage);
 
     const tbody = document.getElementById("usersTableBody");
+    if (!tbody) return;
+
     if (pageData.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted">
             <i data-lucide="search-x" style="width:20px;height:20px;" class="me-2"></i>No users found.
@@ -221,8 +229,9 @@ function renderTable() {
         if (window.lucide) lucide.createIcons();
     } else {
         tbody.innerHTML = pageData.map(u => {
-            const roleName   = roleMap[u.role_id] || "Unknown";
-            const initials   = u.full_name.split(" ").map(p => p[0]).join("").substring(0, 2).toUpperCase();
+            const roleName   = roleMap[u.role_id] || u.role_name || "Unknown";
+            const safeFullName = u.full_name || `User #${u.id}`;
+            const initials   = safeFullName.split(" ").filter(Boolean).map(p => p[0]).join("").substring(0, 2).toUpperCase() || "U";
             const roleClass  = "role-" + roleName.toLowerCase().replace(/\s/g, "");
             let statusBadge = "";
             if (u.status === "Pending Approval" || u.approved === false) {
@@ -236,15 +245,15 @@ function renderTable() {
             }
             
             const userEmail = (u.email_original || u.display_email || u.email || '').trim();
-            const displayEmailStr = userEmail.includes('@') ? userEmail : `${u.full_name.toLowerCase().replace(/\s+/g, '.')}@corp.com`;
-            const emailHtml = `<div class="text-muted d-flex align-items-center gap-1 mt-0.5" style="font-size:11px;" title="${displayEmailStr}">
+            const displayEmailStr = userEmail.includes('@') ? userEmail : `${safeFullName.toLowerCase().replace(/\s+/g, '.')}@corp.com`;
+            const emailHtml = `<div class="text-muted d-flex align-items-center gap-1 mt-0.5" style="font-size:11px;" title="${escapeHtml(displayEmailStr)}">
                 <i data-lucide="mail" style="width:11px;height:11px;color:#94A3B8;"></i>
-                <span style="color:#64748B;font-size:11px;font-weight:500;" class="text-truncate">${displayEmailStr}</span>
+                <span style="color:#64748B;font-size:11px;font-weight:500;" class="text-truncate">${escapeHtml(displayEmailStr)}</span>
             </div>`;
 
             let approveBtn = "";
             if (isAdmin && (u.status === "Pending Approval" || u.approved === false)) {
-                approveBtn = `<button class="btn btn-sm btn-success px-2 py-1" onclick="approveUserDirectly(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Approve Account">
+                approveBtn = `<button class="btn btn-sm btn-success px-2 py-1" onclick="approveUserDirectly(${u.id}, '${safeFullName.replace(/'/g, "\\'")}')" title="Approve Account">
                     <i data-lucide="check-circle" style="width:11px;height:11px;"></i>Approve
                 </button>`;
             }
@@ -268,7 +277,7 @@ function renderTable() {
                 : ``;
 
             const deleteBtn = isAdmin
-                ? `<button class="btn btn-sm btn-outline-danger px-2 py-1" onclick="deleteUserPermanently(${u.id}, '${u.full_name.replace(/'/g, "\\'")}')" title="Delete User">
+                ? `<button class="btn btn-sm btn-outline-danger px-2 py-1" onclick="deleteUserPermanently(${u.id}, '${safeFullName.replace(/'/g, "\\'")}')" title="Delete User">
                     <i data-lucide="trash-2" style="width:11px;height:11px;"></i>Delete
                    </button>`
                 : ``;
