@@ -4,7 +4,23 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-load_dotenv()
+# Find and load .env from any working directory (Render uses --chdir frontend)
+_env_candidates = [
+    os.path.join(os.path.dirname(__file__), "..", "..", ".env"),       # backend/.env
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"), # root .env
+    os.path.join(os.getcwd(), ".env"),
+    os.path.join(os.getcwd(), "..", ".env"),
+    os.path.join(os.getcwd(), "backend", ".env"),
+    os.path.join(os.getcwd(), "..", "backend", ".env"),
+]
+for _ep in _env_candidates:
+    _abs = os.path.abspath(_ep)
+    if os.path.isfile(_abs):
+        load_dotenv(_abs)
+        break
+else:
+    load_dotenv()  # fallback
+
 
 from sqlalchemy import text, inspect
 

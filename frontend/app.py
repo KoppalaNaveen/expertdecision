@@ -158,8 +158,10 @@ def _load_fastapi_app_and_client():
                 break
 
         if not backend_dir:
-            print("FastAPI backend directory not found in candidate paths.")
+            print(f"[BRIDGE] FastAPI backend directory not found. Candidates: {candidate_dirs}")
             return None, None
+
+        print(f"[BRIDGE] Found backend at: {backend_dir}")
 
         if backend_dir in sys.path:
             sys.path.remove(backend_dir)
@@ -190,19 +192,21 @@ def _load_fastapi_app_and_client():
         fastapi_app_obj = backend_main_mod.app
         from fastapi.testclient import TestClient
         test_client = TestClient(fastapi_app_obj)
-        print("FastAPI in-process bridge loaded successfully.")
+        print("[BRIDGE] FastAPI in-process bridge loaded successfully.")
         return fastapi_app_obj, test_client
     except Exception as e:
         import traceback
-        print(f"FastAPI in-process bridge loader note: {e}")
+        print(f"[BRIDGE] FastAPI in-process bridge loader FAILED: {e}")
         traceback.print_exc()
         return None, None
 
 _fastapi_app, _fastapi_client = _load_fastapi_app_and_client()
 
-# Ensure gunicorn (e.g. `gunicorn app:app`) can always find the Flask `app` object on `sys.modules['app']`
+# Ensure gunicorn (e.g. `gunicorn app:app`) can ALWAYS find the Flask `app` object
+# This must succeed regardless of whether the FastAPI bridge loaded
 if "app" in sys.modules and hasattr(sys.modules["app"], "__dict__"):
     sys.modules["app"].__dict__["app"] = app
+    print(f"[BRIDGE] Flask app attached to sys.modules['app']. Bridge active: {_fastapi_client is not None}")
 
 API_URL = _resolve_backend_url()
 
