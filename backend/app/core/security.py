@@ -24,26 +24,35 @@ def verify_password(
     """
     Verify a plain password against a stored hash.
     Supports current SHA-256, legacy passlib hashes (bcrypt, sha256_crypt), and plain text.
+    Handles mobile input variants (e.g. accidental trailing/leading whitespace from keyboards).
     """
-    if not plain_password or not hashed_password:
+    if plain_password is None or hashed_password is None:
         return False
 
     str_plain = str(plain_password)
-    str_hash = str(hashed_password)
+    str_hash = str(hashed_password).strip()
+
+    if not str_plain or not str_hash:
+        return False
 
     # 1. Standard SHA-256 hex match (current system standard)
     if hashlib.sha256(str_plain.encode("utf-8")).hexdigest() == str_hash:
+        return True
+    if hashlib.sha256(str_plain.strip().encode("utf-8")).hexdigest() == str_hash:
         return True
 
     # 2. Legacy passlib verification (bcrypt, sha256_crypt, etc.)
     try:
         if pwd_context.identify(str_hash):
-            return pwd_context.verify(str_plain, str_hash)
+            if pwd_context.verify(str_plain, str_hash):
+                return True
+            if pwd_context.verify(str_plain.strip(), str_hash):
+                return True
     except Exception:
         pass
 
     # 3. Plain text fallback (for any legacy development/seeded records)
-    if str_hash == str_plain:
+    if str_hash == str_plain or str_hash == str_plain.strip():
         return True
 
     return False

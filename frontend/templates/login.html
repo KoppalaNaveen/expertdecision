@@ -190,6 +190,46 @@
             margin-top: 32px;
             font-weight: 500;
         }
+
+        @media (max-width: 576px) {
+            .navbar-custom {
+                padding: 12px 16px;
+                flex-wrap: nowrap;
+                gap: 8px;
+            }
+            .logo-icon {
+                width: 34px;
+                height: 34px;
+            }
+            .brand-text-top {
+                font-size: 14px;
+            }
+            .brand-text-bottom {
+                font-size: 10px;
+            }
+            .nav-right-text {
+                font-size: 11.5px;
+                text-align: right;
+                white-space: nowrap;
+            }
+            .login-wrapper {
+                padding: 24px 16px;
+            }
+            .login-card {
+                padding: 28px 20px;
+                border-radius: 16px;
+            }
+            .login-title {
+                font-size: 24px;
+            }
+            .login-subtitle {
+                font-size: 13px;
+                margin-bottom: 24px;
+            }
+            .input-field {
+                font-size: 15px; /* Prevents auto-zoom on iOS Safari */
+            }
+        }
     </style>
 </head>
 <body>
@@ -198,7 +238,7 @@
     <nav class="navbar-custom d-flex justify-content-between align-items-center">
         <a href="{{ url_for('home') }}" class="navbar-brand">
             <div class="logo-icon">
-                <i data-lucide="zap" style="color: white; width: 22px; height: 22px;"></i>
+                <i data-lucide="zap" style="color: white; width: 20px; height: 20px;"></i>
             </div>
             <div>
                 <div class="brand-text-top">EDRP</div>
@@ -230,14 +270,14 @@
             {% endwith %}
 
             <form method="POST" action="{{ url_for('login') }}">
-                <!-- Employee ID -->
+                <!-- Employee ID or Email -->
                 <div class="mb-4">
-                    <label class="form-label-custom">Employee ID</label>
+                    <label class="form-label-custom">Employee ID or Email</label>
                     <div class="input-group-custom">
                         <div class="input-icon">
                             <i data-lucide="user" style="width: 18px; height: 18px;"></i>
                         </div>
-                        <input type="text" name="employee_id" class="input-field" placeholder="e.g. EMP123456" required autofocus>
+                        <input type="text" name="employee_id" class="input-field" placeholder="e.g. EMP123456 or email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
                     </div>
                 </div>
 
@@ -248,7 +288,7 @@
                         <div class="input-icon">
                             <i data-lucide="lock" style="width: 18px; height: 18px;"></i>
                         </div>
-                        <input type="password" name="password" id="password" class="input-field" placeholder="••••••••••••" required>
+                        <input type="password" name="password" id="password" class="input-field" placeholder="••••••••••••" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required>
                         <div class="input-icon" id="togglePassword" style="cursor: pointer;">
                             <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
                         </div>

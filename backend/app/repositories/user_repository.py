@@ -8,10 +8,19 @@ class UserRepository:
 
     @staticmethod
     def get_user_by_email(db: Session, email: str):
-        clean_email = (email or "").strip().lower()
+        if not email:
+            return None
+        clean_email = email.strip().lower()
         import hashlib
+        from sqlalchemy import func
         email_hash = hashlib.sha256(clean_email.encode('utf-8')).hexdigest() if '@' in clean_email else clean_email
-        return db.query(User).filter((User.email == email_hash) | (User.email == clean_email) | (User.email_hash == email_hash) | (User.email_hash == clean_email)).first()
+        return db.query(User).filter(
+            (func.lower(User.email) == email_hash) | 
+            (func.lower(User.email) == clean_email) | 
+            (func.lower(User.email_hash) == email_hash) | 
+            (func.lower(User.email_hash) == clean_email) |
+            (func.lower(User.email_original) == clean_email)
+        ).first()
 
     @staticmethod
     def get_user_by_employee_id(db: Session, employee_id: str):
@@ -19,7 +28,10 @@ class UserRepository:
             return None
         clean_id = employee_id.strip()
         from sqlalchemy import func
-        return db.query(User).filter((func.lower(User.employee_id) == clean_id.lower()) | (User.employee_id == clean_id)).first()
+        return db.query(User).filter(
+            (func.lower(User.employee_id) == clean_id.lower()) | 
+            (User.employee_id == clean_id)
+        ).first()
 
     @staticmethod
     def create_user(db: Session, user: UserRegister, hashed_password: str):
