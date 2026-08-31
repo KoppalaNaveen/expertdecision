@@ -23,8 +23,19 @@ function changeTeamPageSize(size) {
 window.changeTeamPageSize = changeTeamPageSize;
 
 window.onload = function() {
-    loadTeams();
-    loadAssignableEmployees();
+    if (window.INITIAL_TEAMS && Array.isArray(window.INITIAL_TEAMS) && window.INITIAL_TEAMS.length > 0) {
+        allTeams = window.INITIAL_TEAMS;
+        updateKpiStats();
+        renderTable();
+        // Silent background update
+        setTimeout(() => {
+            loadTeams(true);
+            loadAssignableEmployees();
+        }, 300);
+    } else {
+        loadTeams();
+        loadAssignableEmployees();
+    }
 };
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -37,7 +48,7 @@ document.addEventListener("DOMContentLoaded", function() {
 // -------------------------------------------------------------
 // 1. DATA LOADING & KPI STATS
 // -------------------------------------------------------------
-function loadTeams() {
+function loadTeams(silent = false) {
     fetch(API)
         .then(r => {
             if(!r.ok) throw new Error("Failed to load teams");

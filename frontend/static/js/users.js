@@ -27,9 +27,72 @@ const roleMap = {
 
 let allTeamsList = [];
 
+function populateRoleDropdowns(roles) {
+    if (!Array.isArray(roles) || roles.length === 0) return;
+    roles.forEach(r => { roleMap[r.id] = r.role_name; });
+    const select = document.getElementById("addRoleId");
+    if (select) {
+        select.innerHTML = roles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
+    }
+    const editRoleSelect = document.getElementById("editRoleId");
+    if (editRoleSelect) {
+        editRoleSelect.innerHTML = roles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
+    }
+}
+
+function populateTeamDropdowns(teams) {
+    if (!Array.isArray(teams) || teams.length === 0) return;
+    allTeamsList = teams;
+    const select = document.getElementById("addTeamId");
+    if (select) {
+        select.innerHTML = `<option value="">-- Unassigned --</option>` + 
+            teams.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
+    }
+    const editSelect = document.getElementById("editTeamId");
+    if (editSelect) {
+        editSelect.innerHTML = `<option value="">-- Unassigned --</option>` + 
+            teams.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
+    }
+}
+
+function hydrateInstantData() {
+    // Instant synchronous render (0ms delay)
+    if (window.INITIAL_ROLES && Array.isArray(window.INITIAL_ROLES) && window.INITIAL_ROLES.length > 0) {
+        populateRoleDropdowns(window.INITIAL_ROLES);
+    }
+    if (window.INITIAL_TEAMS && Array.isArray(window.INITIAL_TEAMS) && window.INITIAL_TEAMS.length > 0) {
+        populateTeamDropdowns(window.INITIAL_TEAMS);
+    }
+    if (window.INITIAL_USERS && Array.isArray(window.INITIAL_USERS) && window.INITIAL_USERS.length > 0) {
+        const seenIds = new Set();
+        allUsers = [];
+        window.INITIAL_USERS.forEach(u => {
+            if (!u || !u.id || seenIds.has(u.id)) return;
+            seenIds.add(u.id);
+            allUsers.push(u);
+        });
+        updateStats();
+        renderTable();
+        return true;
+    }
+    return false;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
-    Promise.all([fetchUsers(), fetchRoles(), fetchTeams()]);
+    // 1. Instant Render
+    const wasHydrated = hydrateInstantData();
+
+    // 2. Fetch or Background Sync
+    if (!wasHydrated) {
+        Promise.all([fetchUsers(), fetchRoles(), fetchTeams()]);
+    } else {
+        // Silent background refresh
+        setTimeout(() => {
+            fetchUsers(true);
+            fetchRoles();
+            fetchTeams();
+        }, 300);
+    }
 
     const btnSubmit = document.getElementById("btnAddUserSubmit");
     if (btnSubmit) {
@@ -63,17 +126,8 @@ async function fetchTeams() {
     try {
         const res = await fetch(`${API_URL}/teams/`);
         if (!res.ok) return;
-        allTeamsList = await res.json();
-        const select = document.getElementById("addTeamId");
-        if (select && Array.isArray(allTeamsList) && allTeamsList.length > 0) {
-            select.innerHTML = `<option value="">-- Unassigned --</option>` + 
-                allTeamsList.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
-        }
-        const editSelect = document.getElementById("editTeamId");
-        if (editSelect && Array.isArray(allTeamsList) && allTeamsList.length > 0) {
-            editSelect.innerHTML = `<option value="">-- Unassigned --</option>` + 
-                allTeamsList.map(t => `<option value="${t.id}">${t.team_name}</option>`).join('');
-        }
+        const teams = await res.json();
+        populateTeamDropdowns(teams);
     } catch (_) {}
 }
 
@@ -82,15 +136,7 @@ async function fetchRoles() {
         const res = await fetch(`${API_URL}/roles`);
         if (!res.ok) return;
         const roles = await res.json();
-        roles.forEach(r => { roleMap[r.id] = r.role_name; });
-        const select = document.getElementById("addRoleId");
-        if (select && roles.length > 0) {
-            select.innerHTML = roles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
-        }
-        const editRoleSelect = document.getElementById("editRoleId");
-        if (editRoleSelect && roles.length > 0) {
-            editRoleSelect.innerHTML = roles.map(r => `<option value="${r.id}">${r.role_name}</option>`).join('');
-        }
+        populateRoleDropdowns(roles);
         if (allUsers.length > 0) {
             renderTable();
         }
@@ -98,7 +144,7 @@ async function fetchRoles() {
 }
 
 
-async function fetchUsers() {
+async function fetchUsers(silent = false) {
     try {
         const res = await fetch(`${API_URL}/users/`);
         if (!res.ok) throw new Error("Failed to load users");
@@ -115,12 +161,13 @@ async function fetchUsers() {
         updateStats();
         renderTable();
     } catch (err) {
-
-        document.getElementById("usersTableBody").innerHTML =
-            `<tr><td colspan="7" class="text-center py-5 text-danger">
-                <i data-lucide="alert-circle" style="width:18px;height:18px;" class="me-2"></i>${err.message}
-             </td></tr>`;
-        if (window.lucide) lucide.createIcons();
+        if (!silent && allUsers.length === 0) {
+            document.getElementById("usersTableBody").innerHTML =
+                `<tr><td colspan="7" class="text-center py-5 text-danger">
+                    <i data-lucide="alert-circle" style="width:18px;height:18px;" class="me-2"></i>${err.message}
+                 </td></tr>`;
+            if (window.lucide) lucide.createIcons();
+        }
     }
 }
 

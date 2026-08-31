@@ -16,7 +16,16 @@ function changeRolePageSize(size) {
 window.changeRolePageSize = changeRolePageSize;
 
 window.onload = function() {
-    loadRoles();
+    if (window.INITIAL_ROLES && Array.isArray(window.INITIAL_ROLES) && window.INITIAL_ROLES.length > 0) {
+        allRoles = window.INITIAL_ROLES;
+        renderTable();
+        // Silent background update
+        setTimeout(() => {
+            loadRoles(true);
+        }, 300);
+    } else {
+        loadRoles();
+    }
 };
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -26,7 +35,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-function loadRoles() {
+function loadRoles(silent = false) {
     fetch(API)
         .then(r => r.json())
         .then(data => {
@@ -34,7 +43,7 @@ function loadRoles() {
             renderTable();
         })
         .catch(err => {
-            if(typeof showToast === 'function') showToast("Failed to load roles", "danger");
+            if(!silent && typeof showToast === 'function') showToast("Failed to load roles", "danger");
         });
 }
 

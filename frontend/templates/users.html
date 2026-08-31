@@ -647,6 +647,9 @@
 <script>
     const API_URL = "/api";
     const CURRENT_USER_ROLE = "{{ session.get('role_name', 'Employee') }}";
+    window.INITIAL_USERS = {{ (initial_users or []) | tojson | safe }};
+    window.INITIAL_ROLES = {{ (initial_roles or []) | tojson | safe }};
+    window.INITIAL_TEAMS = {{ (initial_teams or []) | tojson | safe }};
 </script>
 <script src="{{ url_for('static', filename='js/users.js') }}?v={{ range(1, 100000) | random }}"></script>
 {% endblock %}
