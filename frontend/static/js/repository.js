@@ -19,9 +19,36 @@ function changeRepoPageSize(size) {
 }
 window.changeRepoPageSize = changeRepoPageSize;
 
-document.addEventListener("DOMContentLoaded", () => {
-    fetchApprovedDecisions();
-});
+function hydrateRepoInstantData() {
+    if (window.INITIAL_APPROVED_DECISIONS && Array.isArray(window.INITIAL_APPROVED_DECISIONS) && window.INITIAL_APPROVED_DECISIONS.length > 0) {
+        allDecisions = window.INITIAL_APPROVED_DECISIONS.filter(d => d.status === "Approved");
+        buildCategoryFilters();
+        buildTagFilters();
+        updateStats();
+        renderCards();
+        return true;
+    }
+    return false;
+}
+
+try {
+    hydrateRepoInstantData();
+} catch (_) {}
+
+function initRepoPage() {
+    const wasHydrated = hydrateRepoInstantData();
+    if (wasHydrated) {
+        setTimeout(() => { fetchApprovedDecisions(); }, 300);
+    } else {
+        fetchApprovedDecisions();
+    }
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initRepoPage);
+} else {
+    initRepoPage();
+}
 
 async function fetchApprovedDecisions() {
     try {
@@ -34,11 +61,13 @@ async function fetchApprovedDecisions() {
         updateStats();
         renderCards();
     } catch (err) {
-        document.getElementById("repoGrid").innerHTML = `
-            <div class="col-12 text-center py-5 text-danger">
-                <i data-lucide="alert-circle" style="width:24px;height:24px;" class="me-2"></i>${err.message}
-            </div>`;
-        if (window.lucide) lucide.createIcons();
+        if (allDecisions.length === 0) {
+            document.getElementById("repoGrid").innerHTML = `
+                <div class="col-12 text-center py-5 text-danger">
+                    <i data-lucide="alert-circle" style="width:24px;height:24px;" class="me-2"></i>${err.message}
+                </div>`;
+            if (window.lucide) lucide.createIcons();
+        }
     }
 }
 

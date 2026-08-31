@@ -1074,6 +1074,7 @@ def admin_create_user_proxy():
 # ===========================
 
 @app.route("/notifications/<int:user_id>")
+@app.route("/api/notifications/<int:user_id>")
 def get_notifications(user_id):
     if "token" not in session:
         return jsonify({"detail": "Unauthorized"}), 401
@@ -1087,6 +1088,7 @@ def get_notifications(user_id):
         return jsonify([]), 200
 
 @app.route("/notifications/<int:user_id>/mark-all-read", methods=["PUT"])
+@app.route("/api/notifications/<int:user_id>/mark-all-read", methods=["PUT"])
 def mark_all_read(user_id):
     if "token" not in session:
         return jsonify({"detail": "Unauthorized"}), 401
@@ -1100,6 +1102,7 @@ def mark_all_read(user_id):
         return jsonify({"detail": "Error"}), 500
 
 @app.route("/notifications/<int:user_id>/clear-all", methods=["DELETE"])
+@app.route("/api/notifications/<int:user_id>/clear-all", methods=["DELETE"])
 def clear_all_notifications(user_id):
     if "token" not in session:
         return jsonify({"detail": "Unauthorized"}), 401
@@ -1376,7 +1379,9 @@ def repository():
     if "token" not in session:
         return redirect(url_for("login"))
 
-    return render_template("repository.html")
+    headers = {"Authorization": f"Bearer {session['token']}"} if "token" in session else {}
+    initial_approved_decisions = get_cached_data("repo_approved_decisions", "/decisions/?scope=repository&status=Approved", ttl=20, headers=headers)
+    return render_template("repository.html", initial_approved_decisions=initial_approved_decisions)
 
 
 # ===========================
