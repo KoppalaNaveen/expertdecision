@@ -213,6 +213,9 @@ def ensure_user_schema_columns():
                     db.commit()
             finally:
                 db.close()
+    except Exception as role_init_err:
+        print(f"Baseline roles check note: {role_init_err}")
+
     # Ensure baseline teams exist
     try:
         from app.models.team import Team
