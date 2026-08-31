@@ -334,6 +334,71 @@ def ensure_user_schema_columns():
     except Exception as users_sync_err:
         print(f"Active users auto-sync note: {users_sync_err}")
 
+    # Ensure baseline approved decisions exist for the Knowledge Repository
+    try:
+        from app.models.decision import Decision
+        inspector = inspect(engine)
+        if inspector.has_table("decisions"):
+            db = SessionLocal()
+            try:
+                if db.query(Decision).filter(Decision.status == "Approved").count() == 0:
+                    from app.core.security import generate_data_hash
+                    sample_decisions = [
+                        {
+                            "title": "Cloud Infrastructure Migration to Multi-Region High Availability",
+                            "description": "Comprehensive migration strategy transitioning legacy on-premise compute nodes to an automated multi-region Kubernetes cluster with zero-downtime failover.",
+                            "status": "Approved",
+                            "category_id": 2, # Technology
+                            "created_by": 48, # Koppala Naveen
+                            "priority_level": "High",
+                            "department": "Engineering",
+                            "tags": "Technology, Cloud, Infrastructure, Optimization",
+                            "content_hash": generate_data_hash("Cloud Migration", "Multi-region", 2, 48)
+                        },
+                        {
+                            "title": "Enterprise Security & Append-Only Audit Trail Governance",
+                            "description": "Establishment of immutable audit logging policies, cryptographic verification seals, and granular RBAC access controls across all decision workflows.",
+                            "status": "Approved",
+                            "category_id": 3, # Operations
+                            "created_by": 48, # Koppala Naveen
+                            "priority_level": "Critical",
+                            "department": "Security & Compliance",
+                            "tags": "Security, Operations, Policy, Optimization",
+                            "content_hash": generate_data_hash("Security & Audit", "Audit logging", 3, 48)
+                        },
+                        {
+                            "title": "Fiscal Year AI Research & Tooling Budget Allocation",
+                            "description": "Strategic capital allocation for enterprise AI LLM APIs, developer automation toolkits, and machine learning infrastructure optimization.",
+                            "status": "Approved",
+                            "category_id": 1, # Finance
+                            "created_by": 62, # Naga Sai
+                            "priority_level": "Medium",
+                            "department": "Finance",
+                            "tags": "Budget, AI, Optimization, Q4",
+                            "content_hash": generate_data_hash("AI Budget", "Allocation", 1, 62)
+                        },
+                        {
+                            "title": "Automated Code Review & Continuous Integration Pipeline",
+                            "description": "Implementation of automated static code analysis, unit test coverage gates, and continuous deployment pipelines across frontend and backend services.",
+                            "status": "Approved",
+                            "category_id": 2, # Technology
+                            "created_by": 29, # Naveen
+                            "priority_level": "High",
+                            "department": "Quality Assurance",
+                            "tags": "Technology, Infrastructure, Optimization",
+                            "content_hash": generate_data_hash("CI/CD Pipeline", "Automation", 2, 29)
+                        }
+                    ]
+                    for sd in sample_decisions:
+                        db.add(Decision(**sd))
+                    db.commit()
+                    print("[DB] Initialized baseline approved decisions for Knowledge Repository.")
+            finally:
+                db.close()
+    except Exception as dec_init_err:
+        print(f"Baseline decisions check note: {dec_init_err}")
+
+
 ensure_user_schema_columns()
 
 def get_db():

@@ -21,7 +21,7 @@ window.changeRepoPageSize = changeRepoPageSize;
 
 function hydrateRepoInstantData() {
     if (window.INITIAL_APPROVED_DECISIONS && Array.isArray(window.INITIAL_APPROVED_DECISIONS) && window.INITIAL_APPROVED_DECISIONS.length > 0) {
-        allDecisions = window.INITIAL_APPROVED_DECISIONS.filter(d => d.status === "Approved");
+        allDecisions = window.INITIAL_APPROVED_DECISIONS.filter(d => d && (!d.status || d.status.toLowerCase() === "approved"));
         buildCategoryFilters();
         buildTagFilters();
         updateStats();
@@ -55,7 +55,7 @@ async function fetchApprovedDecisions() {
         const res = await fetch(`${API_URL}/decisions/?scope=repository&status=Approved`);
         if (!res.ok) throw new Error("Failed to load decisions");
         const all  = await res.json();
-        allDecisions = all.filter(d => d.status === "Approved");
+        allDecisions = (Array.isArray(all) ? all : []).filter(d => d && (!d.status || d.status.toLowerCase() === "approved"));
         buildCategoryFilters();
         buildTagFilters();
         updateStats();
@@ -244,9 +244,14 @@ function updateActiveFilterBadges() {
 }
 
 function updateStats() {
-    document.getElementById("repoCount").innerText         = allDecisions.length;
-    document.getElementById("repoCategoryCount").innerText =
-        new Set(allDecisions.map(d => d.category_name).filter(Boolean)).size;
+    const repoCountEl = document.getElementById("repoCount");
+    if (repoCountEl) {
+        repoCountEl.innerText = allDecisions.length;
+    }
+    const repoCatCountEl = document.getElementById("repoCategoryCount");
+    if (repoCatCountEl) {
+        repoCatCountEl.innerText = new Set(allDecisions.map(d => d.category_name).filter(Boolean)).size;
+    }
 }
 
 function getFiltered() {
@@ -389,9 +394,12 @@ function renderCards() {
 
     const info = filtered.length === 0 ? "" :
         `Showing ${start + 1}–${Math.min(start + rowsPerPage, filtered.length)} of ${filtered.length} results`;
-    document.getElementById("repoPaginationInfo").innerText = info;
-    document.getElementById("repoBtnPrev").disabled = currentPage === 1;
-    document.getElementById("repoBtnNext").disabled = currentPage === totalPages;
+    const pagInfo = document.getElementById("repoPaginationInfo");
+    if (pagInfo) pagInfo.innerText = info;
+    const btnPrev = document.getElementById("repoBtnPrev");
+    if (btnPrev) btnPrev.disabled = (currentPage === 1);
+    const btnNext = document.getElementById("repoBtnNext");
+    if (btnNext) btnNext.disabled = (currentPage >= totalPages);
 }
 
 function clearAllFilters() {
