@@ -18,7 +18,7 @@ function changeTeamPageSize(size) {
         rowsPerPage = parseInt(size, 10) || 6;
     }
     currentPage = 1;
-    renderTeamTable();
+    renderTable();
 }
 window.changeTeamPageSize = changeTeamPageSize;
 

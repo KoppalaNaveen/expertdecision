@@ -86,6 +86,30 @@
 
 <!-- Reviews Table -->
 <div class="card border-0 shadow-sm" style="border-radius:12px;overflow:hidden;">
+    <div class="card-header bg-white border-bottom py-2.5 px-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span id="reviewPaginationInfo" class="text-muted small fw-medium" style="font-size: 12px;">Loading...</span>
+                <div class="d-inline-flex align-items-center gap-1.5 ms-2">
+                    <label for="reviewPageSizeSelect" class="text-muted small mb-0" style="font-size: 11.5px; white-space: nowrap;">Show:</label>
+                    <select id="reviewPageSizeSelect" class="form-select form-select-sm py-0 px-2.5 text-dark fw-medium" style="font-size: 12px; height: 28px; width: auto; min-width: 68px; border-radius: 7px;" onchange="changeReviewPageSize(this.value)">
+                        <option value="8" selected>8</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="1000">1000</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-secondary px-3" style="font-size: 12px; border-radius: 6px;" id="reviewBtnPrev" onclick="prevPage()" disabled>Previous</button>
+                <span id="reviewPageIndicator" class="text-muted small px-2 fw-semibold" style="font-size: 12px;">—</span>
+                <button class="btn btn-sm btn-outline-secondary px-3" style="font-size: 12px; border-radius: 6px;" id="reviewBtnNext" onclick="nextPage()" disabled>Next</button>
+            </div>
+        </div>
+    </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0" style="font-size:0.9rem;">
             <thead class="table-light text-secondary" style="font-size:0.75rem;text-transform:uppercase;">
@@ -105,30 +129,6 @@
                 </td></tr>
             </tbody>
         </table>
-    </div>
-    <div class="card-footer bg-white border-top py-3 px-4">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div class="d-flex align-items-center gap-2">
-                <span id="reviewPaginationInfo" class="text-muted small">Loading...</span>
-                <div class="d-inline-flex align-items-center gap-1 ms-2">
-                    <label for="reviewPageSizeSelect" class="text-muted small mb-0" style="font-size: 11px; white-space: nowrap;">Show:</label>
-                    <select id="reviewPageSizeSelect" class="form-select form-select-sm py-0 px-2 text-secondary" style="font-size: 11.5px; height: 26px; width: auto; min-width: 65px; border-radius: 6px;" onchange="changeReviewPageSize(this.value)">
-                        <option value="8" selected>8</option>
-                        <option value="10">10</option>
-                        <option value="20">20</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                        <option value="1000">1000</option>
-                        <option value="all">All</option>
-                    </select>
-                </div>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-outline-secondary px-3" id="reviewBtnPrev" onclick="prevPage()" disabled>Previous</button>
-                <span id="reviewPageIndicator" class="text-muted small px-2">—</span>
-                <button class="btn btn-sm btn-outline-secondary px-3" id="reviewBtnNext" onclick="nextPage()" disabled>Next</button>
-            </div>
-        </div>
     </div>
 </div>
 

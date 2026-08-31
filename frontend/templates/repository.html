@@ -140,18 +140,29 @@
     </div>
 </div>
 
-<!-- Active Filter Indicator & Stats Bar -->
-<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-    <div class="d-flex align-items-center gap-3">
-        <div class="text-muted" style="font-size:13px;">
-            <span id="repoCount" class="fw-bold text-dark">—</span> approved decisions found
+<!-- Active Filter Indicator & Top Pagination Bar -->
+<div class="card border-0 shadow-sm rounded-3 mb-3 p-3 bg-white">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span id="repoPaginationInfo" class="text-muted small fw-medium" style="font-size: 12px;"></span>
+            <div class="d-inline-flex align-items-center gap-1.5 ms-2">
+                <label for="repoPageSizeSelect" class="text-muted small mb-0" style="font-size: 11.5px; white-space: nowrap;">Show:</label>
+                <select id="repoPageSizeSelect" class="form-select form-select-sm py-0 px-2.5 text-dark fw-medium" style="font-size: 12px; height: 28px; width: auto; min-width: 68px; border-radius: 7px;" onchange="changeRepoPageSize(this.value)">
+                    <option value="9" selected>9</option>
+                    <option value="18">18</option>
+                    <option value="36">36</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="1000">1000</option>
+                    <option value="all">All</option>
+                </select>
+            </div>
         </div>
-        <div class="text-muted" style="font-size:13px;">
-            • <span id="repoCategoryCount" class="fw-bold text-dark">—</span> categories
+        <div class="d-flex align-items-center gap-2">
+            <div id="activeFilterBadgeContainer" class="d-flex align-items-center gap-1.5 me-2"></div>
+            <button class="btn btn-sm btn-outline-secondary px-3" style="font-size: 12px; border-radius: 6px;" id="repoBtnPrev" onclick="prevPage()" disabled>Previous</button>
+            <button class="btn btn-sm btn-outline-secondary px-3" style="font-size: 12px; border-radius: 6px;" id="repoBtnNext" onclick="nextPage()" disabled>Next</button>
         </div>
-    </div>
-    <div id="activeFilterBadgeContainer" class="d-flex align-items-center gap-1.5">
-        <!-- Active filter tags badge -->
     </div>
 </div>
 
@@ -159,29 +170,6 @@
 <div id="repoGrid" class="row g-3">
     <div class="col-12 text-center py-5 text-muted">
         <div class="spinner-border spinner-border-sm me-2 text-primary"></div>Loading knowledge base...
-    </div>
-</div>
-
-<!-- Pagination -->
-<div class="d-flex justify-content-between align-items-center mt-4 flex-wrap gap-2">
-    <div class="d-flex align-items-center gap-2">
-        <span id="repoPaginationInfo" class="text-muted small"></span>
-        <div class="d-inline-flex align-items-center gap-1 ms-2">
-            <label for="repoPageSizeSelect" class="text-muted small mb-0" style="font-size: 11px; white-space: nowrap;">Show:</label>
-            <select id="repoPageSizeSelect" class="form-select form-select-sm py-0 px-2 text-secondary" style="font-size: 11.5px; height: 26px; width: auto; min-width: 65px; border-radius: 6px;" onchange="changeRepoPageSize(this.value)">
-                <option value="9" selected>9</option>
-                <option value="18">18</option>
-                <option value="36">36</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-                <option value="1000">1000</option>
-                <option value="all">All</option>
-            </select>
-        </div>
-    </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-sm btn-outline-secondary px-3" id="repoBtnPrev" onclick="prevPage()" disabled>Previous</button>
-        <button class="btn btn-sm btn-outline-secondary px-3" id="repoBtnNext" onclick="nextPage()" disabled>Next</button>
     </div>
 </div>
 
