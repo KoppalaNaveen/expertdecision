@@ -86,51 +86,79 @@ def health_check():
         "timestamp": time.time()
     }), 200
 
+@app.route("/debug-info")
+def debug_info():
+    """Diagnostic endpoint to debug deployment issues."""
+    import glob
+    static_folder = app.static_folder
+    template_folder = app.template_folder
+    js_files = []
+    if static_folder and os.path.isdir(os.path.join(static_folder, "js")):
+        js_files = os.listdir(os.path.join(static_folder, "js"))
+    
+    return jsonify({
+        "cwd": os.getcwd(),
+        "frontend_dir": _FRONTEND_DIR,
+        "static_folder": static_folder,
+        "static_exists": os.path.isdir(static_folder) if static_folder else False,
+        "template_folder": template_folder,
+        "template_exists": os.path.isdir(template_folder) if template_folder else False,
+        "js_files": js_files,
+        "bridge_active": _fastapi_client is not None,
+        "sys_modules_app": "app" in sys.modules,
+        "python_path_0": sys.path[0] if sys.path else "empty",
+        "database_url_set": bool(os.getenv("DATABASE_URL")),
+    }), 200
+
 @app.after_request
 def optimize_and_compress_response(response):
     """
     1. Long-term browser caching for static assets (CSS, JS, Fonts, Images).
     2. Real-time GZIP payload compression (reduces payload transfer size by 75-80%).
     """
-    content_type = response.content_type or ""
-    is_static = request.path.startswith('/static/') or request.path.startswith('/favicon')
-    is_asset = any(content_type.startswith(t) for t in (
-        'text/css', 'application/javascript', 'text/javascript',
-        'image/', 'font/', 'application/font', 'application/x-font'
-    ))
-    
-    if is_static or is_asset:
-        # Aggressive caching for static assets (7 days)
-        response.headers["Cache-Control"] = "public, max-age=604800, immutable"
-        response.headers.pop("Pragma", None)
-        response.headers.pop("Expires", None)
-    else:
-        # Dynamic HTML / API fresh headers
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+    try:
+        content_type = response.content_type or ""
+        is_static = request.path.startswith('/static/') or request.path.startswith('/favicon')
+        is_asset = any(content_type.startswith(t) for t in (
+            'text/css', 'application/javascript', 'text/javascript',
+            'image/', 'font/', 'application/font', 'application/x-font'
+        ))
+        
+        if is_static or is_asset:
+            # Aggressive caching for static assets (7 days)
+            response.headers["Cache-Control"] = "public, max-age=604800, immutable"
+            response.headers.pop("Pragma", None)
+            response.headers.pop("Expires", None)
+        else:
+            # Dynamic HTML / API fresh headers
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
 
-    # Fast GZIP compression for HTML, CSS, JS, and JSON
-    accept_encoding = request.headers.get('Accept-Encoding', '')
-    if (
-        'gzip' in accept_encoding.lower() and
-        response.status_code < 300 and
-        'Content-Encoding' not in response.headers and
-        len(response.get_data()) > 400 and
-        any(ct in content_type for ct in ['text/html', 'text/css', 'text/javascript', 'application/javascript', 'application/json'])
-    ):
-        try:
-            gzip_buffer = io.BytesIO()
-            with gzip.GzipFile(mode='wb', fileobj=gzip_buffer, compresslevel=5) as gzip_file:
-                gzip_file.write(response.get_data())
-            response.set_data(gzip_buffer.getvalue())
-            response.headers['Content-Encoding'] = 'gzip'
-            response.headers['Content-Length'] = len(response.get_data())
-            response.headers['Vary'] = 'Accept-Encoding'
-        except Exception:
-            pass
+        # Fast GZIP compression for HTML, CSS, JS, and JSON
+        accept_encoding = request.headers.get('Accept-Encoding', '')
+        if (
+            'gzip' in accept_encoding.lower() and
+            response.status_code < 300 and
+            'Content-Encoding' not in response.headers and
+            len(response.get_data()) > 400 and
+            any(ct in content_type for ct in ['text/html', 'text/css', 'text/javascript', 'application/javascript', 'application/json'])
+        ):
+            try:
+                gzip_buffer = io.BytesIO()
+                with gzip.GzipFile(mode='wb', fileobj=gzip_buffer, compresslevel=5) as gzip_file:
+                    gzip_file.write(response.get_data())
+                response.set_data(gzip_buffer.getvalue())
+                response.headers['Content-Encoding'] = 'gzip'
+                response.headers['Content-Length'] = len(response.get_data())
+                response.headers['Vary'] = 'Accept-Encoding'
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[MIDDLEWARE] after_request error on {request.path}: {e}")
 
     return response
+
 
 # FastAPI Backend URL (Server-side Flask to FastAPI communication)
 def _resolve_backend_url():
