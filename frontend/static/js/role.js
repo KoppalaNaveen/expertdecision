@@ -15,25 +15,40 @@ function changeRolePageSize(size) {
 }
 window.changeRolePageSize = changeRolePageSize;
 
-window.onload = function() {
+function hydrateRoleInstantData() {
     if (window.INITIAL_ROLES && Array.isArray(window.INITIAL_ROLES) && window.INITIAL_ROLES.length > 0) {
         allRoles = window.INITIAL_ROLES;
         renderTable();
-        // Silent background update
+        return true;
+    }
+    return false;
+}
+
+try {
+    hydrateRoleInstantData();
+} catch (_) {}
+
+function initRolePage() {
+    const wasHydrated = hydrateRoleInstantData();
+    if (wasHydrated) {
         setTimeout(() => {
             loadRoles(true);
         }, 300);
     } else {
         loadRoles();
     }
-};
 
-document.addEventListener("DOMContentLoaded", function() {
     const addBtn = document.querySelector('button[data-bs-target="#roleModal"]');
-    if(addBtn) {
+    if (addBtn) {
         addBtn.addEventListener('click', openAddModal);
     }
-});
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initRolePage);
+} else {
+    initRolePage();
+}
 
 function loadRoles(silent = false) {
     fetch(API)

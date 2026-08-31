@@ -22,12 +22,23 @@ function changeTeamPageSize(size) {
 }
 window.changeTeamPageSize = changeTeamPageSize;
 
-window.onload = function() {
+function hydrateTeamInstantData() {
     if (window.INITIAL_TEAMS && Array.isArray(window.INITIAL_TEAMS) && window.INITIAL_TEAMS.length > 0) {
         allTeams = window.INITIAL_TEAMS;
         updateKpiStats();
         renderTable();
-        // Silent background update
+        return true;
+    }
+    return false;
+}
+
+try {
+    hydrateTeamInstantData();
+} catch (_) {}
+
+function initTeamPage() {
+    const wasHydrated = hydrateTeamInstantData();
+    if (wasHydrated) {
         setTimeout(() => {
             loadTeams(true);
             loadAssignableEmployees();
@@ -36,14 +47,18 @@ window.onload = function() {
         loadTeams();
         loadAssignableEmployees();
     }
-};
 
-document.addEventListener("DOMContentLoaded", function() {
     const addBtn = document.querySelector('button[data-bs-target="#teamModal"]');
-    if(addBtn) {
+    if (addBtn) {
         addBtn.addEventListener('click', openAddModal);
     }
-});
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initTeamPage);
+} else {
+    initTeamPage();
+}
 
 // -------------------------------------------------------------
 // 1. DATA LOADING & KPI STATS

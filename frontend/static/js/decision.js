@@ -49,7 +49,11 @@ function hydrateInstantData() {
     return false;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+try {
+    hydrateInstantData();
+} catch (_) {}
+
+function initDecisionPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
     if (tabParam) {
@@ -78,7 +82,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeof lucide !== 'undefined' && lucide.createIcons) {
         lucide.createIcons();
     }
-});
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initDecisionPage);
+} else {
+    initDecisionPage();
+}
 
 async function fetchDecisions() {
     try {

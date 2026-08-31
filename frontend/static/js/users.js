@@ -78,7 +78,14 @@ function hydrateInstantData() {
     return false;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+// Immediate synchronous hydration on script execution
+try {
+    hydrateInstantData();
+} catch (e) {
+    console.warn("Pre-hydration notice:", e);
+}
+
+function initUsersPage() {
     // 1. Instant Render
     const wasHydrated = hydrateInstantData();
 
@@ -120,7 +127,13 @@ document.addEventListener("DOMContentLoaded", () => {
             submitPromoteUser(e);
         });
     }
-});
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initUsersPage);
+} else {
+    initUsersPage();
+}
 
 async function fetchTeams() {
     try {
