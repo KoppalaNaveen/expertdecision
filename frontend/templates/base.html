@@ -60,16 +60,16 @@
             position: fixed;
             height: 100vh;
             top: 0; bottom: 0; left: 0;
-            z-index: 100;
+            z-index: 1050;
             box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
         }
         .sidebar-logo {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 22px 24px;
+            padding: 20px 24px;
             text-decoration: none;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .logo-icon {
             width: 36px;
@@ -80,103 +80,30 @@
             align-items: center;
             justify-content: center;
             box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+            flex-shrink: 0;
         }
         .logo-text-top { font-size: 16px; font-weight: 800; color: #FFFFFF; line-height: 1; }
         .logo-text-bottom { font-size: 10px; color: #94A3B8; font-weight: 500; margin-top: 2px; }
 
-        .nav-links {
-            list-style: none;
-            padding: 12px;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            flex: 1;
-            overflow-y: auto;
+        /* Mobile Sidebar Backdrop */
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 1040;
+            opacity: 0;
+            transition: opacity 0.25s ease;
         }
-        .nav-links::-webkit-scrollbar { width: 3px; }
-        .nav-links::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 11px 16px;
-            border-radius: 10px;
-            color: #94A3B8;
-            text-decoration: none;
-            font-size: 13.5px;
-            font-weight: 600;
-            transition: all 0.2s;
+        .sidebar-backdrop.show {
+            display: block;
+            opacity: 1;
         }
-        .nav-item:hover { background-color: rgba(255, 255, 255, 0.07); color: #FFFFFF; }
-        .nav-item.active {
-            background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
-            color: #FFFFFF;
-            font-weight: 700;
-            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
-        }
-        .nav-section-label {
-            font-size: 9.5px; font-weight: 700; color: #64748B;
-            text-transform: uppercase; letter-spacing: 0.08em;
-            padding: 14px 16px 4px;
-        }
-        
-        .nav-badge {
-            margin-left: auto;
-            background-color: #EF4444;
-            color: white;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 12px;
-        }
-        .nav-divider {
-            height: 1px;
-            background-color: rgba(255,255,255,0.06);
-            margin: 12px 16px;
-        }
-
-        .user-profile-bottom {
-            margin-top: auto;
-            padding: 16px 20px;
-            background: rgba(15, 23, 42, 0.6);
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-            display: flex; align-items: center; gap: 12px;
-            text-decoration: none;
-            transition: background 0.15s;
-        }
-        .user-profile-bottom:hover { background: rgba(255,255,255,0.06); }
-        .user-avatar {
-            width: 36px; height: 36px; border-radius: 50%;
-            background: linear-gradient(135deg, #6366F1, #818CF8);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: 800; color: white;
-            flex-shrink: 0;
-            box-shadow: 0 2px 8px rgba(99,102,241,0.3);
-        }
-        .user-info { flex: 1; min-width: 0; }
-        .user-name { font-size: 13px; font-weight: 700; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .user-role { font-size: 11px; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        
-        /* Role-Based Themes */
-        body[data-role-theme="manager"] .logo-icon { background: linear-gradient(135deg, #14B8A6, #2DD4BF) !important; box-shadow: 0 4px 12px rgba(20,184,166,0.4) !important; }
-        body[data-role-theme="manager"] .nav-item.active { background: linear-gradient(135deg, #14B8A6 0%, #0D9488 100%) !important; color: #FFFFFF !important; box-shadow: 0 4px 14px rgba(20, 184, 166, 0.4) !important; }
-        body[data-role-theme="manager"] .user-avatar { background: linear-gradient(135deg, #14B8A6, #2DD4BF) !important; }
-
-        body[data-role-theme="admin"] .logo-icon { background: linear-gradient(135deg, #3B82F6, #60A5FA) !important; box-shadow: 0 4px 12px rgba(59,130,246,0.4) !important; }
-        body[data-role-theme="admin"] .nav-item.active { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important; color: #FFFFFF !important; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4) !important; }
-        body[data-role-theme="admin"] .user-avatar { background: linear-gradient(135deg, #3B82F6, #60A5FA) !important; }
-
-        body[data-role-theme="employee"] .logo-icon { background: linear-gradient(135deg, #2563EB, #3B82F6) !important; box-shadow: 0 4px 12px rgba(37,99,235,0.4) !important; }
-        body[data-role-theme="employee"] .nav-item.active { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important; color: #FFFFFF !important; box-shadow: 0 4px 14px rgba(37,99,235,0.4) !important; }
-        body[data-role-theme="employee"] .user-avatar { background: linear-gradient(135deg, #2563EB, #3B82F6) !important; }
-
-        body[data-role-theme="reviewer"] .logo-icon { background: linear-gradient(135deg, #7C3AED, #9333EA) !important; box-shadow: 0 4px 12px rgba(124,58,237,0.4) !important; }
-        body[data-role-theme="reviewer"] .nav-item.active { background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%) !important; color: #FFFFFF !important; box-shadow: 0 4px 14px rgba(124,58,237,0.4) !important; }
-        body[data-role-theme="reviewer"] .user-avatar { background: linear-gradient(135deg, #7C3AED, #9333EA) !important; }
-
 
         .main-content { 
             margin-left: 260px; 
@@ -186,7 +113,7 @@
             height: 100vh;
             overflow-y: auto;
             background-color: #F8FAFC;
-            transition: margin-right 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: margin-right 0.32s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.3s ease;
         }
 
         /* ── Dynamic AI Copilot Page Shift (Prevents AI Drawer from covering page content) ── */
@@ -198,6 +125,28 @@
                 margin-right: 0;
             }
         }
+
+        @media (max-width: 991.98px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
+            }
+            .sidebar.show {
+                transform: translateX(0);
+                box-shadow: 12px 0 40px rgba(0, 0, 0, 0.4);
+            }
+            .main-content {
+                margin-left: 0 !important;
+                width: 100vw !important;
+                min-width: 0 !important;
+            }
+            .header-bar {
+                padding: 0 1rem !important;
+            }
+            .content-area {
+                padding: 1.25rem 1rem 5.5rem 1rem !important;
+            }
+        }
         
         .header-bar {
             height: 64px;
@@ -205,7 +154,7 @@
             border-bottom: 1px solid #e2e8f0;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
+            justify-content: space-between;
             padding: 0 2rem;
             flex-shrink: 0;
         }
@@ -471,17 +420,25 @@
 
     <div class="app-wrapper">
         
+        <!-- Mobile Sidebar Backdrop Overlay -->
+        <div id="sidebarBackdrop" class="sidebar-backdrop d-lg-none" onclick="closeMobileSidebar()"></div>
+
         <!-- Sidebar -->
-    <aside class="sidebar">
-        <a href="{{ url_for('dashboard') }}" class="sidebar-logo">
-            <div class="logo-icon">
-                <i data-lucide="zap" style="color: white; width: 20px; height: 20px;"></i>
-            </div>
-            <div>
-                <div class="logo-text-top">EDRP</div>
-                <div class="logo-text-bottom">Decision Platform</div>
-            </div>
-        </a>
+    <aside class="sidebar" id="appSidebar">
+        <div class="sidebar-logo-wrapper d-flex align-items-center justify-content-between border-bottom" style="border-color: rgba(255,255,255,0.06) !important;">
+            <a href="{{ url_for('dashboard') }}" class="sidebar-logo flex-grow-1 border-0">
+                <div class="logo-icon">
+                    <i data-lucide="zap" style="color: white; width: 20px; height: 20px;"></i>
+                </div>
+                <div>
+                    <div class="logo-text-top">EDRP</div>
+                    <div class="logo-text-bottom">Decision Platform</div>
+                </div>
+            </a>
+            <button type="button" class="btn btn-link text-white-50 p-2 me-3 d-lg-none" onclick="closeMobileSidebar()" aria-label="Close Sidebar" style="text-decoration: none;">
+                <i data-lucide="x" style="width: 22px; height: 22px; color: #94A3B8;"></i>
+            </button>
+        </div>
 
         <ul class="nav-links">
             {% set current_role = (session.get('role_name') or 'Employee') | string | lower %}
@@ -566,8 +523,13 @@
         <div class="main-content">
             
             <div class="header-bar">
+                <!-- Mobile Sidebar Hamburger Toggle -->
+                <button type="button" class="btn btn-light d-lg-none border-0 p-2 d-flex align-items-center justify-content-center shadow-none me-2" id="mobileSidebarToggle" onclick="toggleMobileSidebar()" aria-label="Toggle Sidebar" style="border-radius: 10px; width: 40px; height: 40px; background: #F1F5F9; flex-shrink: 0;">
+                    <i data-lucide="menu" style="width: 22px; height: 22px; color: #1E293B;"></i>
+                </button>
+
                 {% if session.get("logged_in") %}
-                <div class="d-flex align-items-center" style="gap: 1rem;">
+                <div class="d-flex align-items-center ms-auto" style="gap: 1rem;">
                     <div class="dropdown">
                         <button class="btn btn-light rounded-circle p-2 d-flex align-items-center justify-content-center dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="position: relative; width: 44px; height: 44px; border: 1px solid #e2e8f0;" id="notificationsDropdown">
                             <i data-lucide="bell" style="width: 22px; height: 22px; color: #64748b;"></i>
@@ -622,6 +584,36 @@
     
     <!-- Global Notifications Polling & Lucide Initialization -->
     <script>
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('appSidebar') || document.querySelector('.sidebar');
+            const backdrop = document.getElementById('sidebarBackdrop');
+            if (sidebar) {
+                sidebar.classList.toggle('show');
+                if (backdrop) {
+                    backdrop.classList.toggle('show', sidebar.classList.contains('show'));
+                }
+            }
+        }
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('appSidebar') || document.querySelector('.sidebar');
+            const backdrop = document.getElementById('sidebarBackdrop');
+            if (sidebar) sidebar.classList.remove('show');
+            if (backdrop) backdrop.classList.remove('show');
+        }
+        window.toggleMobileSidebar = toggleMobileSidebar;
+        window.closeMobileSidebar = closeMobileSidebar;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Auto close mobile sidebar when clicking a nav item on small screens
+            document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    if (window.innerWidth < 992) {
+                        closeMobileSidebar();
+                    }
+                });
+            });
+        });
+
         lucide.createIcons();
         
         const LOGGED_USER_ID = parseInt("{{ session.get('user_id', 0) }}", 10);

@@ -270,14 +270,14 @@
             {% endwith %}
 
             <form method="POST" action="{{ url_for('login') }}">
-                <!-- Employee ID or Email -->
+                <!-- Employee ID -->
                 <div class="mb-4">
-                    <label class="form-label-custom">Employee ID or Email</label>
+                    <label class="form-label-custom">Employee ID</label>
                     <div class="input-group-custom">
                         <div class="input-icon">
                             <i data-lucide="user" style="width: 18px; height: 18px;"></i>
                         </div>
-                        <input type="text" name="employee_id" class="input-field" placeholder="e.g. EMP123456 or email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
+                        <input type="text" name="employee_id" class="input-field" placeholder="e.g. EMP123456" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
                     </div>
                 </div>
 
