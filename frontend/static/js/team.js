@@ -9,7 +9,18 @@ let allAssignableEmployees = [];
 let selectedEmployeeIds = new Set();
 let currentEmpFilter = "all"; // 'all', 'unassigned', 'selected'
 let currentPage = 1;
-const rowsPerPage = 6;
+let rowsPerPage = 6;
+
+function changeTeamPageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 6;
+    }
+    currentPage = 1;
+    renderTeamTable();
+}
+window.changeTeamPageSize = changeTeamPageSize;
 
 window.onload = function() {
     loadTeams();

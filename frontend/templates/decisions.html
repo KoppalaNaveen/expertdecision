@@ -189,8 +189,22 @@
         </table>
     </div>
     <div class="card-footer bg-white border-top-0 py-3 px-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <span id="paginationInfo" class="text-muted small">Showing 0 of 0</span>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span id="paginationInfo" class="text-muted small">Showing 0 of 0</span>
+                <div class="d-inline-flex align-items-center gap-1 ms-2">
+                    <label for="decisionPageSizeSelect" class="text-muted small mb-0" style="font-size: 11px; white-space: nowrap;">Show:</label>
+                    <select id="decisionPageSizeSelect" class="form-select form-select-sm py-0 px-2 text-secondary" style="font-size: 11.5px; height: 26px; width: auto; min-width: 65px; border-radius: 6px;" onchange="changeDecisionPageSize(this.value)">
+                        <option value="5" selected>5</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="1000">1000</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+            </div>
             <div class="btn-group">
                 <button class="btn btn-sm btn-outline-secondary px-3" id="btnPrev" onclick="prevPage()">Previous</button>
                 <button class="btn btn-sm btn-outline-secondary px-3" id="btnNext" onclick="nextPage()">Next</button>

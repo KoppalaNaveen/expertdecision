@@ -4,7 +4,18 @@
 
 let allReplays  = [];
 let currentPage = 1;
-const rowsPerPage = 12;
+let rowsPerPage = 12;
+
+function changeReplayPageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 12;
+    }
+    currentPage = 1;
+    renderReplays();
+}
+window.changeReplayPageSize = changeReplayPageSize;
 
 const ACTION_COLORS = {
     "view"    : { bg: "#EEF2FF", color: "#4F46E5", icon: "eye" },

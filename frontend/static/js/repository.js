@@ -6,7 +6,18 @@ let allDecisions = [];
 let currentCat   = "";
 let currentTag   = "";
 let currentPage  = 1;
-const rowsPerPage = 9;
+let rowsPerPage  = 9;
+
+function changeRepoPageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 9;
+    }
+    currentPage = 1;
+    renderCards();
+}
+window.changeRepoPageSize = changeRepoPageSize;
 
 document.addEventListener("DOMContentLoaded", () => {
     fetchApprovedDecisions();

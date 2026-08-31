@@ -12,7 +12,18 @@ window.escapeHtml = escapeHtml;
 let allDecisions = [];
 let currentStatusFilter = 'All';
 let currentPage = 1;
-const rowsPerPage = 5;
+let rowsPerPage = 5;
+
+function changeDecisionPageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 5;
+    }
+    currentPage = 1;
+    renderTable();
+}
+window.changeDecisionPageSize = changeDecisionPageSize;
 
 let filterState = {
     category: 'All',

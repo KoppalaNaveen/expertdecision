@@ -4,7 +4,18 @@
 
 let allUsers = [];
 let currentPage = 1;
-const rowsPerPage = 12;
+let rowsPerPage = 12;
+
+function changePageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 12;
+    }
+    currentPage = 1;
+    renderTable();
+}
+window.changePageSize = changePageSize;
 
 // Role name lookup (by role_id) pre-populated with system defaults
 const roleMap = {

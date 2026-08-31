@@ -4,8 +4,19 @@
 
 let allAlternatives = [];
 let currentPage     = 1;
-const rowsPerPage   = 9;
+let rowsPerPage     = 9;
 let currentView     = "grid";
+
+function changeAltPageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 9;
+    }
+    currentPage = 1;
+    renderAlternatives();
+}
+window.changeAltPageSize = changeAltPageSize;
 
 // Populated after decisions fetch
 const decisionMap = {};

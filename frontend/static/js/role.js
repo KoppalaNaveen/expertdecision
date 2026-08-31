@@ -2,7 +2,18 @@ const API = "/api/roles";
 
 let allRoles = [];
 let currentPage = 1;
-const rowsPerPage = 5;
+let rowsPerPage = 5;
+
+function changeRolePageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 5;
+    }
+    currentPage = 1;
+    renderTable();
+}
+window.changeRolePageSize = changeRolePageSize;
 
 window.onload = function() {
     loadRoles();

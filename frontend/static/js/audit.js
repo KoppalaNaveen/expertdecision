@@ -4,9 +4,20 @@
 
 let allLogs         = [];
 let currentPage     = 1;
-const rowsPerPage   = 15;
+let rowsPerPage     = 15;
 let isFetchingAudit = false;
 let autoRefreshTimer = null;
+
+function changeAuditPageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 15;
+    }
+    currentPage = 1;
+    renderTable();
+}
+window.changeAuditPageSize = changeAuditPageSize;
 
 // Action keywords to Icons
 const ACTION_ICON = {

@@ -5,7 +5,18 @@
 let allReviews = [];
 let currentFilter = "all";
 let currentPage = 1;
-const rowsPerPage = 8;
+let rowsPerPage = 8;
+
+function changeReviewPageSize(size) {
+    if (size === 'all') {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(size, 10) || 8;
+    }
+    currentPage = 1;
+    renderTable();
+}
+window.changeReviewPageSize = changeReviewPageSize;
 
 // Decision title cache
 const decisionCache = {};
