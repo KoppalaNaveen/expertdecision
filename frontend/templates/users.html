@@ -89,7 +89,28 @@
 
 <!-- Compact Users Table -->
 <div class="card border-0 shadow-sm" style="border-radius:12px; overflow:hidden;">
-    <div class="card-header bg-white border-bottom py-2.5 px-3">
+    <div class="table-responsive" style="overflow-x: auto; max-width: 100%;">
+        <table class="table table-hover align-middle mb-0 user-mgmt-table" style="font-size:0.8rem; width:100%;">
+            <thead class="table-light text-secondary" style="font-size:0.68rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom: 1px solid #E2E8F0;">
+                <tr>
+                    <th class="ps-3 pe-2 py-2.5 border-bottom-0">User</th>
+                    <th class="px-2 py-2.5 border-bottom-0">Emp ID</th>
+                    <th class="px-2 py-2.5 border-bottom-0">Role</th>
+                    <th class="px-2 py-2.5 border-bottom-0">Team</th>
+                    <th class="px-2 py-2.5 border-bottom-0">Designation</th>
+                    <th class="px-2 py-2.5 border-bottom-0">Phone</th>
+                    <th class="px-2 py-2.5 border-bottom-0 text-center">Status</th>
+                    <th class="pe-3 ps-2 py-2.5 border-bottom-0 text-end" style="white-space: nowrap;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody" class="border-top-0">
+                <tr><td colspan="8" class="text-center py-4 text-muted">
+                    <div class="spinner-border spinner-border-sm me-2"></div>Loading users...
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white border-top py-2.5 px-3">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div class="d-flex align-items-center gap-2">
                 <span id="paginationInfo" class="text-muted small fw-medium" style="font-size: 12px;">Loading...</span>
@@ -112,27 +133,6 @@
                 <button class="btn btn-xs btn-outline-secondary px-2.5 py-1" style="font-size:11.5px; border-radius:6px;" id="btnNext" onclick="nextPage()" disabled>Next</button>
             </div>
         </div>
-    </div>
-    <div class="table-responsive" style="overflow-x: auto; max-width: 100%;">
-        <table class="table table-hover align-middle mb-0 user-mgmt-table" style="font-size:0.8rem; width:100%;">
-            <thead class="table-light text-secondary" style="font-size:0.68rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom: 1px solid #E2E8F0;">
-                <tr>
-                    <th class="ps-3 pe-2 py-2.5 border-bottom-0">User</th>
-                    <th class="px-2 py-2.5 border-bottom-0">Emp ID</th>
-                    <th class="px-2 py-2.5 border-bottom-0">Role</th>
-                    <th class="px-2 py-2.5 border-bottom-0">Team</th>
-                    <th class="px-2 py-2.5 border-bottom-0">Designation</th>
-                    <th class="px-2 py-2.5 border-bottom-0">Phone</th>
-                    <th class="px-2 py-2.5 border-bottom-0 text-center">Status</th>
-                    <th class="pe-3 ps-2 py-2.5 border-bottom-0 text-end" style="white-space: nowrap;">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="usersTableBody" class="border-top-0">
-                <tr><td colspan="8" class="text-center py-4 text-muted">
-                    <div class="spinner-border spinner-border-sm me-2"></div>Loading users...
-                </td></tr>
-            </tbody>
-        </table>
     </div>
 </div>
 

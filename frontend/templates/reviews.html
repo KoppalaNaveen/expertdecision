@@ -86,7 +86,27 @@
 
 <!-- Reviews Table -->
 <div class="card border-0 shadow-sm" style="border-radius:12px;overflow:hidden;">
-    <div class="card-header bg-white border-bottom py-2.5 px-4">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:0.9rem;">
+            <thead class="table-light text-secondary" style="font-size:0.75rem;text-transform:uppercase;">
+                <tr>
+                    <th class="px-4 py-3 border-bottom-0">Decision</th>
+                    <th class="px-4 py-3 border-bottom-0">Reviewer</th>
+                    <th class="px-4 py-3 border-bottom-0">Approval Type</th>
+                    <th class="px-4 py-3 border-bottom-0">Comments</th>
+                    <th class="px-4 py-3 border-bottom-0">Reviewed At</th>
+                    <th class="px-4 py-3 border-bottom-0">Status</th>
+                    <th class="px-4 py-3 border-bottom-0 text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody id="reviewsTableBody" class="border-top-0">
+                <tr><td colspan="7" class="text-center py-5 text-muted">
+                    <div class="spinner-border spinner-border-sm me-2"></div>Loading reviews...
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer bg-white border-top py-3 px-4">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div class="d-flex align-items-center gap-2">
                 <span id="reviewPaginationInfo" class="text-muted small fw-medium" style="font-size: 12px;">Loading...</span>
@@ -109,26 +129,6 @@
                 <button class="btn btn-sm btn-outline-secondary px-3" style="font-size: 12px; border-radius: 6px;" id="reviewBtnNext" onclick="nextPage()" disabled>Next</button>
             </div>
         </div>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" style="font-size:0.9rem;">
-            <thead class="table-light text-secondary" style="font-size:0.75rem;text-transform:uppercase;">
-                <tr>
-                    <th class="px-4 py-3 border-bottom-0">Decision</th>
-                    <th class="px-4 py-3 border-bottom-0">Reviewer</th>
-                    <th class="px-4 py-3 border-bottom-0">Approval Type</th>
-                    <th class="px-4 py-3 border-bottom-0">Comments</th>
-                    <th class="px-4 py-3 border-bottom-0">Reviewed At</th>
-                    <th class="px-4 py-3 border-bottom-0">Status</th>
-                    <th class="px-4 py-3 border-bottom-0 text-end">Action</th>
-                </tr>
-            </thead>
-            <tbody id="reviewsTableBody" class="border-top-0">
-                <tr><td colspan="7" class="text-center py-5 text-muted">
-                    <div class="spinner-border spinner-border-sm me-2"></div>Loading reviews...
-                </td></tr>
-            </tbody>
-        </table>
     </div>
 </div>
 
