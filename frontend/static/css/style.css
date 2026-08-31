@@ -287,3 +287,219 @@ footer {
     border-radius: 6px;
     font-weight: 500;
 }
+
+/* ==========================================================================
+   SIDEBAR (Dark Midnight Navy UI - Pixel-Perfect)
+   ========================================================================== */
+.sidebar {
+    width: 270px !important;
+    background: #0B132B !important;
+    color: #FFFFFF !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: fixed !important;
+    height: 100vh !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 1050 !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.04) !important;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease !important;
+}
+
+.sidebar a {
+    text-decoration: none !important;
+}
+
+.sidebar .sidebar-logo-wrapper {
+    padding: 24px 20px 20px 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.sidebar .sidebar-logo {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+    text-decoration: none !important;
+    padding: 0 !important;
+}
+
+.sidebar .logo-icon {
+    width: 44px !important;
+    height: 44px !important;
+    background: #2563EB !important;
+    border-radius: 13px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 0 22px rgba(37, 99, 235, 0.7), 0 0 8px rgba(59, 130, 246, 0.9) !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar .logo-text-top { 
+    font-size: 17px !important; 
+    font-weight: 800 !important; 
+    color: #FFFFFF !important; 
+    line-height: 1.1 !important; 
+    letter-spacing: -0.02em !important; 
+}
+
+.sidebar .logo-text-bottom { 
+    font-size: 11px !important; 
+    color: #64748B !important; 
+    font-weight: 500 !important; 
+    margin-top: 3px !important; 
+}
+
+.sidebar ul,
+.sidebar ul.nav-links,
+.sidebar ol {
+    list-style: none !important;
+    list-style-type: none !important;
+    padding: 12px 14px 24px 14px !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    flex: 1 !important;
+    overflow-y: auto !important;
+}
+
+.sidebar ul::-webkit-scrollbar { width: 4px; }
+.sidebar ul::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+
+.sidebar li {
+    list-style: none !important;
+    list-style-type: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.sidebar .nav-section-label {
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
+    padding: 20px 16px 8px 16px !important;
+    margin: 0 !important;
+    display: block !important;
+    list-style: none !important;
+}
+
+.sidebar .nav-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+    padding: 12px 16px !important;
+    border-radius: 12px !important;
+    color: #8E9BAE !important;
+    text-decoration: none !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: transparent !important;
+}
+
+.sidebar .nav-item:hover { 
+    background-color: rgba(255, 255, 255, 0.05) !important; 
+    color: #FFFFFF !important; 
+}
+
+.sidebar .nav-item:hover i,
+.sidebar .nav-item:hover svg {
+    color: #FFFFFF !important;
+}
+
+.sidebar .nav-item.active {
+    background: #2563EB !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 18px rgba(37, 99, 235, 0.45) !important;
+}
+
+.sidebar .nav-item.active i,
+.sidebar .nav-item.active svg {
+    color: #FFFFFF !important;
+}
+
+.sidebar .nav-item i,
+.sidebar .nav-item svg {
+    width: 20px !important;
+    height: 20px !important;
+    color: inherit !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar .nav-badge {
+    margin-left: auto !important;
+    background-color: #EF4444 !important;
+    color: white !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    padding: 2px 7px !important;
+    border-radius: 10px !important;
+}
+
+.sidebar .nav-divider {
+    height: 1px !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    margin: 14px 16px !important;
+}
+
+.sidebar .user-profile-bottom {
+    margin-top: auto !important;
+    padding: 16px 20px !important;
+    background: rgba(8, 14, 32, 0.9) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    display: flex !important; 
+    align-items: center !important; 
+    gap: 12px !important;
+    text-decoration: none !important;
+    color: #FFFFFF !important;
+    transition: background 0.15s !important;
+}
+
+.sidebar .user-profile-bottom:hover { 
+    background: rgba(255, 255, 255, 0.04) !important; 
+}
+
+.sidebar .user-avatar {
+    width: 36px !important; 
+    height: 36px !important; 
+    border-radius: 10px !important;
+    background: #2563EB !important;
+    display: flex !important; 
+    align-items: center !important; 
+    justify-content: center !important;
+    font-size: 13px !important; 
+    font-weight: 700 !important; 
+    color: white !important;
+    flex-shrink: 0 !important;
+}
+
+.sidebar .user-info { 
+    flex: 1 !important; 
+    min-width: 0 !important; 
+}
+
+.sidebar .user-name { 
+    font-size: 13px !important; 
+    font-weight: 600 !important; 
+    color: #FFFFFF !important; 
+    white-space: nowrap !important; 
+    overflow: hidden !important; 
+    text-overflow: ellipsis !important; 
+}
+
+.sidebar .user-role { 
+    font-size: 11px !important; 
+    color: #64748B !important; 
+    white-space: nowrap !important; 
+    overflow: hidden !important; 
+    text-overflow: ellipsis !important; 
+}
