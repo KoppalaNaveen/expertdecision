@@ -1278,9 +1278,10 @@ def users():
     if "token" not in session:
         return redirect(url_for("login"))
 
-    initial_users = get_cached_data("all_users", "/users/", ttl=30)
-    initial_roles = get_cached_data("all_roles", "/roles", ttl=120)
-    initial_teams = get_cached_data("all_teams", "/teams/", ttl=60)
+    headers = {"Authorization": f"Bearer {session['token']}"} if "token" in session else {}
+    initial_users = get_cached_data("all_users", "/users/", ttl=5, headers=headers)
+    initial_roles = get_cached_data("all_roles", "/roles", ttl=30, headers=headers)
+    initial_teams = get_cached_data("all_teams", "/teams/", ttl=30, headers=headers)
 
     return render_template(
         "users.html",

@@ -213,8 +213,123 @@ def ensure_user_schema_columns():
                     db.commit()
             finally:
                 db.close()
-    except Exception as role_init_err:
-        print(f"Baseline roles check note: {role_init_err}")
+    # Ensure baseline teams exist
+    try:
+        from app.models.team import Team
+        inspector = inspect(engine)
+        if inspector.has_table("teams"):
+            db = SessionLocal()
+            try:
+                teams_data = [
+                    (1, "AI Team", "Artificial Intelligence and Machine Learning Research"),
+                    (2, "Engineering", "Core platform and application engineering"),
+                    (3, "Product", "Product strategy, UI/UX, and feature roadmap"),
+                    (4, "Operations", "Cloud operations, DevOps, and infrastructure"),
+                    (5, "Quality Assurance", "QA and Test Automation"),
+                    (6, "Security & Compliance", "Security auditing and compliance review")
+                ]
+                for t_id, t_name, t_desc in teams_data:
+                    existing_t = db.query(Team).filter(Team.id == t_id).first()
+                    if not existing_t:
+                        db.add(Team(id=t_id, team_name=t_name, description=t_desc))
+                    else:
+                        existing_t.team_name = t_name
+                        existing_t.description = t_desc
+                db.commit()
+            finally:
+                db.close()
+    except Exception as team_init_err:
+        print(f"Baseline teams check note: {team_init_err}")
+
+    # Ensure the exact 19 active Supabase users exist in whatever database is active
+    try:
+        from app.models.user import User
+        inspector = inspect(engine)
+        if inspector.has_table("users"):
+            db = SessionLocal()
+            try:
+                ACTIVE_SUPABASE_USERS = [
+                    {"id": 11, "full_name": "Reviewer", "email": "84b8d5f2bf33c208cfdec8a0c9a0986", "email_hash": "84b8d5f2bf33c208cfdec8a0c9a0986", "email_original": "reviewer@corp.com", "employee_id": "RW1300", "password": "ef92b778bafe771e89245b89ecbc08a4", "role_id": 4, "team_id": 5, "designation": "Developer", "phone": "", "created_at": "2026-07-29 17:00:49", "updated_at": "2026-08-22 23:39:47"},
+                    {"id": 29, "full_name": "Naveen", "email": "3aa388073ca815cc0bd02d1b36c866e", "email_hash": "3aa388073ca815cc0bd02d1b36c866e", "email_original": "manager.naveen@corp.com", "employee_id": "EMP030120", "password": "e61b9f56f2f35375880eba29b736be23", "role_id": 3, "team_id": 1, "designation": "QA & Test Automation Lead", "phone": "", "created_at": "2026-07-29 17:00:49", "updated_at": "2026-08-22 23:39:47"},
+                    {"id": 48, "full_name": "Koppala Naveen", "email": "272712859141a59e53fec4baaa9e4c2c", "email_hash": "272712859141a59e53fec4baaa9e4c2c", "email_original": "koppalanaveen20@gmail.com", "employee_id": "AD030120", "password": "e61b9f56f2f35375880eba29b736be23", "role_id": 1, "team_id": 1, "designation": "Frontend Developer", "phone": "", "created_at": "2026-08-04 07:58:15", "updated_at": "2026-08-22 21:42:35"},
+                    {"id": 59, "full_name": "Vaibhav Ingle", "email": "vi1804365@gmail.com", "email_hash": "vi1804365@gmail.com", "email_original": "vi1804365@gmail.com", "employee_id": "AD741074", "password": "ef92b778bafe771e89245b89ecbc08a4", "role_id": 1, "team_id": 4, "designation": "DevOps & SRE Specialist", "phone": "", "created_at": "2026-08-04 13:14:12", "updated_at": "2026-08-22 21:36:57"},
+                    {"id": 60, "full_name": "anjali", "email": "anjalipalli437@gmail.com", "email_hash": "anjalipalli437@gmail.com", "email_original": "anjalipalli437@gmail.com", "employee_id": "EMP789456", "password": "ef92b778bafe771e89245b89ecbc08a4", "role_id": 3, "team_id": 3, "designation": "", "phone": "", "created_at": "2026-08-04 13:32:45", "updated_at": None},
+                    {"id": 62, "full_name": "Naga Sai", "email": "e9b327628bce4a26523a6c74fb6985b", "email_hash": "e9b327628bce4a26523a6c74fb6985b", "email_original": "adityachowdary3007@gmail.com", "employee_id": "MN198230", "password": "d86022526e5881054d6380812cec641", "role_id": 2, "team_id": 1, "designation": "Frontend Developer", "phone": "", "created_at": "2026-08-05 16:39:55", "updated_at": "2026-08-31 03:41:09"},
+                    {"id": 63, "full_name": "Kamakshi Medisetty", "email": "rd5860447@gmail.com", "email_hash": "rd5860447@gmail.com", "email_original": "rd5860447@gmail.com", "employee_id": "RW937213", "password": "ef92b778bafe771e89245b89ecbc08a4", "role_id": 4, "team_id": 6, "designation": "", "phone": "", "created_at": "2026-08-05 17:18:33", "updated_at": "2026-08-19 03:11:28 UTC"},
+                    {"id": 64, "full_name": "Akhila Kothapalli", "email": "kothapalliakhila6851@gmail.com", "email_hash": "kothapalliakhila6851@gmail.com", "email_original": "kothapalliakhila6851@gmail.com", "employee_id": "AD000001", "password": "3b23bf5bf0458b21b7cdf3d2ac7e94bf", "role_id": 1, "team_id": 2, "designation": "", "phone": "", "created_at": "2026-08-06 10:36:14", "updated_at": None},
+                    {"id": 71, "full_name": "Afsana Honey", "email": "7d2510d374fdca9c4d5cc61aeb6fba6a", "email_hash": "7d2510d374fdca9c4d5cc61aeb6fba6a", "email_original": "honeyafsana5@gmail.com", "employee_id": "MN987456", "password": "3287258036bd331573039ca8ba69832", "role_id": 2, "team_id": 2, "designation": "", "phone": "", "created_at": "2026-08-09 13:25:22", "updated_at": None},
+                    {"id": 77, "full_name": "Test Employee", "email": "c4fef9f03c8107c6173364f9d9989ccad", "email_hash": "c4fef9f03c8107c6173364f9d9989ccad", "email_original": "koppalanaveen.student@saveetha.ac.in", "employee_id": "RW030120", "password": "e61b9f56f2f35375880eba29b736be23", "role_id": 4, "team_id": 6, "designation": "Cybersecurity Analyst", "phone": "", "created_at": "2026-08-19 03:18:08", "updated_at": "2026-08-22 21:43:20"},
+                    {"id": 78, "full_name": "Employee Akhila", "email": "ba2915462d20e38d6dc36a6f21e99771", "email_hash": "ba2915462d20e38d6dc36a6f21e99771", "email_original": "akhila@co.com", "employee_id": "EMP000001", "password": "3b23bf5bf0458b21b7cdf3d2ac7e94bf", "role_id": 3, "team_id": 3, "designation": "Technical Team Lead", "phone": "", "created_at": "2026-08-20 09:37:27", "updated_at": "2026-08-22 21:43:37"},
+                    {"id": 79, "full_name": "Reviewer Akhila", "email": "f19386cfd0f35d1df650d6b488b7b1156", "email_hash": "f19386cfd0f35d1df650d6b488b7b1156", "email_original": "akhila@rw.com", "employee_id": "RW000001", "password": "3b23bf5bf0458b21b7cdf3d2ac7e94bf", "role_id": 4, "team_id": 4, "designation": "", "phone": "", "created_at": "2026-08-20 09:52:13", "updated_at": "2026-08-20 09:53:12"},
+                    {"id": 80, "full_name": "Manager Akhila", "email": "7a497951a3b4ffdbdcb78331e585f494b", "email_hash": "7a497951a3b4ffdbdcb78331e585f494b", "email_original": "akhila@mn.com", "employee_id": "MN000001", "password": "3b23bf5bf0458b21b7cdf3d2ac7e94bf", "role_id": 2, "team_id": 6, "designation": "", "phone": "", "created_at": "2026-08-20 09:57:36", "updated_at": "2026-08-20 09:58:17"},
+                    {"id": 81, "full_name": "Abhineswar", "email": "645ed651c74bc543e02c553a291a7381", "email_hash": "645ed651c74bc543e02c553a291a7381", "email_original": "abhireddy000001@gmail.com", "employee_id": "EMP101105", "password": "839d03e9caeb2da562aabe205df6be9", "role_id": 3, "team_id": 2, "designation": "", "phone": "", "created_at": "2026-08-20 15:47:38", "updated_at": "2026-08-21 21:33:30"},
+                    {"id": 82, "full_name": "Narasimha", "email": "e151b91baa30a1f6e95729edd0acb8d9", "email_hash": "e151b91baa30a1f6e95729edd0acb8d9", "email_original": "narasimhareddy110705@gmail.com", "employee_id": "EMP110705", "password": "3adfb6efb7ead70fe5c7ccf52ddecb747", "role_id": 3, "team_id": 1, "designation": "", "phone": "", "created_at": "2026-08-21 16:29:13", "updated_at": "2026-08-21 16:38:18"},
+                    {"id": 84, "full_name": "Kambham Reddy", "email": "ab5e7874fe8cf9661e834726bd0e8614", "email_hash": "ab5e7874fe8cf9661e834726bd0e8614", "email_original": "abhineswar2312@gmail.com", "employee_id": "EMP101104", "password": "098e5f3237419338d26718b43cd9679", "role_id": 3, "team_id": 1, "designation": "", "phone": "", "created_at": "2026-08-21 16:59:12", "updated_at": "2026-08-21 16:59:43"},
+                    {"id": 85, "full_name": "Mounish", "email": "a3e082870690295c75001a59c870ed8", "email_hash": "a3e082870690295c75001a59c870ed8", "email_original": "mounishthumbart@gmail.com", "employee_id": "RW150206", "password": "22c9e924cfbde9652e8c1fd8346c45ec", "role_id": 4, "team_id": 2, "designation": "QA & Test Verification Reviewer", "phone": "", "created_at": "2026-08-23 05:34:54", "updated_at": "2026-08-23 05:46:01"},
+                    {"id": 86, "full_name": "Koppala Manasa", "email": "8042d3959f6f2c4b68530a993053d20", "email_hash": "8042d3959f6f2c4b68530a993053d20", "email_original": "koppalanandhu20@gmail.com", "employee_id": "EMP010320", "password": "b7d243aa479e9ac2a17ac28d02be1913", "role_id": 3, "team_id": 1, "designation": "Data Analyst", "phone": "", "created_at": "2026-08-30 06:17:05", "updated_at": "2026-08-31 02:36:20"},
+                    {"id": 87, "full_name": "shana", "email": "8ad33c571c9b8441dfe4ed4d4ed3bf7c", "email_hash": "8ad33c571c9b8441dfe4ed4d4ed3bf7c", "email_original": "eshabhanaa@saveetha.ac.in", "employee_id": "EMP333333", "password": "aea8ecab675d760af7f06a469c563d98", "role_id": 3, "team_id": 2, "designation": "Frontend Developer", "phone": "", "created_at": "2026-08-31 04:47:16", "updated_at": "2026-08-31 04:48:56"}
+                ]
+                
+                target_emp_ids = {u["employee_id"] for u in ACTIVE_SUPABASE_USERS}
+                existing_users = db.query(User).all()
+                existing_emp_ids = {u.employee_id for u in existing_users}
+
+                # If database has old/different users, clean them up
+                if not target_emp_ids.issubset(existing_emp_ids):
+                    # Delete obsolete users not in active Supabase list
+                    for old_u in existing_users:
+                        if old_u.employee_id not in target_emp_ids:
+                            db.delete(old_u)
+                    db.commit()
+
+                # Upsert all 19 active Supabase users
+                for u in ACTIVE_SUPABASE_USERS:
+                    user_obj = db.query(User).filter((User.id == u["id"]) | (User.employee_id == u["employee_id"])).first()
+                    if not user_obj:
+                        user_obj = User(
+                            id=u["id"],
+                            full_name=u["full_name"],
+                            email=u["email_original"],
+                            email_hash=u["email_hash"],
+                            email_original=u["email_original"],
+                            employee_id=u["employee_id"],
+                            password=u["password"],
+                            role_id=u["role_id"],
+                            team_id=u["team_id"],
+                            designation=u["designation"],
+                            phone=u["phone"],
+                            created_at=u["created_at"],
+                            updated_at=u["updated_at"],
+                            approved=True,
+                            email_verified=True,
+                            is_active=True,
+                            status="Active"
+                        )
+                        db.add(user_obj)
+                    else:
+                        user_obj.id = u["id"]
+                        user_obj.full_name = u["full_name"]
+                        user_obj.email = u["email_original"]
+                        user_obj.email_hash = u["email_hash"]
+                        user_obj.email_original = u["email_original"]
+                        user_obj.employee_id = u["employee_id"]
+                        user_obj.password = u["password"]
+                        user_obj.role_id = u["role_id"]
+                        user_obj.team_id = u["team_id"]
+                        user_obj.designation = u["designation"]
+                        user_obj.phone = u["phone"]
+                        user_obj.created_at = u["created_at"]
+                        user_obj.updated_at = u["updated_at"]
+                        user_obj.approved = True
+                        user_obj.email_verified = True
+                        user_obj.is_active = True
+                        user_obj.status = "Active"
+                db.commit()
+                print(f"[DB] Synced {len(ACTIVE_SUPABASE_USERS)} active Supabase users on startup.")
+            finally:
+                db.close()
+    except Exception as users_sync_err:
+        print(f"Active users auto-sync note: {users_sync_err}")
 
 ensure_user_schema_columns()
 
