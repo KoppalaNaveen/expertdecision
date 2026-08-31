@@ -334,13 +334,15 @@ def ensure_user_schema_columns():
     except Exception as users_sync_err:
         print(f"Active users auto-sync note: {users_sync_err}")
 
-    # Ensure baseline approved decisions exist for the Knowledge Repository
+    # Ensure baseline approved decisions and alternatives exist
     try:
         from app.models.decision import Decision
+        from app.models.alternative import Alternative
         inspector = inspect(engine)
-        if inspector.has_table("decisions"):
+        if inspector.has_table("decisions") and inspector.has_table("alternatives"):
             db = SessionLocal()
             try:
+                # Seed baseline decisions if none exist
                 if db.query(Decision).filter(Decision.status == "Approved").count() == 0:
                     from app.core.security import generate_data_hash
                     sample_decisions = [
@@ -392,11 +394,123 @@ def ensure_user_schema_columns():
                     for sd in sample_decisions:
                         db.add(Decision(**sd))
                     db.commit()
-                    print("[DB] Initialized baseline approved decisions for Knowledge Repository.")
+                    print("[DB] Initialized baseline approved decisions.")
+
+                # Seed alternatives for all decisions that lack alternatives
+                all_decs = db.query(Decision).all()
+                for dec in all_decs:
+                    alt_count = db.query(Alternative).filter(Alternative.decision_id == dec.id).count()
+                    if alt_count == 0:
+                        alts = []
+                        if "collaborative" in dec.title.lower() or "websocket" in (dec.description or "").lower() or dec.id == 4:
+                            alts = [
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title="Asynchronous WebSocket & Redis Pub/Sub Architecture",
+                                    description="Deploy bidirectional WebSocket streaming backed by Redis Pub/Sub clusters for instantaneous review assignment updates and multi-user cursor awareness.",
+                                    pros="Instantaneous sub-millisecond event delivery, horizontal scalability with Redis clusters, low network bandwidth overhead",
+                                    cons="Requires dedicated Redis stateful connection handling and sticky session load balancing",
+                                    cost=12000.00,
+                                    feasibility_score=9,
+                                    risk_level="Low"
+                                ),
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title="Server-Sent Events (SSE) with Background Task Queue",
+                                    description="Utilize unidirectional HTTP/2 Server-Sent Events coupled with background workers to push live decision updates to reviewer browsers.",
+                                    pros="Built directly on HTTP protocol without custom WebSocket handshakes, simple firewall traversal, native browser automatic reconnection",
+                                    cons="Unidirectional only (clients still need HTTP POST for actions), higher connection pool usage on standard HTTP/1.1 proxies",
+                                    cost=8500.00,
+                                    feasibility_score=8,
+                                    risk_level="Low"
+                                ),
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title="Short-Interval Polling REST Architecture",
+                                    description="Client-side periodic polling every 3 seconds against REST notification endpoints.",
+                                    pros="Completely stateless, simplest to deploy and maintain",
+                                    cons="Higher server request load under concurrency, 3-second notification delay, wasted bandwidth",
+                                    cost=4500.00,
+                                    feasibility_score=6,
+                                    risk_level="Medium"
+                                )
+                            ]
+                        elif "security" in dec.title.lower() or "audit" in dec.title.lower() or dec.id == 3:
+                            alts = [
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title="Cryptographic SHA-256 Checksums with Append-Only Immutability",
+                                    description="Generate tamper-evident SHA-256 cryptographic hashes for every field modification and store sequential immutable audit logs in database.",
+                                    pros="High security compliance, verifiable data integrity, zero risk of undetected audit tampering",
+                                    cons="Slight CPU overhead for hash computation during high-throughput writes",
+                                    cost=14000.00,
+                                    feasibility_score=9,
+                                    risk_level="Low"
+                                ),
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title="External SIEM & CloudWatch Stream Ingestion",
+                                    description="Stream all audit events asynchronously to external enterprise SIEM platforms (Splunk / Datadog).",
+                                    pros="Decoupled audit storage, advanced automated anomaly detection and alerting",
+                                    cons="Third-party vendor dependency, recurring cloud ingestion subscription costs",
+                                    cost=22000.00,
+                                    feasibility_score=7,
+                                    risk_level="Medium"
+                                )
+                            ]
+                        elif "architecture" in dec.title.lower() or "cloud" in dec.title.lower() or dec.id == 2:
+                            alts = [
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title="Modular Monolith with Domain-Driven Service Separation",
+                                    description="Organize the platform into cleanly separated domain modules with unified database connection pools and in-process service interfaces.",
+                                    pros="Simplified single-container deployment, ultra-fast inter-service execution, minimal infrastructure cost",
+                                    cons="Requires disciplined boundary enforcement to avoid circular dependencies",
+                                    cost=10000.00,
+                                    feasibility_score=9,
+                                    risk_level="Low"
+                                ),
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title="Distributed Microservices with gRPC Communication",
+                                    description="Split authentication, decisions, audit, and notifications into independent containers communicating via gRPC.",
+                                    pros="Independent service auto-scaling, polyglot technology flexibility",
+                                    cons="Significant distributed tracing and network latency overhead, complex DevOps orchestration",
+                                    cost=32000.00,
+                                    feasibility_score=6,
+                                    risk_level="High"
+                                )
+                            ]
+                        else:
+                            alts = [
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title=f"Cloud-Native Managed Implementation for {dec.title}",
+                                    description="Adopt fully managed cloud-native services with automated scaling, zero-maintenance patching, and built-in telemetry.",
+                                    pros="Fast time-to-market, 99.99% uptime SLA, elastic auto-scaling",
+                                    cons="Moderate cloud consumption operational cost",
+                                    cost=11000.00,
+                                    feasibility_score=9,
+                                    risk_level="Low"
+                                ),
+                                Alternative(
+                                    decision_id=dec.id,
+                                    title=f"Custom Open-Source In-House Deployment for {dec.title}",
+                                    description="Self-hosted open-source solution deployed on dedicated container instances with custom tailored configurations.",
+                                    pros="Zero software license costs, full data residency control",
+                                    cons="Requires ongoing engineering maintenance and manual upgrade patching",
+                                    cost=6500.00,
+                                    feasibility_score=7,
+                                    risk_level="Medium"
+                                )
+                            ]
+                        db.add_all(alts)
+                        db.commit()
+                        print(f"[DB] Seeded {len(alts)} alternatives for Decision #{dec.id} ({dec.title}).")
             finally:
                 db.close()
     except Exception as dec_init_err:
-        print(f"Baseline decisions check note: {dec_init_err}")
+        print(f"Baseline decisions and alternatives check note: {dec_init_err}")
 
 
 ensure_user_schema_columns()
