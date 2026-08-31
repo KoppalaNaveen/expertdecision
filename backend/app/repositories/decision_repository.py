@@ -554,11 +554,11 @@ class DecisionRepository:
         # 1. Fetch version snapshots
         versions = db.query(DecisionVersion).filter(DecisionVersion.decision_id == decision_id).all()
         
-        # 2. Fetch activity logs related to this decision
+        # 2. Fetch activity logs related to this decision (limited for performance)
         logs = db.query(ActivityLog).filter(
             (ActivityLog.action.like(f"%DEC-{decision_id}%")) | 
             (ActivityLog.details.like(f"%DEC-{decision_id}%"))
-        ).all()
+        ).order_by(ActivityLog.id.desc()).limit(50).all()
 
         # 3. Fetch reviews related to this decision
         reviews = db.query(Review).filter(

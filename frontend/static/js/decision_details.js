@@ -31,7 +31,6 @@ async function fetchDecisionDetails() {
         }
         renderDecisionDetails();
         renderAlternativesTable();
-        loadHistory();
     } catch (error) {
         showToast("Danger", error.message || "Failed to load decision");
     }
@@ -2205,16 +2204,31 @@ function getHistoryUserIdBadge(userId) {
     return `<span class="badge bg-light text-secondary border px-2 py-0.5" style="font-size: 11px; font-weight: 500; vertical-align: middle;">ID: ${escapeHtml(userId)}</span>`;
 }
 
-async function loadHistory() {
+let _historyLoaded = false;
+
+async function loadHistory(forceRefresh = false) {
     const container = document.getElementById('versionHistoryContainer');
     if (!container) return;
+
+    // Skip if already loaded unless force refresh
+    if (_historyLoaded && !forceRefresh) return;
+
+    // Show loading spinner
+    container.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+            <span class="text-muted small">Loading version history...</span>
+        </div>`;
+
+    const refreshIcon = document.getElementById('historyRefreshIcon');
+    if (refreshIcon) refreshIcon.style.animation = 'spin 1s linear infinite';
 
     const decisionId = typeof DECISION_ID !== 'undefined' ? DECISION_ID : (typeof CURRENT_DECISION_ID !== 'undefined' ? CURRENT_DECISION_ID : 1);
     const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
 
     let versions = [];
     try {
-        const vRes = await fetch(`${API_URL}/decisions/${decisionId}/versions?user_id=${userIdParam}`);
+        const vRes = await fetch(`/api/decisions/${decisionId}/versions?user_id=${userIdParam}`);
         if (vRes.ok) {
             versions = await vRes.json();
         }
@@ -2379,7 +2393,17 @@ async function loadHistory() {
             `;
         }
     });
+
+    _historyLoaded = true;
+    const refreshIcon2 = document.getElementById('historyRefreshIcon');
+    if (refreshIcon2) refreshIcon2.style.animation = '';
 }
+
+function refreshVersionHistory() {
+    _historyLoaded = false;
+    loadHistory(true);
+}
+window.refreshVersionHistory = refreshVersionHistory;
 
 async function restoreVersion(versionNumber) {
     if (!confirm(`Are you sure you want to restore decision to Version ${versionNumber}?`)) {

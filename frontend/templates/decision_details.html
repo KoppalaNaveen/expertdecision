@@ -2,6 +2,7 @@
 
 {% block content %}
 <style>
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     /* Custom Premium CSS for Decision Details */
     .premium-card {
         border: none;
@@ -686,6 +687,9 @@
                 <h5 class="fw-bold text-dark mb-1">Version History</h5>
                 <p class="text-muted text-sm mb-0">Timeline of updates and changes to this decision.</p>
             </div>
+            <button class="btn btn-outline-primary btn-sm fw-semibold shadow-sm d-flex align-items-center gap-1.5" id="btnRefreshHistory" onclick="refreshVersionHistory()">
+                <i class="bi bi-arrow-clockwise" id="historyRefreshIcon"></i> Refresh
+            </button>
         </div>
 
         <div class="timeline-vertical mt-3" id="versionHistoryContainer">
@@ -1509,5 +1513,5 @@
     const CURRENT_USER_ROLE = "{{ session.get('role_name', '') }}" || localStorage.getItem('role_name') || 'Employee';
     const CURRENT_USER_NAME = "{{ session.get('full_name', '') }}" || localStorage.getItem('full_name') || '';
 </script>
-<script src="{{ url_for('static', filename='js/decision_details.js') }}?v=20260831_alts_fix_v5"></script>
+<script src="{{ url_for('static', filename='js/decision_details.js') }}?v=20260831_history_refresh_v6"></script>
 {% endblock %}
