@@ -605,7 +605,7 @@ def _call_groq_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], c
                 messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": f"{user_name}: {clean_msg}"})
 
-    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192", "llama3-8b-8192", "gemma2-9b-it"]
+    models = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "groq/compound-mini"]
     for model in models:
         try:
             url = "https://api.groq.com/openai/v1/chat/completions"
@@ -625,7 +625,7 @@ def _call_groq_api(clean_msg: str, user_name: str, db_context: Dict[str, Any], c
                 },
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=3.0) as resp:
+            with urllib.request.urlopen(req, timeout=12.0) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     choices = data.get("choices", [])
@@ -1366,13 +1366,67 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
 
         # Check if we have an active Decision loaded from DB or URL
         current_dec = db_context.get("current_decision")
-        if not current_dec and db_context.get("matched_decisions"):
-            # If on a decision page or title mentions decision
-            if "/decision/" in current_url.lower() or "dec-" in screen_title.lower() or "dec-" in current_url.lower():
-                current_dec = db_context["matched_decisions"][0]
+        
+        is_dashboard = (
+            "dashboard" in screen_title.lower() or 
+            "dashboard" in current_url.lower() or 
+            current_url in ["/", "/index", "/dashboard", "/admin-dashboard", "/manager-dashboard", "/reviewer-dashboard"] or
+            "administrator dashboard" in screen_title.lower() or
+            "manager dashboard" in screen_title.lower() or
+            "reviewer dashboard" in screen_title.lower() or
+            "employee dashboard" in screen_title.lower()
+        )
 
-        # ── Case A: Decision Details Page Full Breakdown ──
-        if current_dec or "/decision/" in current_url.lower() or "dec-" in screen_title.lower() or "decision:" in visible_text.lower():
+        is_decision_details = (
+            not is_dashboard and
+            (
+                "/decision/" in current_url.lower() or
+                bool(re.search(r'\bdec-\d+\b', screen_title.lower())) or
+                (current_dec and not any(p in current_url.lower() for p in ["/dashboard", "/teams", "/users", "/audit", "/reviews", "/repository", "/roles", "/email", "/replays", "/alternatives", "/support"]))
+            )
+        )
+
+        # ── Case A: Dashboard (Administrator, Manager, Reviewer, Employee) ──
+        if is_dashboard:
+            reply_lines = [
+                f"### 📊 Executive Overview: **{screen_title}**\n",
+                f"The **{screen_title}** serves as your centralized command center in the Expert Decision Replay Platform (EDRP) for real-time decision governance, organizational analytics, and system monitoring.\n",
+                "#### 📈 Key Visible Components & Operational Metrics:"
+            ]
+            if visible_text:
+                # Clean and append visible metrics
+                clean_visible = visible_text.replace("Executive Decision Summary:", "").strip()
+                reply_lines.append(f"{clean_visible[:900]}\n")
+            else:
+                reply_lines.extend([
+                    "- **Total Users & Active Sessions**: Real-time count of registered members and active platform sessions.",
+                    "- **Decision Volume & Approvals**: Total platform decisions, categorized by Approved, In Review, and Rejected.",
+                    "- **Organization Analytics**: Visual decision submission velocity, approval flow rates, and SLA turnaround.",
+                    "- **System Health & Audit Activity**: System uptime and immutable audit log activity counters.\n"
+                ])
+
+            reply_lines.extend([
+                "#### ⚡ Key Actions You Can Perform Here:",
+                "1. **Propose Strategic Decisions**: Click **'Create Decision'** in the sidebar to start formulating a new decision with alternative matrices.",
+                "2. **Monitor Approval Flows**: Review real-time approval rates and identify bottlenecks across Reviewer, Manager, and Admin tiers.",
+                "3. **Inspect Governance & Audit Logs**: Navigate to **Audit Logs** to view immutable before/after diffs and event timestamps.",
+                "4. **User & Team Management**: Access **User Management** and **Teams** to configure role permissions and department assignments.",
+                "5. **Decision Replay & Knowledge Base**: Open **Replays** or **Knowledge Repository** to examine decision timelines and past consensus records."
+            ])
+
+            return {
+                "reply": "\n".join(reply_lines),
+                "suggested_actions": [
+                    "How do I create a new decision?",
+                    "Explain the 3-tier approval workflow",
+                    "How do I view Audit Logs?",
+                    "Search Knowledge Repository"
+                ],
+                "source": "EDRP AI Assistant"
+            }
+
+        # ── Case B: Decision Details Page Full Breakdown ──
+        if is_decision_details:
             d = current_dec if current_dec else (db_context["matched_decisions"][0] if db_context.get("matched_decisions") else None)
             if not d:
                 # Parse structured fields from live screen context
@@ -1486,7 +1540,7 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
                     "source": "EDRP Decision Engine"
                 }
 
-        # ── Case B: Internal Email Service Full Breakdown ──
+        # ── Case C: Internal Email Service Full Breakdown ──
         if "email" in screen_title.lower() or "/email" in current_url.lower():
             reply_lines = [
                 f"### 📍 Executive Guide: **Internal Email & Communication Center** (`/email`)\n",
@@ -1517,7 +1571,7 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
                 "source": "EDRP Email Service"
             }
 
-        # ── Case C: User Management Full Breakdown ──
+        # ── Case D: User Management Full Breakdown ──
         if "user" in screen_title.lower() or "/users" in current_url.lower():
             reply_lines = [
                 f"### 📍 Executive Guide: **Enterprise User & Role Management** (`/users`)\n",
@@ -1539,6 +1593,53 @@ def _answer_with_knowledge_engine(query: str, user_name: str, db_context: Dict[s
                     "How to promote an employee to Reviewer?"
                 ],
                 "source": "EDRP User Directory"
+            }
+
+        # ── Case E: Audit Logs Full Breakdown ──
+        if "audit" in screen_title.lower() or "/audit" in current_url.lower():
+            reply_lines = [
+                f"### 🔒 Executive Guide: **Immutable Audit Logs & Compliance** (`/audit`)\n",
+                "This security workspace provides an immutable, append-only chronological log of every action, state change, and vote across the platform.\n",
+                "#### 🛡️ Key Capabilities & Features:",
+                "1. **Append-Only Logging**: Every decision creation, status change, review evaluation, and version restore is permanently logged.",
+                "2. **Field-Level JSON Diffs**: Inspect precise before/after field changes for complete transparency.",
+                "3. **Security Auditing**: Track user identity, role, timestamp, and IP address for compliance (SOC 2, ISO 27001).",
+                "4. **Search & Filter**: Search logs by user, action type, severity, or module."
+            ]
+            if visible_text:
+                reply_lines.append(f"\n**Visible Audit Records:**\n*{visible_text[:300]}...*")
+
+            return {
+                "reply": "\n".join(reply_lines),
+                "suggested_actions": [
+                    "Who can view Audit Logs?",
+                    "How does Decision Replay use audit diffs?",
+                    "Explain the approval workflow"
+                ],
+                "source": "EDRP Audit Engine"
+            }
+
+        # ── Case F: Team Management Full Breakdown ──
+        if "team" in screen_title.lower() or "/teams" in current_url.lower():
+            reply_lines = [
+                f"### 👥 Executive Guide: **Team & Department Management** (`/teams`)\n",
+                "This workspace allows administrators and managers to organize employees into functional departments and project teams.\n",
+                "#### 🏢 Key Capabilities & Operations:",
+                "1. **Create Teams**: Set up department teams (e.g. Engineering, Finance, Operations, Product, Legal).",
+                "2. **Assign Members**: Allocate employees and assign team leads with specific decision authority.",
+                "3. **Department Analytics**: Track decision volume and review turnaround per team."
+            ]
+            if visible_text:
+                reply_lines.append(f"\n**Visible Teams:**\n*{visible_text[:300]}...*")
+
+            return {
+                "reply": "\n".join(reply_lines),
+                "suggested_actions": [
+                    "How do I assign users to a team?",
+                    "What permissions does a Manager have?",
+                    "How to create a new decision?"
+                ],
+                "source": "EDRP Team Management"
             }
 
         # ── Case D: General Structured Page Summary ──
