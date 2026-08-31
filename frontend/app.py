@@ -13,6 +13,9 @@ import os
 import sys
 import requests
 import time
+import gzip
+import io
+import threading
 from datetime import timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -42,29 +45,86 @@ app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 
 # Reusable high-performance HTTP session with connection pooling
 http_session = requests.Session()
-adapter = HTTPAdapter(pool_connections=30, pool_maxsize=30, max_retries=Retry(total=2, backoff_factor=0.05))
+adapter = HTTPAdapter(pool_connections=50, pool_maxsize=50, max_retries=Retry(total=2, backoff_factor=0.05))
 http_session.mount("http://", adapter)
 http_session.mount("https://", adapter)
 
+# ── Render Free-Tier Keep-Alive Background Worker ──
+def _start_keep_alive_daemon():
+    """
+    Background daemon that pings the Render public endpoint every 9 minutes
+    to prevent Render Free Tier instances from sleeping / cold-starting.
+    """
+    def _ping_loop():
+        time.sleep(20)  # Initial wait on boot
+        while True:
+            try:
+                render_url = os.getenv("RENDER_EXTERNAL_URL", "https://expertdecision.onrender.com")
+                ping_target = f"{render_url.rstrip('/')}/health"
+                requests.get(ping_target, timeout=8)
+            except Exception:
+                pass
+            time.sleep(540)  # Ping every 9 minutes (540s < 900s inactivity threshold)
+
+    t = threading.Thread(target=_ping_loop, daemon=True, name="RenderKeepAliveWorker")
+    t.start()
+
+_start_keep_alive_daemon()
+
+@app.route("/health")
+@app.route("/ping")
+def health_check():
+    """Instantaneous lightweight healthcheck endpoint (0ms response)."""
+    return jsonify({
+        "status": "healthy",
+        "service": "EDRP Frontend",
+        "timestamp": time.time()
+    }), 200
+
 @app.after_request
-def disable_client_caching(response):
-    # Allow browser caching for static assets (JS, CSS, images, fonts) for fast page loads
+def optimize_and_compress_response(response):
+    """
+    1. Long-term browser caching for static assets (CSS, JS, Fonts, Images).
+    2. Real-time GZIP payload compression (reduces payload transfer size by 75-80%).
+    """
     content_type = response.content_type or ""
     is_static = request.path.startswith('/static/') or request.path.startswith('/favicon')
     is_asset = any(content_type.startswith(t) for t in (
         'text/css', 'application/javascript', 'text/javascript',
         'image/', 'font/', 'application/font', 'application/x-font'
     ))
+    
     if is_static or is_asset:
-        # Cache static assets for 1 hour
-        response.headers["Cache-Control"] = "public, max-age=3600, immutable"
+        # Aggressive caching for static assets (7 days)
+        response.headers["Cache-Control"] = "public, max-age=604800, immutable"
         response.headers.pop("Pragma", None)
         response.headers.pop("Expires", None)
     else:
-        # No caching for HTML pages and API responses (ensures fresh data)
+        # Dynamic HTML / API fresh headers
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+
+    # Fast GZIP compression for HTML, CSS, JS, and JSON
+    accept_encoding = request.headers.get('Accept-Encoding', '')
+    if (
+        'gzip' in accept_encoding.lower() and
+        response.status_code < 300 and
+        'Content-Encoding' not in response.headers and
+        len(response.get_data()) > 400 and
+        any(ct in content_type for ct in ['text/html', 'text/css', 'text/javascript', 'application/javascript', 'application/json'])
+    ):
+        try:
+            gzip_buffer = io.BytesIO()
+            with gzip.GzipFile(mode='wb', fileobj=gzip_buffer, compresslevel=5) as gzip_file:
+                gzip_file.write(response.get_data())
+            response.set_data(gzip_buffer.getvalue())
+            response.headers['Content-Encoding'] = 'gzip'
+            response.headers['Content-Length'] = len(response.get_data())
+            response.headers['Vary'] = 'Accept-Encoding'
+        except Exception:
+            pass
+
     return response
 
 # FastAPI Backend URL (Server-side Flask to FastAPI communication)
@@ -85,7 +145,7 @@ def make_backend_request(method, path, **kwargs):
     Sends a high-speed HTTP request directly to the FastAPI backend.
     """
     if "timeout" not in kwargs:
-        kwargs["timeout"] = 6
+        kwargs["timeout"] = 5
 
     url_path = path if path.startswith("/") else f"/{path}"
     full_url = f"{API_URL}{url_path}"
@@ -118,13 +178,13 @@ def inject_global_stats():
 
     now = time.time()
     cached = _GLOBAL_STATS_CACHE.get(user_id)
-    if cached and (now - cached["ts"] < 60):
+    if cached and (now - cached["ts"] < 120):
         base_data.update(cached["data"])
         return base_data
         
     try:
         headers = {"Authorization": f"Bearer {token}"}
-        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=2)
+        response = make_backend_request("GET", f"/dashboard/{user_id}", headers=headers, timeout=0.8)
         if response is not None and response.status_code == 200:
             data = response.json()
             fresh = {
@@ -133,6 +193,8 @@ def inject_global_stats():
             }
             _GLOBAL_STATS_CACHE[user_id] = {"data": fresh, "ts": now}
             base_data.update(fresh)
+        elif cached:
+            base_data.update(cached["data"])
     except Exception:
         if cached:
             base_data.update(cached["data"])

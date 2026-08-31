@@ -71,7 +71,10 @@ app.include_router(support_router)
 app.include_router(email_router)
 
 @app.get("/")
+@app.get("/health")
+@app.get("/ping")
 def home():
     return {
+        "status": "healthy",
         "message": "Expert Decision Replay Platform API is Running"
     }
