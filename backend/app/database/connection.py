@@ -507,6 +507,78 @@ def ensure_user_schema_columns():
                         db.add_all(alts)
                         db.commit()
                         print(f"[DB] Seeded {len(alts)} alternatives for Decision #{dec.id} ({dec.title}).")
+
+                # Seed baseline attachments, discussions, meeting notes, and versions
+                from app.models.attachment import Attachment
+                from app.models.comment import DiscussionThread, Comment
+                from app.models.meeting_note import MeetingNote
+                from app.models.decision_version import DecisionVersion
+
+                for dec in all_decs:
+                    # 1. Version History
+                    if db.query(DecisionVersion).filter(DecisionVersion.decision_id == dec.id).count() == 0:
+                        db.add(DecisionVersion(
+                            decision_id=dec.id,
+                            version_number=1,
+                            title=dec.title,
+                            description=dec.description,
+                            category_id=dec.category_id,
+                            status=dec.status,
+                            priority_level=dec.priority_level or "High",
+                            department=dec.department or "Engineering",
+                            tags=dec.tags,
+                            changed_by=dec.created_by,
+                            change_reason="Initial Creation & Formal Approval"
+                        ))
+
+                    # 2. Attachments
+                    if db.query(Attachment).filter(Attachment.decision_id == dec.id).count() == 0:
+                        doc_name = f"{dec.title.replace(' ', '_')[:30]}_Architecture_Spec.pdf"
+                        db.add(Attachment(
+                            filename=doc_name,
+                            file_path=f"/uploads/{doc_name}",
+                            file_size=2458000,
+                            decision_id=dec.id,
+                            uploaded_by=dec.created_by
+                        ))
+
+                    # 3. Discussion Thread & Comments
+                    if db.query(DiscussionThread).filter(DiscussionThread.decision_id == dec.id).count() == 0:
+                        thread = DiscussionThread(
+                            decision_id=dec.id,
+                            topic=f"Implementation & Performance Benchmarking for DEC-{dec.id}",
+                            status="Open",
+                            is_pinned=True,
+                            created_by=dec.created_by
+                        )
+                        db.add(thread)
+                        db.flush()
+                        db.add_all([
+                            Comment(
+                                thread_id=thread.id,
+                                user_id=dec.created_by,
+                                content="All automated load tests passed with zero degradation. Feasibility score is verified at 9/10."
+                            ),
+                            Comment(
+                                thread_id=thread.id,
+                                user_id=62, # Naga Sai
+                                content="Approved from the architecture and team capacity perspective. Deployment strategy is signed off."
+                            )
+                        ])
+
+                    # 4. Meeting Notes
+                    if db.query(MeetingNote).filter(MeetingNote.decision_id == dec.id).count() == 0:
+                        db.add(MeetingNote(
+                            decision_id=dec.id,
+                            title=f"Technical Review & Architecture Sign-Off for DEC-{dec.id}",
+                            notes="Detailed evaluation of primary and fallback alternatives with full stakeholder alignment.",
+                            participants="Koppala Naveen, Naga Sai, Reviewer Akhila, Vaibhav Ingle",
+                            agenda="1. Alternative evaluation & cost review. 2. Operational risk assessment. 3. Final sign-off.",
+                            action_items="1. Configure staging deployment pipeline. 2. Enable automated audit verification.",
+                            meeting_link="https://meet.google.com/edrp-review",
+                            created_by=dec.created_by
+                        ))
+                db.commit()
             finally:
                 db.close()
     except Exception as dec_init_err:
