@@ -47,13 +47,13 @@
             overflow: hidden;
         }
         
-        /* Sidebar Layout styling */
+        /* ── Sidebar Layout Styling ─────────────────────────── */
         .app-wrapper { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
         
-        /* ── Sidebar ─────────────────────────────────────────── */
+        /* ── Sidebar (Exact Dark Midnight Navy UI) ──────────── */
         .sidebar {
-            width: 260px;
-            background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+            width: 270px;
+            background: #0B132B !important;
             color: #FFFFFF;
             display: flex;
             flex-direction: column;
@@ -61,29 +61,142 @@
             height: 100vh;
             top: 0; bottom: 0; left: 0;
             z-index: 1050;
-            box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+            border-right: 1px solid rgba(255, 255, 255, 0.04);
             transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+        }
+        
+        .sidebar-logo-wrapper {
+            padding: 24px 20px 20px 20px;
         }
         .sidebar-logo {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 20px 24px;
+            gap: 14px;
             text-decoration: none;
+            padding: 0;
         }
         .logo-icon {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, #6366F1, #818CF8);
-            border-radius: 10px;
+            width: 44px;
+            height: 44px;
+            background: #2563EB;
+            border-radius: 13px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+            box-shadow: 0 0 22px rgba(37, 99, 235, 0.7), 0 0 8px rgba(59, 130, 246, 0.9);
             flex-shrink: 0;
         }
-        .logo-text-top { font-size: 16px; font-weight: 800; color: #FFFFFF; line-height: 1; }
-        .logo-text-bottom { font-size: 10px; color: #94A3B8; font-weight: 500; margin-top: 2px; }
+        .logo-text-top { 
+            font-size: 17px; 
+            font-weight: 800; 
+            color: #FFFFFF; 
+            line-height: 1.1; 
+            letter-spacing: -0.02em; 
+        }
+        .logo-text-bottom { 
+            font-size: 11px; 
+            color: #64748B; 
+            font-weight: 500; 
+            margin-top: 3px; 
+        }
+
+        .nav-links {
+            list-style: none;
+            padding: 10px 16px 24px 16px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        .nav-links::-webkit-scrollbar { width: 4px; }
+        .nav-links::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+
+        .nav-section-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 20px 16px 8px 16px;
+            margin: 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 18px;
+            border-radius: 12px;
+            color: #8E9BAE;
+            text-decoration: none;
+            font-size: 13.5px;
+            font-weight: 500;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .nav-item:hover { 
+            background-color: rgba(255, 255, 255, 0.05); 
+            color: #FFFFFF; 
+        }
+        .nav-item:hover i, .nav-item:hover svg {
+            color: #FFFFFF;
+        }
+        
+        .nav-item.active {
+            background: #2563EB !important;
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 18px rgba(37, 99, 235, 0.45) !important;
+        }
+        .nav-item.active i, .nav-item.active svg {
+            color: #FFFFFF !important;
+        }
+        
+        .nav-badge {
+            margin-left: auto;
+            background-color: #EF4444;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+        }
+        .nav-divider {
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.05);
+            margin: 14px 16px;
+        }
+
+        .user-profile-bottom {
+            margin-top: auto;
+            padding: 16px 20px;
+            background: rgba(8, 14, 32, 0.85);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex; 
+            align-items: center; 
+            gap: 12px;
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+        .user-profile-bottom:hover { background: rgba(255, 255, 255, 0.04); }
+        .user-avatar {
+            width: 36px; 
+            height: 36px; 
+            border-radius: 10px;
+            background: #2563EB;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 13px; 
+            font-weight: 700; 
+            color: white;
+            flex-shrink: 0;
+        }
+        .user-info { flex: 1; min-width: 0; }
+        .user-name { font-size: 13px; font-weight: 600; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-role { font-size: 11px; color: #64748B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* Mobile Sidebar Backdrop */
         .sidebar-backdrop {
@@ -93,7 +206,7 @@
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(15, 23, 42, 0.65);
+            background: rgba(11, 19, 43, 0.7);
             backdrop-filter: blur(4px);
             -webkit-backdrop-filter: blur(4px);
             z-index: 1040;
@@ -106,7 +219,7 @@
         }
 
         .main-content { 
-            margin-left: 260px; 
+            margin-left: 270px; 
             flex: 1; 
             display: flex; 
             flex-direction: column; 
@@ -116,7 +229,7 @@
             transition: margin-right 0.32s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.3s ease;
         }
 
-        /* ── Dynamic AI Copilot Page Shift (Prevents AI Drawer from covering page content) ── */
+        /* ── Dynamic AI Copilot Page Shift ── */
         body.ai-copilot-active .main-content {
             margin-right: 450px;
         }
@@ -133,7 +246,7 @@
             }
             .sidebar.show {
                 transform: translateX(0);
-                box-shadow: 12px 0 40px rgba(0, 0, 0, 0.4);
+                box-shadow: 14px 0 45px rgba(0, 0, 0, 0.5);
             }
             .main-content {
                 margin-left: 0 !important;
@@ -428,7 +541,7 @@
         <div class="sidebar-logo-wrapper d-flex align-items-center justify-content-between border-bottom" style="border-color: rgba(255,255,255,0.06) !important;">
             <a href="{{ url_for('dashboard') }}" class="sidebar-logo flex-grow-1 border-0">
                 <div class="logo-icon">
-                    <i data-lucide="zap" style="color: white; width: 20px; height: 20px;"></i>
+                    <i data-lucide="zap" style="color: white; width: 24px; height: 24px;"></i>
                 </div>
                 <div>
                     <div class="logo-text-top">EDRP</div>
