@@ -1,65 +1,50 @@
 import os
-import sqlite3
 from datetime import datetime
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfgen import canvas
 
-def create_credentials_pdf():
+def generate_pdf():
     pdf_path = "d:/ExpertDecisionPlatform/EDRP_User_Credentials_Confidential.pdf"
-    
-    # Read database records
-    db_path = "d:/ExpertDecisionPlatform/backend/edrp.db"
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("SELECT id, role_name FROM roles")
-    roles = dict(cur.fetchall())
 
-    cur.execute("SELECT id, full_name, employee_id, role_id, email_original, email, status, is_active FROM users ORDER BY role_id, employee_id")
-    users = cur.fetchall()
-    conn.close()
-
-    # Create document
     doc = SimpleDocTemplate(
         pdf_path,
         pagesize=landscape(letter),
-        leftMargin=36,
-        rightMargin=36,
-        topMargin=36,
-        bottomMargin=36
+        leftMargin=30,
+        rightMargin=30,
+        topMargin=28,
+        bottomMargin=28
     )
 
     styles = getSampleStyleSheet()
-    
+
     title_style = ParagraphStyle(
         'DocTitle',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=20,
-        leading=24,
+        fontSize=18,
+        leading=22,
         textColor=colors.HexColor('#0F172A'),
-        spaceAfter=4
+        spaceAfter=3
     )
-    
+
     subtitle_style = ParagraphStyle(
         'DocSubtitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=10,
-        leading=14,
+        fontSize=9.5,
+        leading=13,
         textColor=colors.HexColor('#DC2626'),
-        spaceAfter=10
+        spaceAfter=8
     )
 
     meta_style = ParagraphStyle(
         'MetaStyle',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9,
-        leading=13,
+        fontSize=8.5,
+        leading=12,
         textColor=colors.HexColor('#475569')
     )
 
@@ -67,8 +52,8 @@ def create_credentials_pdf():
         'CellText',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8.5,
-        leading=11,
+        fontSize=8,
+        leading=10,
         textColor=colors.HexColor('#1E293B')
     )
 
@@ -76,146 +61,127 @@ def create_credentials_pdf():
         'CellBold',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=11,
+        fontSize=8,
+        leading=10,
         textColor=colors.HexColor('#0F172A')
     )
 
-    role_admin_style = ParagraphStyle(
-        'RoleAdmin',
+    cell_emp_id = ParagraphStyle(
+        'CellEmpId',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
         fontSize=8.5,
-        leading=11,
-        textColor=colors.HexColor('#7C3AED')
-    )
-    
-    role_mgr_style = ParagraphStyle(
-        'RoleMgr',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=11,
-        textColor=colors.HexColor('#2563EB')
+        leading=10.5,
+        textColor=colors.HexColor('#1E1B4B')
     )
 
-    role_emp_style = ParagraphStyle(
-        'RoleEmp',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=11,
-        textColor=colors.HexColor('#059669')
-    )
-
-    role_rev_style = ParagraphStyle(
-        'RoleRev',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=11,
-        textColor=colors.HexColor('#D97706')
-    )
+    role_admin = ParagraphStyle('RAdmin', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#7C3AED'))
+    role_mgr   = ParagraphStyle('RMgr',   parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#2563EB'))
+    role_emp   = ParagraphStyle('REmp',   parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#059669'))
+    role_rev   = ParagraphStyle('RRev',   parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor('#D97706'))
 
     pass_style = ParagraphStyle(
         'PassStyle',
         parent=styles['Normal'],
         fontName='Courier-Bold',
-        fontSize=9,
-        leading=11,
-        textColor=colors.HexColor('#0284C7')
+        fontSize=8.5,
+        leading=10.5,
+        textColor=colors.HexColor('#0369A1')
     )
 
     story = []
 
     # Title & Header
-    story.append(Paragraph("Expert Decision Replay Platform (EDRP)", title_style))
-    story.append(Paragraph("CONFIDENTIAL & RESTRICTED — AUTHORIZED ADMINISTRATOR ACCESS ONLY", subtitle_style))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#CBD5E1'), spaceAfter=8, spaceBefore=0))
-    
-    now_str = datetime.now().strftime("%B %d, %Y - %I:%M %p")
-    story.append(Paragraph(f"<b>Document Generated:</b> {now_str} &nbsp;|&nbsp; <b>Total Registered User Accounts:</b> {len(users)} &nbsp;|&nbsp; <b>Platform URL:</b> https://expertdecision.onrender.com", meta_style))
-    story.append(Spacer(1, 10))
+    story.append(Paragraph("Expert Decision Replay Platform (EDRP) — User Credentials Directory", title_style))
+    story.append(Paragraph("CONFIDENTIAL &amp; RESTRICTED — AUTHORIZED ADMINISTRATOR ACCESS ONLY", subtitle_style))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#CBD5E1'), spaceAfter=6, spaceBefore=0))
 
-    # Table Data
+    now_str = datetime.now().strftime("%B %d, %Y - %I:%M %p")
+    story.append(Paragraph(f"<b>Generated:</b> {now_str} &nbsp;|&nbsp; <b>Total Accounts:</b> 19 &nbsp;|&nbsp; <b>Platform URL:</b> https://expertdecision.onrender.com", meta_style))
+    story.append(Spacer(1, 8))
+
+    # Complete 19 Users Table
+    users_data = [
+        {"id": 11, "name": "Reviewer",          "emp_id": "RW1300",    "role": "Reviewer",      "email": "reviewer@corp.com",               "designation": "Developer",                      "password": "password123"},
+        {"id": 29, "name": "Naveen",            "emp_id": "EMP030120", "role": "Employee",      "email": "naveen@corp.com",                 "designation": "QA & Test Automation Lead",       "password": "ShabhanaaNaveen0320@"},
+        {"id": 48, "name": "Koppala Naveen",    "emp_id": "AD030120",  "role": "Administrator", "email": "koppalanaveen@corp.com",          "designation": "Frontend Developer",              "password": "ShabhanaaNaveen0320@"},
+        {"id": 59, "name": "Vaibhav Ingle",     "emp_id": "AD741074",  "role": "Administrator", "email": "vif804365@gmail.com",             "designation": "DevOps & SRE Specialist",        "password": "password123"},
+        {"id": 60, "name": "anjali",            "emp_id": "EMP789456", "role": "Employee",      "email": "anjalipalli437@gmail.com",        "designation": "Team Member",                    "password": "password123"},
+        {"id": 62, "name": "Naga Sai",          "emp_id": "MN198230",  "role": "Manager",       "email": "nagasai@corp.com",                "designation": "Frontend Developer",              "password": "Nagasai#07"},
+        {"id": 63, "name": "Kamakshi Medisetty", "emp_id": "RW937213", "role": "Reviewer",      "email": "rd5860447@gmail.com",             "designation": "Reviewer Specialist",            "password": "password123"},
+        {"id": 64, "name": "Akhila Kothapalli", "emp_id": "AD000001",  "role": "Administrator", "email": "kothapalliakhila6851@gmail.com", "designation": "Platform Administrator",        "password": "Akhila@6"},
+        {"id": 71, "name": "Afsana Honey",      "emp_id": "MN987456",  "role": "Manager",       "email": "afsana.honey@corp.com",           "designation": "Manager Lead",                   "password": "password123"},
+        {"id": 77, "name": "Test Employee",     "emp_id": "RW030120",  "role": "Reviewer",      "email": "test.employee@corp.com",          "designation": "Cybersecurity Analyst",           "password": "ShabhanaaNaveen0320@"},
+        {"id": 78, "name": "Employee Akhila",   "emp_id": "EMP000001", "role": "Employee",      "email": "akhila.emp@corp.com",             "designation": "Technical Team Lead",             "password": "Akhila@6"},
+        {"id": 79, "name": "Reviewer Akhila",   "emp_id": "RW000001",  "role": "Reviewer",      "email": "akhila.rev@corp.com",             "designation": "Review Board Member",             "password": "Akhila@6"},
+        {"id": 80, "name": "Manager Akhila",    "emp_id": "MN000001",  "role": "Manager",       "email": "akhila.mgr@corp.com",             "designation": "Operations Manager",              "password": "Akhila@6"},
+        {"id": 81, "name": "Abhineswar",        "emp_id": "EMP101105", "role": "Employee",      "email": "abhineswar@corp.com",             "designation": "Team Member",                    "password": "Naveen0320@"},
+        {"id": 82, "name": "Narasimha",         "emp_id": "EMP110705", "role": "Employee",      "email": "narasimha@corp.com",              "designation": "Team Member",                    "password": "Narasimha@11"},
+        {"id": 84, "name": "Kambham Reddy",     "emp_id": "EMP101104", "role": "Employee",      "email": "kambham.reddy@corp.com",          "designation": "Team Member",                    "password": "Abhineswar@123"},
+        {"id": 85, "name": "Mounish",           "emp_id": "RW150206",  "role": "Reviewer",      "email": "mounish@corp.com",                "designation": "QA & Test Verification Reviewer", "password": "Mounish@123"},
+        {"id": 86, "name": "Koppala Manasa",    "emp_id": "EMP010320", "role": "Employee",      "email": "manasa.koppala@corp.com",         "designation": "Data Analyst",                    "password": "KoppalaNaveen0320@"},
+        {"id": 87, "name": "shana",             "emp_id": "EMP333333", "role": "Employee",      "email": "shana@corp.com",                  "designation": "Frontend Developer",              "password": "password123"}
+    ]
+
     table_data = [
         [
             Paragraph("<b>#</b>", cell_bold),
-            Paragraph("<b>Employee ID</b>", cell_bold),
+            Paragraph("<b>Emp ID</b>", cell_bold),
             Paragraph("<b>Full Name</b>", cell_bold),
             Paragraph("<b>Assigned Role</b>", cell_bold),
+            Paragraph("<b>Designation</b>", cell_bold),
             Paragraph("<b>Registered Email / Username</b>", cell_bold),
-            Paragraph("<b>Status</b>", cell_bold),
-            Paragraph("<b>Login Password</b>", cell_bold)
+            Paragraph("<b>Original Password</b>", cell_bold)
         ]
     ]
 
-    for idx, u in enumerate(users, 1):
-        uid, name, emp_id, role_id, email_orig, email_h, status, is_act = u
-        role_name = roles.get(role_id, "Employee")
-        email = email_orig if email_orig else email_h
-
-        # Style based on role
-        if role_name == "Administrator":
-            r_st = role_admin_style
-        elif role_name == "Manager":
-            r_st = role_mgr_style
-        elif role_name == "Reviewer":
-            r_st = role_rev_style
+    for idx, u in enumerate(users_data, 1):
+        r_name = u["role"]
+        if r_name == "Administrator":
+            r_st = role_admin
+        elif r_name == "Manager":
+            r_st = role_mgr
+        elif r_name == "Reviewer":
+            r_st = role_rev
         else:
-            r_st = role_emp_style
-
-        # Password
-        # Default system password for seeded users is password123
-        pwd_text = "password123"
-
-        status_display = "Active" if status == "Active" or is_act else "Inactive"
-        status_color = "#059669" if status_display == "Active" else "#DC2626"
-        status_p = Paragraph(f"<font color='{status_color}'><b>{status_display}</b></font>", cell_style)
+            r_st = role_emp
 
         table_data.append([
             Paragraph(str(idx), cell_style),
-            Paragraph(f"<b>{emp_id}</b>", cell_bold),
-            Paragraph(name, cell_style),
-            Paragraph(role_name, r_st),
-            Paragraph(email, cell_style),
-            status_p,
-            Paragraph(pwd_text, pass_style)
+            Paragraph(f"<b>{u['emp_id']}</b>", cell_emp_id),
+            Paragraph(u["name"], cell_bold),
+            Paragraph(r_name, r_st),
+            Paragraph(u["designation"], cell_style),
+            Paragraph(u["email"], cell_style),
+            Paragraph(f"<code>{u['password']}</code>", pass_style)
         ])
 
-    # 720pt printable width on landscape letter (792 - 72 = 720)
-    col_widths = [26, 85, 140, 100, 185, 64, 120]
+    # 732 printable width
+    col_widths = [22, 75, 120, 85, 140, 160, 130]
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
-    
+
     t.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#0F172A')),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8FAFC')]),
     ]))
 
     story.append(t)
-    story.append(Spacer(1, 14))
+    story.append(Spacer(1, 8))
 
-    # Notes section
-    note_title = ParagraphStyle('NoteTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#0F172A'))
-    note_body = ParagraphStyle('NoteBody', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=11, textColor=colors.HexColor('#475569'))
+    # Notes
+    note_body = ParagraphStyle('NoteBody', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=10, textColor=colors.HexColor('#475569'))
+    story.append(Paragraph("<b>Authentication Guide:</b> Users can log into the platform at <code>https://expertdecision.onrender.com/login</code> using either their <b>Employee ID</b> (e.g. <code>AD030120</code>, <code>MN198230</code>, <code>RW1300</code>) and Password. Passwords can also be updated directly from the Administrator User Management console.", note_body))
 
-    story.append(Paragraph("<b>Security & Password Information Notes:</b>", note_title))
-    story.append(Paragraph("1. <b>Standard Password:</b> All standard and seeded accounts use the default password <code>password123</code> for login authentication.", note_body))
-    story.append(Paragraph("2. <b>Authentication Format:</b> Users can log in using their assigned <b>Employee ID</b> (e.g., <code>AD030120</code>, <code>MN1297</code>, <code>EMP8749</code>, <code>RW1300</code>) and Password.", note_body))
-    story.append(Paragraph("3. <b>Password Hashing:</b> Passwords are cryptographically protected in the database using one-way <code>bcrypt</code> hashing (cost factor 12) in compliance with enterprise security governance.", note_body))
-    story.append(Paragraph("4. <b>Password Reset:</b> If any user has modified their password or forgotten it, an Administrator can reset it directly from the <b>User Management</b> console or via 6-digit Email OTP.", note_body))
-
-    # Build PDF
     doc.build(story)
-    print(f"Successfully created PDF: {pdf_path} (Size: {os.path.getsize(pdf_path)} bytes)")
+    print(f"Successfully generated PDF: {pdf_path} (Size: {os.path.getsize(pdf_path)} bytes)")
 
 if __name__ == "__main__":
-    create_credentials_pdf()
+    generate_pdf()
