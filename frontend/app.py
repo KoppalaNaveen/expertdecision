@@ -89,13 +89,32 @@ def health_check():
 @app.route("/debug-info")
 def debug_info():
     """Diagnostic endpoint to debug deployment issues."""
-    import glob
     static_folder = app.static_folder
     template_folder = app.template_folder
     js_files = []
     if static_folder and os.path.isdir(os.path.join(static_folder, "js")):
         js_files = os.listdir(os.path.join(static_folder, "js"))
     
+    # Get database info
+    db_url_raw = os.getenv("DATABASE_URL", "(NOT SET)")
+    db_url_safe = db_url_raw[:20] + "..." if len(db_url_raw) > 20 else db_url_raw
+    db_type = "unknown"
+    try:
+        from backend.app.database.connection import DATABASE_URL as active_db_url
+        if "sqlite" in (active_db_url or ""):
+            db_type = "sqlite"
+        elif "postgresql" in (active_db_url or ""):
+            db_type = "postgresql"
+    except Exception:
+        try:
+            from app.database.connection import DATABASE_URL as active_db_url
+            if "sqlite" in (active_db_url or ""):
+                db_type = "sqlite"
+            elif "postgresql" in (active_db_url or ""):
+                db_type = "postgresql"
+        except Exception:
+            pass
+
     return jsonify({
         "cwd": os.getcwd(),
         "frontend_dir": _FRONTEND_DIR,
@@ -107,7 +126,9 @@ def debug_info():
         "bridge_active": _fastapi_client is not None,
         "sys_modules_app": "app" in sys.modules,
         "python_path_0": sys.path[0] if sys.path else "empty",
-        "database_url_set": bool(os.getenv("DATABASE_URL")),
+        "database_url_env_set": db_url_raw != "(NOT SET)",
+        "database_url_preview": db_url_safe,
+        "active_db_type": db_type,
     }), 200
 
 @app.after_request

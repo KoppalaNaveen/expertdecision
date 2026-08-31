@@ -41,25 +41,40 @@ def _get_local_sqlite_url():
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+print(f"[DB] Raw DATABASE_URL from env: {'(set, {len(DATABASE_URL)} chars)' if DATABASE_URL else '(NOT SET)'}")
+if DATABASE_URL and len(DATABASE_URL) > 20:
+    # Log a safe preview (hide password)
+    safe_preview = DATABASE_URL[:15] + "..." + DATABASE_URL[-20:]
+    print(f"[DB] Preview: {safe_preview}")
+
+# Fix Supabase/Render postgres:// -> postgresql:// (SQLAlchemy requires postgresql://)
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    print("[DB] Converted postgres:// to postgresql://")
+
 # Optimized Connection Pool for Remote PostgreSQL / Local SQLite
 if not DATABASE_URL or "sqlite" in DATABASE_URL:
     DATABASE_URL = _get_local_sqlite_url()
+    print(f"[DB] Using LOCAL SQLite: {DATABASE_URL}")
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
+    print(f"[DB] Attempting remote PostgreSQL connection...")
     try:
         engine = create_engine(
             DATABASE_URL,
-            pool_size=15,
-            max_overflow=25,
-            pool_timeout=2,
+            pool_size=10,
+            max_overflow=20,
+            pool_timeout=30,
             pool_recycle=300,
             pool_pre_ping=True,
-            connect_args={"connect_timeout": 2}
+            connect_args={"connect_timeout": 15}
         )
         with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+            result = conn.execute(text("SELECT 1"))
+            print(f"[DB] ✅ Remote PostgreSQL connection SUCCESSFUL")
     except Exception as remote_db_err:
-        print(f"Remote DB connection unreachable ({remote_db_err}). Falling back immediately to local SQLite.")
+        print(f"[DB] ❌ Remote DB connection FAILED: {remote_db_err}")
+        print(f"[DB] Falling back to local SQLite")
         DATABASE_URL = _get_local_sqlite_url()
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
