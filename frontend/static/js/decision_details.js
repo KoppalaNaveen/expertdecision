@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
     fetchAlternatives();
 
     if (!livePollInterval) {
-        livePollInterval = setInterval(fetchDecisionDetailsSilent, 3000);
+        livePollInterval = setInterval(fetchDecisionDetailsSilent, 10000);
     }
 });
 
@@ -26,7 +26,11 @@ async function fetchDecisionDetails() {
         
         currentDecision = await response.json().catch(() => null);
         if (!currentDecision) throw new Error("Invalid response format received from decision API");
+        if (currentDecision.alternatives && Array.isArray(currentDecision.alternatives) && currentDecision.alternatives.length > 0) {
+            currentAlternatives = currentDecision.alternatives;
+        }
         renderDecisionDetails();
+        renderAlternativesTable();
         loadHistory();
     } catch (error) {
         showToast("Danger", error.message || "Failed to load decision");
@@ -41,10 +45,16 @@ async function fetchDecisionDetailsSilent() {
         const newData = await response.json().catch(() => null);
         if (!newData) return;
         
-        const hasChanged = JSON.stringify(newData.reviews) !== JSON.stringify(currentDecision?.reviews) || newData.status !== currentDecision?.status;
+        const hasChanged = JSON.stringify(newData.reviews) !== JSON.stringify(currentDecision?.reviews) || 
+                           newData.status !== currentDecision?.status ||
+                           JSON.stringify(newData.alternatives) !== JSON.stringify(currentAlternatives);
         currentDecision = newData;
+        if (newData.alternatives && Array.isArray(newData.alternatives) && newData.alternatives.length > 0) {
+            currentAlternatives = newData.alternatives;
+        }
         if (hasChanged) {
             renderDecisionDetails();
+            renderAlternativesTable();
         }
     } catch (_) {}
 }
@@ -396,22 +406,21 @@ async function updateStatus() {
 
 async function fetchAlternatives() {
     try {
-        const response = await fetch(`${API_URL}/alternatives/decision/${DECISION_ID}`);
-        if (!response.ok) {
-            let errorMsg = "Failed to load alternatives";
-            try {
-                const errData = await response.json();
-                errorMsg = errData.detail || errorMsg;
-            } catch (_) {}
-            console.warn("Alternatives load notice:", errorMsg);
-            return;
+        const response = await fetch(`/api/alternatives/decision/${DECISION_ID}`);
+        if (response.ok) {
+            const data = await response.json().catch(() => []);
+            if (Array.isArray(data) && data.length > 0) {
+                currentAlternatives = data;
+            }
         }
-        
-        currentAlternatives = await response.json().catch(() => []);
+    } catch (error) {
+        console.warn("Alternatives load notice:", error);
+    } finally {
+        if ((!currentAlternatives || currentAlternatives.length === 0) && currentDecision && Array.isArray(currentDecision.alternatives) && currentDecision.alternatives.length > 0) {
+            currentAlternatives = currentDecision.alternatives;
+        }
         renderAlternativesTable();
         renderRationale();
-    } catch (error) {
-        console.warn("Alternatives load error:", error);
     }
 }
 
@@ -419,12 +428,20 @@ function renderAlternativesTable() {
     const listContainer = document.getElementById("alternativesEvaluatorList");
     const tbody = document.getElementById("alternativesTableBody");
 
+    const altsToRender = (currentAlternatives && currentAlternatives.length > 0) 
+        ? currentAlternatives 
+        : ((typeof currentDecision !== 'undefined' && currentDecision && Array.isArray(currentDecision.alternatives)) ? currentDecision.alternatives : []);
+
+    if (altsToRender && altsToRender.length > 0) {
+        currentAlternatives = altsToRender;
+    }
+
     if (listContainer) {
         listContainer.innerHTML = "";
-        if (!currentAlternatives || currentAlternatives.length === 0) {
+        if (!altsToRender || altsToRender.length === 0) {
             listContainer.innerHTML = `<div class="text-center py-4 text-muted">No alternatives added yet.</div>`;
         } else {
-            currentAlternatives.forEach((alt, idx) => {
+            altsToRender.forEach((alt, idx) => {
                 let riskBadge = "bg-secondary-subtle text-secondary";
                 if (alt.risk_level === "Low") riskBadge = "bg-success-subtle text-success border border-success-subtle";
                 if (alt.risk_level === "Medium") riskBadge = "bg-warning-subtle text-warning-emphasis border border-warning-subtle";

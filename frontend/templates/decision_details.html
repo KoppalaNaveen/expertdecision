@@ -1014,10 +1014,24 @@
         }
     }
     
+    // Safe HTML Escape helper
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+    window.escapeHtml = escapeHtml;
+
     // Original editAlternative overrides from decision_details.js
     function editAlternative(id) {
-        if(typeof alternativesData === 'undefined') return;
-        const d = alternativesData.find(x => x.id === id);
+        const list = (typeof currentAlternatives !== 'undefined' && currentAlternatives && currentAlternatives.length > 0)
+            ? currentAlternatives
+            : ((typeof currentDecision !== 'undefined' && currentDecision && Array.isArray(currentDecision.alternatives)) ? currentDecision.alternatives : []);
+        const d = list.find(x => x.id === id);
         if (!d) return;
 
         currentAltStep = 1;
@@ -1025,9 +1039,9 @@
         document.getElementById("altTitle").value = d.title;
         document.getElementById("altDescription").value = d.description || '';
         document.getElementById("altCost").value = d.cost || 0;
-        document.getElementById("altRisk").value = d.risk || 'Medium';
-        document.getElementById("altFeasibility").value = d.feasibility || 5;
-        document.getElementById('val-feasibility').innerText = (d.feasibility || 5) + '/10';
+        document.getElementById("altRisk").value = d.risk_level || d.risk || 'Medium';
+        document.getElementById("altFeasibility").value = d.feasibility_score || d.feasibility || 5;
+        document.getElementById('val-feasibility').innerText = (d.feasibility_score || d.feasibility || 5) + '/10';
         
         document.getElementById("altModalTitle").innerText = "Edit Alternative Option";
         
@@ -1254,8 +1268,16 @@
                 const list = document.getElementById('alternativesEvaluatorList');
                 if (!list) return;
                 
+                const altsToRender = (typeof currentAlternatives !== 'undefined' && currentAlternatives && currentAlternatives.length > 0)
+                    ? currentAlternatives
+                    : ((typeof currentDecision !== 'undefined' && currentDecision && Array.isArray(currentDecision.alternatives)) ? currentDecision.alternatives : []);
+
+                if (altsToRender && altsToRender.length > 0) {
+                    currentAlternatives = altsToRender;
+                }
+
                 list.innerHTML = '';
-                if (currentAlternatives.length === 0) {
+                if (!altsToRender || altsToRender.length === 0) {
                     list.innerHTML = `
                         <div class="text-center p-4 border rounded-3 bg-light border-dashed">
                             <i class="bi bi-ui-checks-grid text-muted fs-3 mb-2"></i>
@@ -1266,7 +1288,11 @@
                     return;
                 }
                 
-                currentAlternatives.forEach((alt, index) => {
+                const isOwner = (typeof currentDecision !== 'undefined' && currentDecision && currentDecision.created_by === USER_ID);
+                const isAdmin = typeof CURRENT_USER_ROLE !== 'undefined' && CURRENT_USER_ROLE && String(CURRENT_USER_ROLE).toLowerCase().includes('admin');
+                const isEditable = isAdmin || (isOwner && currentDecision && currentDecision.status === 'Draft');
+
+                altsToRender.forEach((alt, index) => {
                     let score = 50;
                     if (alt.feasibility_score !== null && alt.feasibility_score !== undefined && !isNaN(alt.feasibility_score)) {
                         let val = parseFloat(alt.feasibility_score);
@@ -1281,10 +1307,11 @@
                     }
                     const isRecommended = index === 0;
                     
-                    let riskColor = alt.risk_level === 'High' ? 'danger' : (alt.risk_level === 'Medium' ? 'warning' : 'success');
+                    const risk = alt.risk_level || 'Medium';
+                    let riskColor = risk.toLowerCase().includes('high') ? 'danger' : (risk.toLowerCase().includes('low') ? 'success' : 'warning');
                     
                     const card = document.createElement('div');
-                    card.className = `border rounded-3 p-3 mb-3 position-relative ${isRecommended ? 'border-primary-subtle bg-primary-subtle bg-opacity-10' : ''}`;
+                    card.className = `border rounded-3 p-3 mb-3 position-relative ${isRecommended ? 'border-primary-subtle bg-primary-subtle bg-opacity-10' : 'bg-white'}`;
                     
                     card.innerHTML = `
                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -1295,8 +1322,10 @@
                             <div class="d-flex align-items-center">
                                 ${isRecommended ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill me-2">Recommended</span>' : ''}
                                 <button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="viewAlternativeDetail(${alt.id})" title="View Alternative Details"><i class="bi bi-eye fs-6"></i></button>
-                                <button class="btn btn-sm btn-link text-muted p-0 me-2" onclick="editAlternative(${alt.id})" title="Edit Option"><i class="bi bi-pencil"></i></button>
-                                <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteAlternative(${alt.id})" title="Delete Option"><i class="bi bi-trash"></i></button>
+                                ${isEditable ? `
+                                    <button class="btn btn-sm btn-link text-muted p-0 me-2" onclick="editAlternative(${alt.id})" title="Edit Option"><i class="bi bi-pencil"></i></button>
+                                    <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteAlternative(${alt.id})" title="Delete Option"><i class="bi bi-trash"></i></button>
+                                ` : ''}
                             </div>
                         </div>
                         <p class="text-sm text-muted mb-3">${escapeHtml(alt.description || 'No description provided.')}</p>
@@ -1316,7 +1345,7 @@
                             </div>
                             <div class="col-sm-4 col-6 text-end text-sm-start">
                                 <small class="text-muted d-block mb-1" style="font-size: 11px;">Risk</small>
-                                <span class="badge bg-${riskColor}-subtle text-${riskColor} border border-${riskColor}-subtle px-2 py-1">${alt.risk_level || 'Unknown'}</span>
+                                <span class="badge bg-${riskColor}-subtle text-${riskColor} border border-${riskColor}-subtle px-2 py-1">${risk}</span>
                             </div>
                         </div>
                     `;
@@ -1326,6 +1355,8 @@
             
             if (typeof fetchAlternatives === 'function') {
                 fetchAlternatives();
+            } else if (typeof renderAlternativesTable === 'function') {
+                renderAlternativesTable();
             }
         }
     });
@@ -1478,5 +1509,5 @@
     const CURRENT_USER_ROLE = "{{ session.get('role_name', '') }}" || localStorage.getItem('role_name') || 'Employee';
     const CURRENT_USER_NAME = "{{ session.get('full_name', '') }}" || localStorage.getItem('full_name') || '';
 </script>
-<script src="{{ url_for('static', filename='js/decision_details.js') }}?v=20260830_safe_json_v4"></script>
+<script src="{{ url_for('static', filename='js/decision_details.js') }}?v=20260831_alts_fix_v5"></script>
 {% endblock %}

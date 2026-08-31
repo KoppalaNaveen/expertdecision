@@ -48,9 +48,23 @@ http_session.mount("https://", adapter)
 
 @app.after_request
 def disable_client_caching(response):
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+    # Allow browser caching for static assets (JS, CSS, images, fonts) for fast page loads
+    content_type = response.content_type or ""
+    is_static = request.path.startswith('/static/') or request.path.startswith('/favicon')
+    is_asset = any(content_type.startswith(t) for t in (
+        'text/css', 'application/javascript', 'text/javascript',
+        'image/', 'font/', 'application/font', 'application/x-font'
+    ))
+    if is_static or is_asset:
+        # Cache static assets for 1 hour
+        response.headers["Cache-Control"] = "public, max-age=3600, immutable"
+        response.headers.pop("Pragma", None)
+        response.headers.pop("Expires", None)
+    else:
+        # No caching for HTML pages and API responses (ensures fresh data)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     return response
 
 # FastAPI Backend URL (Server-side Flask to FastAPI communication)
@@ -694,7 +708,11 @@ def universal_api_proxy(endpoint):
         if query_string:
             url_path = f"{url_path}?{query_string}"
 
-        headers = {k: v for k, v in request.headers if k.lower() not in ["host", "content-length"]}
+        # Strip encoding headers to prevent gzip mismatch (requests auto-decompresses)
+        headers = {
+            k: v for k, v in request.headers
+            if k.lower() not in ["host", "content-length", "accept-encoding", "content-encoding", "transfer-encoding"]
+        }
         
         json_data = None
         form_data = None
@@ -721,11 +739,9 @@ def universal_api_proxy(endpoint):
             timeout=30
         )
 
-        out_headers = {}
-        if "Content-Type" in resp.headers:
-            out_headers["Content-Type"] = resp.headers["Content-Type"]
-        if "Content-Disposition" in resp.headers:
-            out_headers["Content-Disposition"] = resp.headers["Content-Disposition"]
+        # Forward only safe headers; exclude encoding headers since requests auto-decompresses
+        excluded = {"content-encoding", "transfer-encoding", "connection", "content-length"}
+        out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
 
         return make_response(resp.content, resp.status_code, out_headers)
     except Exception as e:
@@ -1382,34 +1398,6 @@ def account_deleted():
     res.headers["Expires"] = "0"
     return res
 
-
-# ===========================
-# API PROXY (FLASK TO FASTAPI)
-# ===========================
-
-@app.route("/api/<path:subpath>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-def api_proxy(subpath):
-    try:
-        url = f"{API_URL}/{subpath}"
-        headers = {k: v for k, v in request.headers if k.lower() not in ("host", "content-length")}
-        if "token" in session and "Authorization" not in headers:
-            headers["Authorization"] = f"Bearer {session['token']}"
-        
-        res = http_session.request(
-            method=request.method,
-            url=url,
-            headers=headers,
-            data=request.get_data(),
-            params=request.args,
-            cookies=request.cookies,
-            allow_redirects=False,
-            timeout=15
-        )
-        excluded_headers = ["content-encoding", "content-length", "transfer-encoding", "connection"]
-        resp_headers = [(k, v) for k, v in res.headers.items() if k.lower() not in excluded_headers]
-        return make_response(res.content, res.status_code, resp_headers)
-    except Exception as e:
-        return jsonify({"detail": f"API Proxy connection error: {str(e)}"}), 502
 
 
 # ===========================

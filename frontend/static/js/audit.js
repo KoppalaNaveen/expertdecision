@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!document.hidden) {
             fetchAuditLogs(false);
         }
-    }, 3000);
+    }, 15000);
 });
 
 async function fetchAuditLogs(showSpinner = false) {
