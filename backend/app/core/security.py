@@ -23,8 +23,12 @@ def verify_password(
 ) -> bool:
     """
     Verify a plain password against a stored hash.
-    Supports current SHA-256, legacy passlib hashes (bcrypt, sha256_crypt), and plain text.
-    Handles mobile input variants (e.g. accidental trailing/leading whitespace from keyboards).
+    Supports:
+    - 64-char standard SHA-256
+    - 32-char SHA-256 prefix/truncated hashes (e.g. from Supabase columns)
+    - 32-char MD5 hashes
+    - Legacy passlib hashes (bcrypt, sha256_crypt)
+    - Plain text fallback
     """
     if plain_password is None or hashed_password is None:
         return False
@@ -35,13 +39,23 @@ def verify_password(
     if not str_plain or not str_hash:
         return False
 
-    # 1. Standard SHA-256 hex match (current system standard)
-    if hashlib.sha256(str_plain.encode("utf-8")).hexdigest() == str_hash:
-        return True
-    if hashlib.sha256(str_plain.strip().encode("utf-8")).hexdigest() == str_hash:
-        return True
+    for candidate in [str_plain, str_plain.strip()]:
+        c_sha256 = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
+        c_md5 = hashlib.md5(candidate.encode("utf-8")).hexdigest()
 
-    # 2. Legacy passlib verification (bcrypt, sha256_crypt, etc.)
+        # 1. Exact SHA-256 match (64-char)
+        if c_sha256.lower() == str_hash.lower():
+            return True
+
+        # 2. 32-char / truncated SHA-256 match
+        if len(str_hash) >= 16 and (c_sha256.lower().startswith(str_hash.lower()) or str_hash.lower().startswith(c_sha256[:len(str_hash)].lower())):
+            return True
+
+        # 3. MD5 match
+        if c_md5.lower() == str_hash.lower():
+            return True
+
+    # 4. Legacy passlib verification (bcrypt, sha256_crypt, etc.)
     try:
         if pwd_context.identify(str_hash):
             if pwd_context.verify(str_plain, str_hash):
@@ -51,7 +65,7 @@ def verify_password(
     except Exception:
         pass
 
-    # 3. Plain text fallback (for any legacy development/seeded records)
+    # 5. Plain text fallback
     if str_hash == str_plain or str_hash == str_plain.strip():
         return True
 

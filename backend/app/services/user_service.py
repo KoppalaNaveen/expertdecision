@@ -175,23 +175,25 @@ class UserService:
 
     @staticmethod
     def login_user(db: Session, user: UserLogin):
-        identifier = user.employee_id.strip()
+        identifier = (user.employee_id or "").strip()
         
-        # Look up user ONLY by employee_id
+        # Look up user by employee_id, or fallback to email
         db_user = UserRepository.get_user_by_employee_id(db, identifier)
+        if not db_user:
+            db_user = UserRepository.get_user_by_email(db, identifier)
 
         # Case 1: Account not found
         if not db_user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Employee ID or Password."
+                detail="Invalid Employee ID / Email or Password."
             )
 
         # Case 2: Wrong password
         if not verify_password(user.password, db_user.password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Employee ID or Password."
+                detail="Invalid Employee ID / Email or Password."
             )
 
         # Upgrade legacy hash to modern SHA-256 if needed
