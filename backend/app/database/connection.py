@@ -10,13 +10,18 @@ from sqlalchemy import text, inspect
 
 
 def _get_local_sqlite_url():
-    backend_db = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "edrp.db"))
-    if os.path.exists(backend_db) and os.path.getsize(backend_db) > 0:
-        return f"sqlite:///{backend_db}"
-    root_db = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "edrp.db"))
-    if os.path.exists(root_db) and os.path.getsize(root_db) > 0:
-        return f"sqlite:///{root_db}"
-    return f"sqlite:///{backend_db}"
+    candidates = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "edrp.db")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "edrp.db")),
+        os.path.abspath(os.path.join(os.getcwd(), "edrp.db")),
+        os.path.abspath(os.path.join(os.getcwd(), "backend", "edrp.db")),
+        os.path.abspath(os.path.join(os.getcwd(), "..", "backend", "edrp.db")),
+        os.path.abspath(os.path.join(os.getcwd(), "..", "edrp.db")),
+    ]
+    for p in candidates:
+        if os.path.exists(p) and os.path.getsize(p) > 0:
+            return f"sqlite:///{p}"
+    return f"sqlite:///{candidates[0]}"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 

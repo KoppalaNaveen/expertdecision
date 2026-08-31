@@ -145,23 +145,64 @@ def _resolve_backend_url():
 
 def _load_fastapi_app_and_client():
     try:
-        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend"))
-        if backend_dir not in sys.path:
-            sys.path.insert(0, backend_dir)
+        candidate_dirs = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend")),
+            os.path.abspath(os.path.join(os.getcwd(), "backend")),
+            os.path.abspath(os.path.join(os.getcwd(), "..", "backend")),
+            os.path.abspath("backend"),
+        ]
+        backend_dir = None
+        for d in candidate_dirs:
+            if os.path.isdir(d) and os.path.exists(os.path.join(d, "app", "main.py")):
+                backend_dir = d
+                break
+
+        if not backend_dir:
+            print("FastAPI backend directory not found in candidate paths.")
+            return None, None
+
+        if backend_dir in sys.path:
+            sys.path.remove(backend_dir)
+        sys.path.insert(0, backend_dir)
+
         import importlib.util
-        main_file = os.path.join(backend_dir, "app", "main.py")
-        spec = importlib.util.spec_from_file_location("backend_main_module", main_file)
-        backend_mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(backend_mod)
-        fastapi_app_obj = backend_mod.app
+        app_pkg_dir = os.path.join(backend_dir, "app")
+        app_init_file = os.path.join(app_pkg_dir, "__init__.py")
+        if not os.path.exists(app_init_file):
+            with open(app_init_file, "a") as f:
+                pass
+
+        pkg_spec = importlib.util.spec_from_file_location(
+            "app",
+            app_init_file,
+            submodule_search_locations=[app_pkg_dir]
+        )
+        pkg_mod = importlib.util.module_from_spec(pkg_spec)
+        sys.modules["app"] = pkg_mod
+        pkg_spec.loader.exec_module(pkg_mod)
+
+        main_file = os.path.join(app_pkg_dir, "main.py")
+        main_spec = importlib.util.spec_from_file_location("app.main", main_file)
+        backend_main_mod = importlib.util.module_from_spec(main_spec)
+        sys.modules["app.main"] = backend_main_mod
+        main_spec.loader.exec_module(backend_main_mod)
+
+        fastapi_app_obj = backend_main_mod.app
         from fastapi.testclient import TestClient
         test_client = TestClient(fastapi_app_obj)
+        print("FastAPI in-process bridge loaded successfully.")
         return fastapi_app_obj, test_client
     except Exception as e:
+        import traceback
         print(f"FastAPI in-process bridge loader note: {e}")
+        traceback.print_exc()
         return None, None
 
 _fastapi_app, _fastapi_client = _load_fastapi_app_and_client()
+
+# Ensure gunicorn (e.g. `gunicorn app:app`) can always find the Flask `app` object on `sys.modules['app']`
+if "app" in sys.modules and hasattr(sys.modules["app"], "__dict__"):
+    sys.modules["app"].__dict__["app"] = app
 
 API_URL = _resolve_backend_url()
 
