@@ -141,12 +141,19 @@ class AuditService:
             return None
 
     @staticmethod
-    def get_logs(db: Session, limit: int = 1000, offset: int = 0):
+    def get_logs(db: Session, limit: Optional[int] = None, offset: int = 0):
         """
         Fetch all audit logs live from database with second-level timestamps and enriched user context.
         Always queries live real-time data with zero stale caching.
+        Returns all records when limit is None or 0.
         """
-        logs_raw = db.query(ActivityLog).order_by(ActivityLog.id.desc()).limit(limit).offset(offset).all()
+        query = db.query(ActivityLog).order_by(ActivityLog.id.desc())
+        if offset and offset > 0:
+            query = query.offset(offset)
+        if limit and limit > 0:
+            query = query.limit(limit)
+        
+        logs_raw = query.all()
 
         user_ids = {log.user_id for log in logs_raw if log.user_id}
         users = db.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
@@ -155,9 +162,51 @@ class AuditService:
         result = []
         for log in logs_raw:
             u = users_map.get(log.user_id)
-            user_name = u.full_name if u else "System Admin"
-            emp_id = u.employee_id if u and u.employee_id else f"SYS-{log.user_id}"
-            user_role = (u.role.role_name if u and u.role else "Administrator")
+            user_name = u.full_name if u else None
+            emp_id = u.employee_id if u and u.employee_id else None
+            user_role = (u.role.role_name if u and u.role else None)
+
+            act = log.action or ""
+            det = log.details or ""
+
+            # Intelligent name recovery for historical or deleted user records
+            if not user_name:
+                low_act = act.lower()
+                if "login successful:" in low_act:
+                    extracted = act.split(":", 1)[1].strip()
+                    user_name = extracted.split("(")[0].strip()
+                elif "for user" in low_act:
+                    parts = act.split("for user", 1)
+                    if len(parts) > 1:
+                        user_name = parts[1].strip()
+                elif "by:" in det.lower():
+                    user_name = det.split("By:", 1)[1].strip().split("\n")[0]
+                elif log.user_id == 1:
+                    user_name = "System Admin"
+                else:
+                    user_name = f"User #{log.user_id}"
+
+            if not emp_id:
+                if "(" in act and ")" in act:
+                    possible = act[act.find("(") + 1:act.find(")")].strip()
+                    if any(possible.upper().startswith(p) for p in ("EMP", "AD", "MN", "RW")):
+                        emp_id = possible.upper()
+                if not emp_id:
+                    emp_id = f"EMP-{log.user_id:04d}" if log.user_id != 1 else "SYS-001"
+
+            if not user_role:
+                if "role:" in det.lower():
+                    role_str = det.lower().split("role:", 1)[1].split(",")[0].split("\n")[0].strip()
+                    if "admin" in role_str:
+                        user_role = "Administrator"
+                    elif "manager" in role_str:
+                        user_role = "Manager"
+                    elif "reviewer" in role_str:
+                        user_role = "Reviewer"
+                    elif "employee" in role_str:
+                        user_role = "Employee"
+                if not user_role:
+                    user_role = "Administrator" if log.user_id == 1 else "Employee"
 
             dt = log.created_at
             if dt and dt.tzinfo is None:
@@ -166,7 +215,7 @@ class AuditService:
             exact_sec_str = dt.strftime("%Y-%m-%d %H:%M:%S UTC") if dt else "—"
             created_str = dt.strftime("%b %d, %Y %I:%M:%S %p") if dt else "—"
 
-            raw_details = log.details or ""
+            raw_details = det
             detected_mod = None
             if raw_details.startswith("[") and "]" in raw_details:
                 detected_mod = raw_details[1:raw_details.index("]")].strip().capitalize()
@@ -176,10 +225,10 @@ class AuditService:
                 "user_name": user_name,
                 "employee_id": emp_id,
                 "user_role": user_role,
-                "action": log.action,
-                "module": _module_for_action(log.action, detected_mod),
+                "action": act,
+                "module": _module_for_action(act, detected_mod),
                 "time_ago": _time_ago(dt),
-                "severity": _severity_for_action(log.action),
+                "severity": _severity_for_action(act),
                 "created_at_str": created_str,
                 "exact_timestamp": exact_sec_str,
                 "details": raw_details if raw_details else "—"

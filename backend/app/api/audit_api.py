@@ -39,11 +39,12 @@ def create_audit_log(payload: AuditLogCreate, db: Session = Depends(get_db)):
 @router.get("/")
 @router.get("/logs")
 def get_audit_logs(
-    limit: int = Query(300, ge=1, le=1000),
+    limit: Optional[int] = Query(None, ge=1, le=1000000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db)
 ):
     """
     Returns full system audit logs for administrative monitoring.
+    When limit is omitted, returns all platform activity records.
     """
     return AuditService.get_logs(db, limit=limit, offset=offset)

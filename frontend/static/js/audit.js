@@ -74,7 +74,7 @@ async function fetchAuditLogs(showSpinner = false) {
     }
 
     try {
-        const res = await fetch(`${API_URL}/audit/?limit=500&_t=${Date.now()}`);
+        const res = await fetch(`${API_URL}/audit/?_t=${Date.now()}`);
         if (!res.ok) {
             throw new Error(`Server returned ${res.status}`);
         }
