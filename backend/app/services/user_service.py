@@ -574,15 +574,44 @@ class UserService:
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+        from app.models.role import Role
+        from app.models.team import Team
+
+        # Capture previous / old data
+        old_full_name = user.full_name or ""
         old_email = (getattr(user, 'email_original', None) or user.email or "").strip().lower()
         if '@' not in old_email:
             # If old_email was stored as a raw hash without original, keep fallback
             orig = getattr(user, 'email_original', '')
             if orig and '@' in orig:
                 old_email = orig.strip().lower()
-        old_full_name = user.full_name
+        
         employee_id = user.employee_id or f"EMP-{user.id}"
 
+        old_role_obj = db.query(Role).filter(Role.id == user.role_id).first() if user.role_id else None
+        old_role_name = old_role_obj.role_name if old_role_obj else (user.role.role_name if getattr(user, 'role', None) else "Employee")
+
+        old_team_obj = db.query(Team).filter(Team.id == user.team_id).first() if user.team_id else None
+        old_team_name = old_team_obj.team_name if old_team_obj else (user.team.team_name if getattr(user, 'team', None) else "Unassigned")
+
+        old_designation = user.designation or "Not Specified"
+        old_phone = user.phone or "Not Specified"
+
+        changes = []
+        changes_desc = []
+
+        # 1. Full Name
+        if req.full_name and req.full_name.strip() != old_full_name:
+            new_full_name = req.full_name.strip()
+            changes.append({
+                "field": "Full Name",
+                "old": old_full_name or "Not Specified",
+                "new": new_full_name
+            })
+            changes_desc.append(f"Name: {old_full_name} -> {new_full_name}")
+            user.full_name = new_full_name
+
+        # 2. Email Address
         email_changed = False
         new_email = old_email
         if req.email:
@@ -600,10 +629,17 @@ class UserService:
                 user.email_original = candidate_email
                 user.email_hash = candidate_hash
                 email_changed = True
+                changes.append({
+                    "field": "Email Address",
+                    "old": old_email,
+                    "new": new_email
+                })
+                changes_desc.append(f"Email: {old_email} -> {new_email}")
 
-
+        # 3. Password Reset
         password_changed = False
-        if req.password:
+        plain_new_pwd = ""
+        if req.password and req.password.strip():
             raw_pwd = req.password.strip()
             if len(raw_pwd) < 6:
                 raise HTTPException(
@@ -612,17 +648,79 @@ class UserService:
                 )
             user.password = hash_password(raw_pwd)
             password_changed = True
+            plain_new_pwd = raw_pwd
+            changes.append({
+                "field": "Login Password",
+                "old": "•••••••• (Previous Password)",
+                "new": plain_new_pwd,
+                "is_password": True
+            })
+            changes_desc.append("Password Reset")
 
-        if req.full_name:
-            user.full_name = req.full_name.strip()
-        if req.role_id:
+        # 4. Role & Employee ID Prefix
+        if req.role_id and req.role_id != user.role_id:
+            new_role_obj = db.query(Role).filter(Role.id == req.role_id).first()
+            new_role_name = new_role_obj.role_name if new_role_obj else f"Role #{req.role_id}"
+            changes.append({
+                "field": "Role / Access Level",
+                "old": old_role_name,
+                "new": new_role_name
+            })
+            changes_desc.append(f"Role: {old_role_name} -> {new_role_name}")
             user.role_id = req.role_id
+
+            try:
+                new_prefix = UserService._get_role_prefix(db, req.role_id)
+                new_emp_id = UserService._transform_employee_id(employee_id, new_prefix, db, user.id)
+                if new_emp_id != employee_id:
+                    changes.append({
+                        "field": "Employee / Login ID",
+                        "old": employee_id,
+                        "new": new_emp_id
+                    })
+                    changes_desc.append(f"ID: {employee_id} -> {new_emp_id}")
+                    user.employee_id = new_emp_id
+                    employee_id = new_emp_id
+            except Exception as prefix_err:
+                print(f"Role prefix transform note: {prefix_err}")
+
+        # 5. Team Assignment
         if req.team_id is not None:
-            user.team_id = req.team_id if req.team_id > 0 else None
+            new_team_id = req.team_id if req.team_id > 0 else None
+            if new_team_id != user.team_id:
+                new_team_obj = db.query(Team).filter(Team.id == new_team_id).first() if new_team_id else None
+                new_team_name = new_team_obj.team_name if new_team_obj else "Unassigned"
+                changes.append({
+                    "field": "Team Assignment",
+                    "old": old_team_name,
+                    "new": new_team_name
+                })
+                changes_desc.append(f"Team: {old_team_name} -> {new_team_name}")
+                user.team_id = new_team_id
+
+        # 6. Designation
         if req.designation is not None:
-            user.designation = req.designation.strip()
+            new_desig = req.designation.strip()
+            if new_desig != (user.designation or "").strip():
+                changes.append({
+                    "field": "Designation / Title",
+                    "old": old_designation,
+                    "new": new_desig or "Not Specified"
+                })
+                changes_desc.append(f"Designation: {old_designation} -> {new_desig or 'Not Specified'}")
+                user.designation = new_desig or None
+
+        # 7. Phone Number
         if req.phone is not None:
-            user.phone = req.phone.strip()
+            new_phone = req.phone.strip()
+            if new_phone != (user.phone or "").strip():
+                changes.append({
+                    "field": "Phone Number",
+                    "old": old_phone,
+                    "new": new_phone or "Not Specified"
+                })
+                changes_desc.append(f"Phone: {old_phone} -> {new_phone or 'Not Specified'}")
+                user.phone = new_phone or None
 
         from datetime import datetime
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -631,19 +729,26 @@ class UserService:
         db.refresh(user)
 
         # Activity logging
-        changes_desc = []
-        if email_changed: changes_desc.append(f"Email: {old_email} -> {new_email}")
-        if password_changed: changes_desc.append("Password reset")
-        if req.full_name and req.full_name != old_full_name: changes_desc.append(f"Name updated")
-        if req.role_id: changes_desc.append(f"Role ID: {req.role_id}")
-        if req.team_id is not None: changes_desc.append(f"Team ID: {req.team_id}")
-
         UserService._log_activity(
             db,
             user.id,
-            f"Administrator updated credentials for {user.full_name} ({employee_id})",
+            f"Administrator updated profile for {user.full_name} ({employee_id})",
             ", ".join(changes_desc) if changes_desc else "Profile updated"
         )
+
+        # In-App Notification
+        if changes:
+            try:
+                from app.services.notification_service import NotificationService
+                change_summary_text = ", ".join([c["field"] for c in changes])
+                NotificationService.create_notification(
+                    db,
+                    user_id=user.id,
+                    message=f"An Administrator updated your account details ({change_summary_text}).",
+                    notification_type="Account Update"
+                )
+            except Exception as notif_err:
+                print(f"Update notification note: {notif_err}")
 
         # Invalidate dashboard caches
         try:
@@ -652,17 +757,17 @@ class UserService:
         except Exception:
             pass
 
-        # Dispatches emails to OLD email and NEW email
-        if (email_changed or password_changed) and req.notify_user:
-            plain_new_pwd = req.password.strip() if req.password else ""
-            def _async_send_credential_updates(to_old, to_new, name, emp_id, em_chg, pwd_chg, new_pwd):
+        # Dispatches emails with Old Data vs Updated Data comparison table
+        if changes and req.notify_user:
+            def _async_send_credential_updates(to_old, to_new, name, emp_id, chgs, em_chg, pwd_chg, new_pwd):
                 try:
-                    # 1. Send to old email
+                    # 1. Send to old email (or primary email if unchanged)
                     if to_old:
                         send_credentials_updated_email(
                             to_email=to_old,
                             full_name=name,
                             employee_id=emp_id,
+                            changes=chgs,
                             email_changed=em_chg,
                             old_email=to_old,
                             new_email=to_new,
@@ -676,6 +781,7 @@ class UserService:
                             to_email=to_new,
                             full_name=name,
                             employee_id=emp_id,
+                            changes=chgs,
                             email_changed=em_chg,
                             old_email=to_old,
                             new_email=to_new,
@@ -688,21 +794,22 @@ class UserService:
 
             threading.Thread(
                 target=_async_send_credential_updates,
-                args=(old_email, new_email, user.full_name, employee_id, email_changed, password_changed, plain_new_pwd),
+                args=(old_email, new_email, user.full_name, employee_id, changes, email_changed, password_changed, plain_new_pwd),
                 daemon=True
             ).start()
-
 
         return {
             "message": "User account and credentials updated successfully",
             "user_id": user.id,
             "employee_id": employee_id,
             "full_name": user.full_name,
-            "email": user.email,
+            "email": new_email,
             "email_changed": email_changed,
             "password_changed": password_changed,
             "old_email": old_email,
-            "new_email": new_email
+            "new_email": new_email,
+            "changes_count": len(changes),
+            "changes": changes
         }
 
 

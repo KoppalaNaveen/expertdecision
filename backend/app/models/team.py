@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String
-from app.database.connection import Base
 from sqlalchemy.orm import relationship
+from app.database.base import Base
 
 
 class Team(Base):

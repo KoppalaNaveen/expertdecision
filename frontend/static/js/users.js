@@ -989,11 +989,13 @@ async function submitEditUserForm(e) {
 
         let notifyDetails = "";
         if (data.email_changed && data.password_changed) {
-            notifyDetails = `Email & Password updated. Security notices dispatched to both ${data.old_email} and ${data.new_email}.`;
+            notifyDetails = `Email & Password updated. Security notices with previous and updated data dispatched to both ${data.old_email} and ${data.new_email}.`;
         } else if (data.email_changed) {
-            notifyDetails = `Email updated (${data.old_email} &rarr; ${data.new_email}). Notification dispatched to both inboxes.`;
+            notifyDetails = `Email updated (${data.old_email} &rarr; ${data.new_email}). Notification dispatched to both inboxes with updated details.`;
         } else if (data.password_changed) {
-            notifyDetails = `Password has been reset. Confirmation dispatched to ${data.email}.`;
+            notifyDetails = `Password reset. Updated credentials dispatched to ${data.new_email || data.email}.`;
+        } else if (data.changes_count > 0) {
+            notifyDetails = `User profile details updated. Notification containing previous and updated data sent to ${data.new_email || data.old_email}.`;
         } else {
             notifyDetails = `User profile details updated successfully.`;
         }

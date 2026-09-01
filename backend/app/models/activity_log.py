@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from app.database.connection import Base
+from app.database.base import Base
 
 class ActivityLog(Base):
     __tablename__ = "activity_logs"

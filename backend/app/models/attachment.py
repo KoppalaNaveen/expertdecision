@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.database.connection import Base
+from app.database.base import Base
 
 class Attachment(Base):
     __tablename__ = "attachments"

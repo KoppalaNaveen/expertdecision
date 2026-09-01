@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.database.connection import Base
+from app.database.base import Base
 
 class MeetingNote(Base):
     __tablename__ = "meeting_notes"

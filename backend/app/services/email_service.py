@@ -1,5 +1,6 @@
 import os
 import requests
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 import dns.resolver
 
@@ -1036,6 +1037,7 @@ def send_credentials_updated_email(
     to_email: str,
     full_name: str,
     employee_id: str,
+    changes: Optional[List[Dict[str, Any]]] = None,
     email_changed: bool = False,
     old_email: str = "",
     new_email: str = "",
@@ -1044,39 +1046,65 @@ def send_credentials_updated_email(
     is_old_inbox: bool = False
 ) -> bool:
     """
-    Dispatches security notifications when an Administrator updates a user's email or password via Resend HTTPS.
-    Sent to both old and new email addresses with updated credential details.
+    Dispatches security notifications when an Administrator updates any user details or credentials.
+    Includes a structured comparison table showing Old Data (Previous) vs Updated Data (New).
+    Dispatched via HTTPS (Brevo / Resend).
     """
     clean_email = (to_email or "").strip()
     if not clean_email or "@" not in clean_email:
         return False
 
     name_str = f" {full_name}" if full_name else ""
-    subject = "Security Notice: EDRP Account Credentials Updated by Administrator"
+    subject = "Security Notice: EDRP Account Details & Credentials Updated"
 
-    changes_html = ""
+    # Build changes list if not passed explicitly
+    if changes is None:
+        changes = []
+        if email_changed:
+            changes.append({
+                "field": "Email Address",
+                "old": old_email,
+                "new": new_email
+            })
+        if password_changed:
+            changes.append({
+                "field": "Login Password",
+                "old": "•••••••• (Previous Password)",
+                "new": new_password if new_password else "[Reset by Administrator]",
+                "is_password": True
+            })
+
+    table_rows_html = ""
     changes_text = ""
 
-    if email_changed:
-        changes_html += f"""
-        <li style="margin-bottom: 8px;">
-            <strong>Email Address Updated:</strong><br>
-            <span style="color: #64748b;">Previous Email:</span> <code style="background: #f1f5f9; padding: 2px 4px; border-radius: 3px;">{old_email}</code><br>
-            <span style="color: #059669; font-weight: 600;">New Primary Email:</span> <strong style="color: #059669;">{new_email}</strong>
-        </li>
-        """
-        changes_text += f"\n- Email Address Updated: Previous: {old_email} -> New: {new_email}"
+    for item in changes:
+        field_name = item.get("field", "Detail")
+        old_val = str(item.get("old", "—") or "—")
+        new_val = str(item.get("new", "—") or "—")
+        is_pwd = item.get("is_password", False)
 
-    if password_changed:
-        pwd_display = f'<code style="background: #eef2ff; color: #4338ca; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 13.5px; border: 1px solid #c7d2fe;">{new_password}</code>' if new_password else '<em>(Reset by Administrator)</em>'
-        changes_html += f"""
-        <li style="margin-bottom: 8px;">
-            <strong>Password Updated by Administrator:</strong><br>
-            <span style="color: #64748b;">Previous Password:</span> <span style="font-family: monospace; color: #94a3b8;">•••••••• (Overwritten)</span><br>
-            <span style="color: #4338ca; font-weight: 600;">New Login Password:</span> {pwd_display}
-        </li>
+        if is_pwd:
+            old_display = '<span style="font-family: monospace; color: #94a3b8; text-decoration: line-through;">•••••••• (Previous)</span>'
+            new_display = f'<code style="background: #eef2ff; color: #4338ca; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 13.5px; border: 1px solid #c7d2fe; font-family: monospace;">{new_val}</code>'
+            changes_text += f"\n- {field_name}: [Previous: Overwritten] -> [New: {new_val}]"
+        else:
+            old_display = f'<span style="color: #64748b; text-decoration: line-through;">{old_val}</span>'
+            new_display = f'<strong style="color: #0f172a; background: #f0fdf4; padding: 2px 6px; border-radius: 4px; border: 1px solid #bbf7d0;">{new_val}</strong>'
+            changes_text += f"\n- {field_name}: [Previous: {old_val}] -> [New: {new_val}]"
+
+        table_rows_html += f"""
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 14px; font-weight: 600; color: #1e293b; font-size: 13px; vertical-align: middle; background: #ffffff;">
+                {field_name}
+            </td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #64748b; background: #f8fafc; vertical-align: middle;">
+                {old_display}
+            </td>
+            <td style="padding: 10px 14px; font-size: 13px; vertical-align: middle; background: #ffffff;">
+                {new_display}
+            </td>
+        </tr>
         """
-        changes_text += f"\n- Password: Previous: [Overwritten] -> New Password: {new_password if new_password else '[Reset]'}"
 
     notice_box = ""
     if is_old_inbox and email_changed:
@@ -1086,37 +1114,55 @@ def send_credentials_updated_email(
         </div>
         """
 
+    credentials_box = ""
+    if password_changed and new_password:
+        credentials_box = f"""
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 16px; margin: 16px 0;">
+            <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #1d4ed8; letter-spacing: 0.05em; margin-bottom: 6px;">🔐 Updated Login Credentials</div>
+            <div style="font-size: 13px; margin-bottom: 4px;"><strong>Employee ID / Login ID:</strong> <code style="background: #ffffff; border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #0f172a;">{employee_id}</code></div>
+            <div style="font-size: 13px;"><strong>New Password:</strong> <code style="background: #ffffff; border: 1px solid #c7d2fe; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #4338ca;">{new_password}</code></div>
+        </div>
+        """
+
     body_html = f"""
     <!DOCTYPE html>
     <html>
-    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6; background-color: #f8fafc; padding: 20px;">
-        <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6; background-color: #f8fafc; padding: 20px;">
+        <div style="max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
             <div style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #ffffff; padding: 24px;">
-                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; font-weight: 700;">Security Notification</div>
-                <h2 style="margin: 6px 0 0 0; font-size: 20px; font-weight: 700; color: #ffffff;">Account Credentials Updated</h2>
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; font-weight: 700;">Security & Access Notification</div>
+                <h2 style="margin: 6px 0 0 0; font-size: 20px; font-weight: 700; color: #ffffff;">Account Details Updated</h2>
             </div>
             <div style="padding: 24px;">
-                <p style="font-size: 15px;">Hello<strong>{name_str}</strong>,</p>
-                <p>An <strong>Administrator</strong> has updated the credentials and access details for your account on the <strong>Expert Decision Replay Platform (EDRP)</strong>.</p>
+                <p style="font-size: 15px; margin-top: 0;">Hello<strong>{name_str}</strong>,</p>
+                <p style="margin-bottom: 16px;">An <strong>Administrator</strong> has updated your profile details and access credentials on the <strong>Expert Decision Replay Platform (EDRP)</strong>.</p>
                 
-                <div style="background: #f1f5f9; border-radius: 8px; padding: 16px; margin: 18px 0;">
-                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 8px;">Account Details</div>
-                    <div style="margin-bottom: 6px;"><strong>Employee ID / Login ID:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #0f172a;">{employee_id}</code></div>
-                    <div style="margin-top: 10px;">
-                        <strong>Applied Changes:</strong>
-                        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                            {changes_html}
-                        </ul>
+                <div style="margin-bottom: 16px;">
+                    <div style="font-size: 11.5px; text-transform: uppercase; font-weight: 700; color: #475569; letter-spacing: 0.05em; margin-bottom: 8px;">
+                        📋 Summary of Updated Details (Old Data vs Updated Data)
                     </div>
+                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                        <thead>
+                            <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1; text-align: left;">
+                                <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; font-weight: 700; width: 32%;">Detail / Field</th>
+                                <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700; width: 34%;">Old Data (Previous)</th>
+                                <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #059669; font-weight: 700; width: 34%;">Updated Data (New)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {table_rows_html}
+                        </tbody>
+                    </table>
                 </div>
 
+                {credentials_box}
                 {notice_box}
 
-                <p style="margin-top: 20px; font-size: 13.5px;">You can now sign in to your dashboard using your Employee ID <code>{employee_id}</code> or updated email address along with your updated credentials.</p>
+                <p style="margin-top: 18px; font-size: 13.5px;">You can sign in to the platform with your Employee ID <code>{employee_id}</code> or current email address.</p>
                 
                 <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
-                    <p style="margin: 0 0 6px 0;"><strong>Security Note:</strong> If you did not authorize or expect this change, please immediately contact your platform system administrator.</p>
-                    <p style="margin: 0;">Regards,<br><strong>EDRP Platform Security Team</strong></p>
+                    <p style="margin: 0 0 6px 0;"><strong>Security Note:</strong> If you did not authorize or expect these changes, please immediately contact your platform system administrator.</p>
+                    <p style="margin: 0;">Regards,<br><strong>EDRP Platform Administration & Security Team</strong></p>
                 </div>
             </div>
         </div>
@@ -1126,18 +1172,18 @@ def send_credentials_updated_email(
 
     body_text = f"""Hello{name_str},
 
-An Administrator has updated the credentials for your account on the Expert Decision Replay Platform (EDRP).
+An Administrator has updated your profile details and access credentials on the Expert Decision Replay Platform (EDRP).
 
-Account Details:
-- Employee ID / Login ID: {employee_id}
-Applied Changes:{changes_text}
+Employee ID / Login ID: {employee_id}
 
-You can now sign in using your Employee ID ({employee_id}) or new email with your updated credentials.
+Summary of Updated Details (Old Data vs Updated Data):{changes_text}
 
-Security Note: If you did not authorize or expect this change, please contact your platform administrator immediately.
+You can sign in to the platform with your Employee ID ({employee_id}) or current email address.
+
+Security Note: If you did not authorize or expect these changes, please contact your platform administrator immediately.
 
 Regards,
 EDRP Platform Security Team
 """
 
-    return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Security")
+    return send_email(clean_email, subject, body_html, body_text)
