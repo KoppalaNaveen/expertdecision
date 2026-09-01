@@ -76,8 +76,8 @@ def _start_keep_alive_daemon():
 
 _start_keep_alive_daemon()
 
-@app.route("/health")
-@app.route("/ping")
+@app.route("/health", methods=["GET", "HEAD"])
+@app.route("/ping", methods=["GET", "HEAD"])
 def health_check():
     """Instantaneous lightweight healthcheck endpoint (0ms response)."""
     return jsonify({
@@ -477,13 +477,13 @@ def inject_global_stats():
 # HOME
 # ===========================
 
-@app.route("/")
+@app.route("/", methods=["GET", "HEAD"])
 def index():
     if session.get("logged_in") and "token" in session:
         return redirect(url_for("dashboard"))
     return render_template("landing.html")
 
-@app.route("/landing")
+@app.route("/landing", methods=["GET", "HEAD"])
 def home():
     if session.get("logged_in") and "token" in session:
         return redirect(url_for("dashboard"))

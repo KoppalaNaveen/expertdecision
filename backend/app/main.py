@@ -78,9 +78,9 @@ app.include_router(settings_router)
 app.include_router(support_router)
 app.include_router(email_router)
 
-@app.get("/")
-@app.get("/health")
-@app.get("/ping")
+@app.api_route("/", methods=["GET", "HEAD"])
+@app.api_route("/health", methods=["GET", "HEAD"])
+@app.api_route("/ping", methods=["GET", "HEAD"])
 def home():
     return {
         "status": "healthy",
