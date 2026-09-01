@@ -342,6 +342,18 @@ def ensure_user_schema_columns():
         if inspector.has_table("decisions") and inspector.has_table("alternatives"):
             db = SessionLocal()
             try:
+                # Fix orphaned decisions whose created_by points to non-existent users
+                from app.models.user import User
+                all_valid_ids = set(uid for (uid,) in db.query(User.id).all())
+                if all_valid_ids:
+                    default_admin_id = 48  # Koppala Naveen (primary admin)
+                    orphaned = db.query(Decision).filter(~Decision.created_by.in_(list(all_valid_ids))).all()
+                    if orphaned:
+                        for dec in orphaned:
+                            dec.created_by = default_admin_id
+                        db.commit()
+                        print(f"[DB] Reassigned {len(orphaned)} orphaned decisions to user #{default_admin_id}.")
+
                 # Seed baseline decisions if fewer than 4 exist
                 if db.query(Decision).count() <= 3:
                     from app.core.security import generate_data_hash
