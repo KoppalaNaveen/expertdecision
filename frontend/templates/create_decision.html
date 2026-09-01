@@ -579,7 +579,7 @@
         temp_file_ids: []
     };
     
-    const currentUserId = parseInt("{{ session.get('user_id', 2) }}", 10);
+    const currentUserId = parseInt("{{ session.get('user_id', '') }}" || localStorage.getItem('user_id') || 0, 10);
     let allUsers = [];
 
     async function loadUsers() {
@@ -1995,10 +1995,21 @@ Return ONLY a valid JSON array of objects with the following exact keys:
     let isEditMode = false;
     let editDecisionId = null;
 
-    // ── Local Storage Progress Saver & Restorer ──
-    const DRAFT_STORAGE_KEY = 'edrp_create_decision_saved_draft';
+    // ── Local Storage Progress Saver & Restorer (Strictly Scoped Per User) ──
+    function getDraftStorageKey() {
+        const uid = (typeof currentUserId !== 'undefined' && currentUserId) ? currentUserId : (parseInt("{{ session.get('user_id', '') }}" || localStorage.getItem('user_id') || 0, 10));
+        return uid ? `edrp_create_decision_saved_draft_user_${uid}` : null;
+    }
 
     function saveEnteredProgress(showMessage = true) {
+        const storageKey = getDraftStorageKey();
+        if (!storageKey) {
+            if (showMessage) {
+                alert("Please log in to save your decision draft.");
+            }
+            return;
+        }
+
         const titleInput = document.getElementById('cdTitle') ? document.getElementById('cdTitle').value.trim() : '';
         const descInput = document.getElementById('cdDescription') ? document.getElementById('cdDescription').value.trim() : '';
         const catInput = document.getElementById('cdCategory') ? parseInt(document.getElementById('cdCategory').value, 10) : 1;
@@ -2009,6 +2020,7 @@ Return ONLY a valid JSON array of objects with the following exact keys:
         const deadline = document.getElementById('cdReviewDeadline') ? document.getElementById('cdReviewDeadline').value : '';
 
         const draftData = {
+            user_id: currentUserId,
             title: titleInput,
             description: descInput,
             category_id: catInput,
@@ -2026,7 +2038,9 @@ Return ONLY a valid JSON array of objects with the following exact keys:
             saved_at: new Date().toISOString()
         };
 
-        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
+        localStorage.setItem(storageKey, JSON.stringify(draftData));
+        // Remove any legacy un-scoped draft key
+        try { localStorage.removeItem('edrp_create_decision_saved_draft'); } catch(e) {}
 
         if (showMessage) {
             const btn = document.getElementById('btnSaveProgress');
@@ -2043,7 +2057,7 @@ Return ONLY a valid JSON array of objects with the following exact keys:
             }
 
             if (typeof showCenterNotification === 'function') {
-                showCenterNotification("Your entered decision progress is saved! If you refresh or leave the page, all your details will be automatically restored.", "success", "Progress Saved");
+                showCenterNotification("Your entered decision progress is saved! Only you will see your saved draft.", "success", "Progress Saved");
             } else {
                 alert("✓ Saved successfully! Your entered details are preserved and will auto-restore on page refresh.");
             }
@@ -2053,10 +2067,23 @@ Return ONLY a valid JSON array of objects with the following exact keys:
     function restoreSavedProgress() {
         if (isEditMode) return;
         try {
-            const savedStr = localStorage.getItem(DRAFT_STORAGE_KEY);
+            // Purge old global shared key so other users' drafts never leak
+            try { localStorage.removeItem('edrp_create_decision_saved_draft'); } catch(e) {}
+
+            const storageKey = getDraftStorageKey();
+            if (!storageKey) return;
+
+            const savedStr = localStorage.getItem(storageKey);
             if (!savedStr) return;
             const saved = JSON.parse(savedStr);
-            if (!saved || (!saved.title && !saved.description && (!saved.alternatives || saved.alternatives.length === 0))) return;
+            if (!saved) return;
+
+            // Security check: ONLY restore if the draft belongs strictly to the currently logged in user
+            if (saved.user_id && currentUserId && saved.user_id !== currentUserId) {
+                return;
+            }
+
+            if (!saved.title && !saved.description && (!saved.alternatives || saved.alternatives.length === 0)) return;
 
             if (saved.title && document.getElementById('cdTitle')) document.getElementById('cdTitle').value = saved.title;
             if (saved.description && document.getElementById('cdDescription')) document.getElementById('cdDescription').value = saved.description;
@@ -2107,7 +2134,11 @@ Return ONLY a valid JSON array of objects with the following exact keys:
 
     function clearSavedProgress() {
         if (confirm("Are you sure you want to clear all entered progress and start a new blank decision?")) {
-            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            const storageKey = getDraftStorageKey();
+            if (storageKey) {
+                try { localStorage.removeItem(storageKey); } catch(e) {}
+            }
+            try { localStorage.removeItem('edrp_create_decision_saved_draft'); } catch(e) {}
             window.location.reload();
         }
     }
@@ -2406,7 +2437,11 @@ Return ONLY a valid JSON array of objects with the following exact keys:
             }
             
             if (res.ok) {
-                localStorage.removeItem(DRAFT_STORAGE_KEY);
+                const storageKey = getDraftStorageKey();
+                if (storageKey) {
+                    try { localStorage.removeItem(storageKey); } catch(e) {}
+                }
+                try { localStorage.removeItem('edrp_create_decision_saved_draft'); } catch(e) {}
                 if (targetStatus === 'Draft') {
                     if (typeof showCenterNotification === 'function') {
                         showCenterNotification("Decision saved as draft successfully.", "success", "Draft Saved");
