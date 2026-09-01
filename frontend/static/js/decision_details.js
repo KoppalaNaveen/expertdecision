@@ -2,9 +2,9 @@ let currentDecision = null;
 let currentAlternatives = [];
 let livePollInterval = null;
 
-document.addEventListener("DOMContentLoaded", () => {
-    fetchDecisionDetails();
-    fetchAlternatives();
+document.addEventListener("DOMContentLoaded", async () => {
+    await fetchDecisionDetails();
+    await fetchAlternatives();
 
     if (!livePollInterval) {
         livePollInterval = setInterval(fetchDecisionDetailsSilent, 10000);

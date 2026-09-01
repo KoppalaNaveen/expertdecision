@@ -342,16 +342,17 @@ def ensure_user_schema_columns():
         if inspector.has_table("decisions") and inspector.has_table("alternatives"):
             db = SessionLocal()
             try:
-                # Seed baseline decisions if none exist
-                if db.query(Decision).filter(Decision.status == "Approved").count() == 0:
+                # Seed baseline decisions if fewer than 4 exist
+                if db.query(Decision).count() <= 3:
                     from app.core.security import generate_data_hash
                     sample_decisions = [
+                        # Approved decisions (Knowledge Repository)
                         {
                             "title": "Cloud Infrastructure Migration to Multi-Region High Availability",
                             "description": "Comprehensive migration strategy transitioning legacy on-premise compute nodes to an automated multi-region Kubernetes cluster with zero-downtime failover.",
                             "status": "Approved",
-                            "category_id": 2, # Technology
-                            "created_by": 48, # Koppala Naveen
+                            "category_id": 2,
+                            "created_by": 48,
                             "priority_level": "High",
                             "department": "Engineering",
                             "tags": "Technology, Cloud, Infrastructure, Optimization",
@@ -361,8 +362,8 @@ def ensure_user_schema_columns():
                             "title": "Enterprise Security & Append-Only Audit Trail Governance",
                             "description": "Establishment of immutable audit logging policies, cryptographic verification seals, and granular RBAC access controls across all decision workflows.",
                             "status": "Approved",
-                            "category_id": 3, # Operations
-                            "created_by": 48, # Koppala Naveen
+                            "category_id": 3,
+                            "created_by": 48,
                             "priority_level": "Critical",
                             "department": "Security & Compliance",
                             "tags": "Security, Operations, Policy, Optimization",
@@ -372,8 +373,8 @@ def ensure_user_schema_columns():
                             "title": "Fiscal Year AI Research & Tooling Budget Allocation",
                             "description": "Strategic capital allocation for enterprise AI LLM APIs, developer automation toolkits, and machine learning infrastructure optimization.",
                             "status": "Approved",
-                            "category_id": 1, # Finance
-                            "created_by": 62, # Naga Sai
+                            "category_id": 1,
+                            "created_by": 62,
                             "priority_level": "Medium",
                             "department": "Finance",
                             "tags": "Budget, AI, Optimization, Q4",
@@ -383,18 +384,99 @@ def ensure_user_schema_columns():
                             "title": "Automated Code Review & Continuous Integration Pipeline",
                             "description": "Implementation of automated static code analysis, unit test coverage gates, and continuous deployment pipelines across frontend and backend services.",
                             "status": "Approved",
-                            "category_id": 2, # Technology
-                            "created_by": 29, # Naveen
+                            "category_id": 2,
+                            "created_by": 29,
                             "priority_level": "High",
                             "department": "Quality Assurance",
                             "tags": "Technology, Infrastructure, Optimization",
                             "content_hash": generate_data_hash("CI/CD Pipeline", "Automation", 2, 29)
+                        },
+                        # Pending decisions
+                        {
+                            "title": "Employee Wellness & Remote Work Policy Framework",
+                            "description": "Define organizational policies for hybrid remote work models, mental health support programs, and flexible scheduling guidelines.",
+                            "status": "Pending",
+                            "category_id": 4,
+                            "created_by": 60,
+                            "priority_level": "Medium",
+                            "department": "Human Resources",
+                            "tags": "HR, Policy, Remote, Wellness",
+                            "content_hash": generate_data_hash("Wellness", "Remote Work", 4, 60)
+                        },
+                        {
+                            "title": "Customer Data Privacy & GDPR Compliance Upgrade",
+                            "description": "Comprehensive review and implementation of data privacy controls, consent management, and GDPR-compliant data processing workflows.",
+                            "status": "Pending",
+                            "category_id": 3,
+                            "created_by": 64,
+                            "priority_level": "Critical",
+                            "department": "Legal & Compliance",
+                            "tags": "Security, Compliance, GDPR, Privacy",
+                            "content_hash": generate_data_hash("GDPR", "Privacy", 3, 64)
+                        },
+                        # In Review decisions
+                        {
+                            "title": "Cross-Platform Mobile App Development Strategy",
+                            "description": "Evaluation of React Native vs Flutter vs native development for launching the EDRP mobile companion application across iOS and Android platforms.",
+                            "status": "In Review",
+                            "category_id": 2,
+                            "created_by": 81,
+                            "priority_level": "High",
+                            "department": "Engineering",
+                            "tags": "Technology, Mobile, Development, Strategy",
+                            "content_hash": generate_data_hash("Mobile App", "Cross-Platform", 2, 81)
+                        },
+                        {
+                            "title": "Q4 Marketing & Brand Awareness Campaign",
+                            "description": "Multi-channel marketing initiative including LinkedIn content strategy, technical blog series, developer community engagement, and conference sponsorships.",
+                            "status": "In Review",
+                            "category_id": 1,
+                            "created_by": 82,
+                            "priority_level": "Medium",
+                            "department": "Marketing",
+                            "tags": "Marketing, Brand, Campaign, Q4",
+                            "content_hash": generate_data_hash("Marketing", "Q4 Campaign", 1, 82)
+                        },
+                        # Draft decisions
+                        {
+                            "title": "Database Sharding & Horizontal Scaling Architecture",
+                            "description": "Research and design proposal for implementing database sharding strategies to handle 10x growth in decision records and user activity.",
+                            "status": "Draft",
+                            "category_id": 2,
+                            "created_by": 84,
+                            "priority_level": "High",
+                            "department": "Engineering",
+                            "tags": "Technology, Database, Scaling, Architecture",
+                            "content_hash": generate_data_hash("DB Sharding", "Scaling", 2, 84)
+                        },
+                        {
+                            "title": "Vendor Selection for Enterprise Analytics Dashboard",
+                            "description": "Comparative analysis of Tableau, Power BI, Metabase, and custom D3.js solutions for executive-level decision analytics reporting.",
+                            "status": "Draft",
+                            "category_id": 1,
+                            "created_by": 86,
+                            "priority_level": "Low",
+                            "department": "Product",
+                            "tags": "Analytics, Dashboard, Vendor, Reporting",
+                            "content_hash": generate_data_hash("Analytics", "Vendor", 1, 86)
+                        },
+                        # Rejected decision
+                        {
+                            "title": "Monolithic to Serverless Full Migration",
+                            "description": "Proposal to migrate the entire EDRP platform from containerized monolith to fully serverless AWS Lambda functions. Rejected due to cost projections and cold-start latency concerns.",
+                            "status": "Rejected",
+                            "category_id": 2,
+                            "created_by": 87,
+                            "priority_level": "High",
+                            "department": "Engineering",
+                            "tags": "Technology, Serverless, Migration",
+                            "content_hash": generate_data_hash("Serverless", "Migration", 2, 87)
                         }
                     ]
                     for sd in sample_decisions:
                         db.add(Decision(**sd))
                     db.commit()
-                    print("[DB] Initialized baseline approved decisions.")
+                    print("[DB] Initialized baseline decisions across all statuses.")
 
                 # Seed alternatives for all decisions that lack alternatives
                 all_decs = db.query(Decision).all()

@@ -1266,9 +1266,9 @@
     }
     
     // Override the displayAlternatives function from decision_details.js to render cards with eye buttons
-    window.addEventListener('load', function() {
-        if(typeof renderAlternativesTable === 'function') {
-            renderAlternativesTable = function() {
+    // Execute immediately so the override is in place before DOMContentLoaded fires fetchAlternatives
+    (function() {
+        renderAlternativesTable = function() {
                 const list = document.getElementById('alternativesEvaluatorList');
                 if (!list) return;
                 
@@ -1362,8 +1362,7 @@
             } else if (typeof renderAlternativesTable === 'function') {
                 renderAlternativesTable();
             }
-        }
-    });
+    })();
 </script>
 <!-- New Discussion Thread Modal -->
 <div class="modal fade" id="newThreadModal" tabindex="-1" aria-hidden="true">
