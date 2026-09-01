@@ -761,8 +761,23 @@ class UserService:
         if changes and req.notify_user:
             def _async_send_credential_updates(to_old, to_new, name, emp_id, chgs, em_chg, pwd_chg, new_pwd):
                 try:
-                    # 1. Send to old email (or primary email if unchanged)
-                    if to_old:
+                    # 1. Send to primary / updated email address
+                    target_primary = to_new if (to_new and "@" in to_new) else to_old
+                    if target_primary:
+                        send_credentials_updated_email(
+                            to_email=target_primary,
+                            full_name=name,
+                            employee_id=emp_id,
+                            changes=chgs,
+                            email_changed=em_chg,
+                            old_email=to_old,
+                            new_email=to_new,
+                            password_changed=pwd_chg,
+                            new_password=new_pwd,
+                            is_old_inbox=False
+                        )
+                    # 2. If email was changed, ALSO send a security notice to the old email inbox
+                    if em_chg and to_old and to_new and to_old != to_new and "@" in to_old:
                         send_credentials_updated_email(
                             to_email=to_old,
                             full_name=name,
@@ -773,21 +788,7 @@ class UserService:
                             new_email=to_new,
                             password_changed=pwd_chg,
                             new_password=new_pwd,
-                            is_old_inbox=(to_old != to_new)
-                        )
-                    # 2. Send to new email if different from old
-                    if to_new and to_new != to_old:
-                        send_credentials_updated_email(
-                            to_email=to_new,
-                            full_name=name,
-                            employee_id=emp_id,
-                            changes=chgs,
-                            email_changed=em_chg,
-                            old_email=to_old,
-                            new_email=to_new,
-                            password_changed=pwd_chg,
-                            new_password=new_pwd,
-                            is_old_inbox=False
+                            is_old_inbox=True
                         )
                 except Exception as mail_err:
                     print(f"Async credential email notification error: {mail_err}")
