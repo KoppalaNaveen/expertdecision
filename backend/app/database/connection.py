@@ -62,12 +62,12 @@ else:
     try:
         engine = create_engine(
             DATABASE_URL,
-            pool_size=10,
-            max_overflow=20,
-            pool_timeout=30,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=5,
             pool_recycle=300,
             pool_pre_ping=True,
-            connect_args={"connect_timeout": 15}
+            connect_args={"connect_timeout": 5}
         )
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1"))
@@ -678,8 +678,6 @@ def ensure_user_schema_columns():
     except Exception as dec_init_err:
         print(f"Baseline decisions and alternatives check note: {dec_init_err}")
 
-
-ensure_user_schema_columns()
 
 def get_db():
     db = SessionLocal()

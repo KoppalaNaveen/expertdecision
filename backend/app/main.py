@@ -26,11 +26,8 @@ from app.api.settings_api import router as settings_router
 from app.api.support_api import router as support_router
 from app.api.email_api import router as email_router
 
-# Create all database tables (safeguarded against connection timeouts)
-try:
-    Base.metadata.create_all(bind=engine)
-except Exception as db_init_err:
-    print(f"Database initialization warning (remote DB unreachable): {db_init_err}")
+import os
+import threading
 
 app = FastAPI(
     title="Expert Decision Replay Platform",
@@ -38,7 +35,18 @@ app = FastAPI(
     description="A centralized platform for managing organizational decisions."
 )
 
-import os
+@app.on_event("startup")
+def startup_db_init():
+    def _async_init():
+        try:
+            Base.metadata.create_all(bind=engine)
+            from app.database.connection import ensure_user_schema_columns
+            ensure_user_schema_columns()
+            print("[SERVER] Database schema & baseline initialization complete.")
+        except Exception as db_init_err:
+            print(f"[SERVER WARNING] Background database initialization note: {db_init_err}")
+
+    threading.Thread(target=_async_init, daemon=True).start()
 
 allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000").split(",")
 allowed_origins = [orig.strip() for orig in allowed_origins if orig.strip()]
