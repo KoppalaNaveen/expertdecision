@@ -417,11 +417,60 @@
         animation: typing 1.4s infinite ease-in-out both;
         margin: 0 2px;
     }
-    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
-    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-    @keyframes typing {
-        0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
-        40% { transform: scale(1); opacity: 1; }
+    /* Chat History Styles (ChatGPT Style) */
+    .chat-history-item {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+    .chat-history-item:hover {
+        background: #f8fafc;
+        border-color: #6366f1;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+        transform: translateY(-1px);
+    }
+    .chat-history-item.active-session {
+        background: #eff6ff;
+        border-color: #3b82f6;
+    }
+    .chat-history-item-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 2px;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .chat-history-item-snippet {
+        font-size: 11.5px;
+        color: #64748b;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .chat-history-delete-btn {
+        opacity: 0.4;
+        transition: all 0.2s ease;
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+    .chat-history-item:hover .chat-history-delete-btn {
+        opacity: 1;
+    }
+    .chat-history-delete-btn:hover {
+        background: #fee2e2;
+        color: #dc2626 !important;
     }
 </style>
 
@@ -585,7 +634,10 @@
                     <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill text-xs px-2 py-1 d-flex align-items-center gap-1">
                         <i class="bi bi-circle-fill" style="font-size: 6px;"></i> Active
                     </span>
-                    <button type="button" class="btn btn-sm btn-light border text-muted px-2.5 py-1 text-xs rounded-pill" onclick="clearAiChatFeed()" title="Start New Chat">
+                    <button type="button" class="btn btn-sm btn-light border text-dark px-2.5 py-1 text-xs rounded-pill d-flex align-items-center gap-1.5 shadow-2xs" onclick="openChatHistoryModal()" title="View Chat History">
+                        <i class="bi bi-clock-history text-primary"></i> <span>Chat History</span>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light border text-muted px-2.5 py-1 text-xs rounded-pill" onclick="startNewChatSession()" title="Start New Chat">
                         <i class="bi bi-pencil-square me-1"></i> New Chat
                     </button>
                 </div>
@@ -763,6 +815,55 @@
     </div>
 </div>
 
+<!-- AI Chat History Modal (ChatGPT Style) -->
+<div class="modal fade" id="aiChatHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header border-bottom py-3 px-4 bg-light bg-opacity-50">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:34px;height:34px;border-radius:10px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;">
+                        <i class="bi bi-clock-history text-primary fs-5"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark fs-6 mb-0">AI Chat History</h5>
+                        <p class="text-muted text-xs mb-0">Review past conversations, search topics, or continue a chat session.</p>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 text-xs fw-semibold d-flex align-items-center gap-1 shadow-sm" onclick="startNewChatSession(); bootstrap.Modal.getInstance(document.getElementById('aiChatHistoryModal'))?.hide();">
+                        <i class="bi bi-plus-lg"></i> New Chat
+                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            
+            <div class="modal-body p-4">
+                <!-- Search & Filters -->
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="bi bi-search text-muted" style="font-size: 13px;"></i>
+                        </span>
+                        <input type="text" id="searchChatHistoryInput" class="form-control border-start-0 text-xs py-2 ps-0" placeholder="Search conversations by title or topic..." oninput="filterChatHistoryList()">
+                    </div>
+                </div>
+
+                <!-- Chat Sessions Container -->
+                <div class="chat-history-list-container" id="chatHistoryListContainer" style="max-height: 380px; overflow-y: auto;">
+                    <!-- Dynamically Rendered Sessions -->
+                </div>
+            </div>
+
+            <div class="modal-footer border-top py-2.5 px-4 d-flex justify-content-between align-items-center bg-light bg-opacity-30">
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 text-xs" onclick="clearAllChatHistory()" id="btnClearAllChatHistory">
+                    <i class="bi bi-trash3 me-1"></i> Clear All History
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary rounded-pill px-4 text-xs fw-semibold" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- New Support Ticket Modal -->
 <div class="modal fade" id="newSupportTicketModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -855,6 +956,262 @@ const API_URL = "/api";
 let supportTicketsCache = [];
 let conversationHistory = [];
 let currentAiMode = 'standard';
+let currentSessionId = "session_" + Date.now();
+
+// -------------------------------------------------------------
+// AI Chat History Session Management (ChatGPT Style)
+// -------------------------------------------------------------
+function getChatHistoryStorageKey() {
+    return `edrp_ai_chat_history_user_${USER_ID}`;
+}
+
+function getAllChatSessions() {
+    try {
+        const raw = localStorage.getItem(getChatHistoryStorageKey());
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error("Error reading chat history:", e);
+        return [];
+    }
+}
+
+function saveAllChatSessions(sessions) {
+    try {
+        localStorage.setItem(getChatHistoryStorageKey(), JSON.stringify(sessions));
+    } catch (e) {
+        console.error("Error saving chat history:", e);
+    }
+}
+
+function appendMessageToCurrentSession(userMsg, aiMsg, source, isKrSource) {
+    const sessions = getAllChatSessions();
+    let session = sessions.find(s => s.id === currentSessionId);
+    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nowIso = new Date().toISOString();
+
+    if (!session) {
+        session = {
+            id: currentSessionId,
+            title: userMsg.length > 50 ? userMsg.substring(0, 48) + "..." : userMsg,
+            created_at: nowIso,
+            updated_at: nowIso,
+            mode: currentAiMode,
+            messages: []
+        };
+        sessions.unshift(session);
+    } else {
+        session.updated_at = nowIso;
+    }
+
+    session.messages.push({
+        role: "user",
+        content: userMsg,
+        time: timeNow
+    });
+
+    session.messages.push({
+        role: "assistant",
+        content: aiMsg,
+        source: source,
+        isKrSource: isKrSource,
+        time: timeNow
+    });
+
+    saveAllChatSessions(sessions);
+}
+
+function openChatHistoryModal() {
+    renderChatHistoryList();
+    const modalEl = document.getElementById('aiChatHistoryModal');
+    if (modalEl) {
+        new bootstrap.Modal(modalEl).show();
+    }
+}
+
+function filterChatHistoryList() {
+    renderChatHistoryList();
+}
+
+function renderChatHistoryList() {
+    const container = document.getElementById('chatHistoryListContainer');
+    if (!container) return;
+
+    const query = (document.getElementById('searchChatHistoryInput')?.value || '').trim().toLowerCase();
+    let sessions = getAllChatSessions();
+
+    if (query) {
+        sessions = sessions.filter(s => 
+            (s.title && s.title.toLowerCase().includes(query)) ||
+            (s.messages && s.messages.some(m => m.content && m.content.toLowerCase().includes(query)))
+        );
+    }
+
+    if (sessions.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <div class="mb-2" style="font-size: 2rem;"><i class="bi bi-chat-left-dots text-secondary opacity-50"></i></div>
+                <h6 class="fw-bold text-dark mb-1">${query ? 'No matching conversations' : 'No Chat History Yet'}</h6>
+                <p class="text-xs text-muted mb-3">${query ? 'Try a different search term.' : 'Your conversations with EDRP AI will automatically appear here.'}</p>
+                ${query ? '' : `<button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 text-xs" onclick="startNewChatSession(); bootstrap.Modal.getInstance(document.getElementById('aiChatHistoryModal'))?.hide();"><i class="bi bi-plus-lg me-1"></i>Start First Chat</button>`}
+            </div>
+        `;
+        return;
+    }
+
+    // Sort by most recently updated
+    sessions.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
+
+    container.innerHTML = sessions.map(s => {
+        const isActive = s.id === currentSessionId;
+        const msgCount = (s.messages || []).length;
+        const lastMsg = s.messages && s.messages.length > 0 ? s.messages[s.messages.length - 1].content : '';
+        const isKr = s.mode === 'knowledge_repository';
+        
+        let dateLabel = "Today";
+        if (s.updated_at) {
+            const d = new Date(s.updated_at);
+            dateLabel = d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + " " + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        return `
+            <div class="chat-history-item ${isActive ? 'active-session' : ''}" onclick="loadChatSession('${s.id}')">
+                <div class="d-flex align-items-start gap-2.5" style="flex: 1; min-width: 0;">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: ${isKr ? '#EEF2FF' : '#F1F5F9'}; color: ${isKr ? '#4F46E5' : '#0F172A'}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">
+                        <i class="bi ${isKr ? 'bi-database-fill-check' : 'bi-stars'}" style="font-size: 14px;"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="d-flex align-items-center gap-2 mb-0.5">
+                            <span class="chat-history-item-title">${escapeHtml(s.title || 'Untitled Conversation')}</span>
+                            ${isActive ? '<span class="badge bg-primary-subtle text-primary rounded-pill" style="font-size: 9px;">Current</span>' : ''}
+                        </div>
+                        <div class="chat-history-item-snippet">${escapeHtml(lastMsg)}</div>
+                        <div class="d-flex align-items-center gap-2 mt-1.5 text-muted" style="font-size: 10.5px;">
+                            <span><i class="bi bi-clock me-1"></i>${dateLabel}</span>
+                            <span>&middot;</span>
+                            <span><i class="bi bi-chat-quote me-1"></i>${msgCount} messages</span>
+                            ${isKr ? '<span>&middot;</span><span class="text-indigo fw-semibold">Knowledge Repo</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <button type="button" class="btn btn-link text-muted chat-history-delete-btn p-1 text-decoration-none" onclick="deleteChatSession('${s.id}', event)" title="Delete conversation">
+                        <i class="bi bi-trash3 fs-6"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function loadChatSession(sessionId) {
+    const sessions = getAllChatSessions();
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    currentSessionId = session.id;
+    if (session.mode) {
+        setAiMode(session.mode);
+    }
+
+    const feed = document.getElementById('aiChatFeed');
+    if (!feed) return;
+
+    // Remove empty welcome state
+    const emptyState = document.getElementById('chatgptEmptyState');
+    if (emptyState) emptyState.remove();
+
+    conversationHistory = [];
+    feed.innerHTML = '';
+
+    (session.messages || []).forEach(m => {
+        if (m.role === 'user') {
+            feed.innerHTML += `
+                <div class="chatgpt-msg-row chatgpt-user-row">
+                    <div class="chatgpt-user-bubble shadow-2xs">
+                        ${escapeHtml(m.content)}
+                    </div>
+                </div>
+            `;
+            conversationHistory.push({ role: 'user', content: m.content });
+        } else {
+            const formattedReply = formatMarkdown(m.content);
+            const replyId = "reply-" + Math.random().toString(36).substr(2, 8);
+            const isKrSource = m.isKrSource || (m.source && m.source.toLowerCase().includes('knowledge'));
+            const badgeHtml = isKrSource 
+                ? `<span class="badge bg-indigo-subtle text-primary border border-primary-subtle px-2 py-0.5 rounded-pill text-xs"><i class="bi bi-database-fill-check me-1"></i>Knowledge Repository Verified</span>`
+                : '';
+
+            feed.innerHTML += `
+                <div class="chatgpt-msg-row">
+                    <div class="chatgpt-avatar ${isKrSource ? 'chatgpt-avatar-kr' : 'chatgpt-avatar-ai'}">
+                        <i class="bi ${isKrSource ? 'bi-database-fill-check' : 'bi-stars'}"></i>
+                    </div>
+                    <div class="chatgpt-ai-body">
+                        <div class="d-flex align-items-center gap-2 mb-1.5 flex-wrap">
+                            <strong class="text-dark fs-7">${escapeHtml(m.source || 'EDRP AI Assistant')}</strong>
+                            ${badgeHtml}
+                        </div>
+                        <div id="${replyId}">${formattedReply}</div>
+                        
+                        <div class="d-flex align-items-center gap-3 pt-2 mt-2 text-muted border-top border-light-subtle" style="font-size: 11px;">
+                            <button type="button" class="btn btn-link text-muted p-0 text-decoration-none" onclick="copyAiReply('${replyId}', this)" title="Copy response">
+                                <i class="bi bi-copy me-1"></i> Copy
+                            </button>
+                            <button type="button" class="btn btn-link text-muted p-0 text-decoration-none" onclick="this.classList.toggle('text-primary')" title="Good response">
+                                <i class="bi bi-hand-thumbs-up"></i>
+                            </button>
+                            <button type="button" class="btn btn-link text-muted p-0 text-decoration-none" onclick="this.classList.toggle('text-danger')" title="Bad response">
+                                <i class="bi bi-hand-thumbs-down"></i>
+                            </button>
+                            <span class="text-muted ms-auto" style="font-size: 10.5px;"><i class="bi bi-clock me-1"></i>${m.time || ''}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            conversationHistory.push({ role: 'assistant', content: m.content });
+        }
+    });
+
+    const modalEl = document.getElementById('aiChatHistoryModal');
+    if (modalEl) {
+        bootstrap.Modal.getInstance(modalEl)?.hide();
+    }
+
+    feed.scrollTop = feed.scrollHeight;
+}
+
+function startNewChatSession() {
+    currentSessionId = "session_" + Date.now();
+    clearAiChatFeed();
+    const input = document.getElementById('aiChatInputText');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+}
+
+function deleteChatSession(sessionId, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    let sessions = getAllChatSessions();
+    sessions = sessions.filter(s => s.id !== sessionId);
+    saveAllChatSessions(sessions);
+    renderChatHistoryList();
+
+    if (currentSessionId === sessionId) {
+        startNewChatSession();
+    }
+}
+
+function clearAllChatHistory() {
+    if (!confirm("Are you sure you want to clear all your AI chat history? This cannot be undone.")) {
+        return;
+    }
+    localStorage.removeItem(getChatHistoryStorageKey());
+    renderChatHistoryList();
+    startNewChatSession();
+}
 
 window.addEventListener('DOMContentLoaded', () => {
     loadMySupportTickets();
@@ -1118,6 +1475,9 @@ async function handleAiChatSubmit(e) {
         conversationHistory.push({ role: "user", content: userMessage });
         conversationHistory.push({ role: "assistant", content: replyText });
 
+        // Save into user-scoped Chat History
+        appendMessageToCurrentSession(userMessage, replyText, source, isKrSource);
+
     } catch (err) {
         console.error("AI Chat error:", err);
         const typingEl = document.getElementById(typingId);
@@ -1138,6 +1498,14 @@ async function handleAiChatSubmit(e) {
         feed.scrollTop = feed.scrollHeight;
     }
 }
+
+// Expose handlers globally
+window.openChatHistoryModal = openChatHistoryModal;
+window.startNewChatSession = startNewChatSession;
+window.loadChatSession = loadChatSession;
+window.deleteChatSession = deleteChatSession;
+window.clearAllChatHistory = clearAllChatHistory;
+window.filterChatHistoryList = filterChatHistoryList;
 
 function copyAiReply(elementId, btnEl) {
     const el = document.getElementById(elementId);
