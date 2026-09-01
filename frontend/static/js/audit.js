@@ -264,28 +264,141 @@ function prevPage() { if (currentPage > 1) { currentPage--; renderTable(); } }
 function nextPage() { currentPage++; renderTable(); }
 
 function exportCSV() {
+    exportAuditAs('csv');
+}
+
+function exportAuditAs(format = 'csv') {
     const filtered = getFiltered();
-    const header   = ["Log ID", "Exact Time (UTC)", "Time Ago", "User", "Employee ID", "Role", "Module", "Action", "Severity", "Details"].join(",");
-    const rows     = filtered.map(l =>
-        [
-            l.id,
-            `"${l.exact_timestamp || ""}"`,
-            `"${l.time_ago || ""}"`,
-            `"${l.user_name || ""}"`,
-            `"${l.employee_id || ""}"`,
-            `"${l.user_role || ""}"`,
-            `"${l.module || ""}"`,
-            `"${(l.action || "").replace(/"/g, '""')}"`,
-            `"${l.severity || ""}"`,
-            `"${(l.details || "").replace(/"/g, '""')}"`
-        ].join(",")
-    );
-    const csv  = [header, ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = `edrp_live_audit_logs_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const timeStr = new Date().toLocaleString();
+
+    if (format === 'csv') {
+        const header = ["Log ID", "Exact Time (UTC)", "Time Ago", "User", "Employee ID", "Role", "Module", "Action", "Severity", "Details"].join(",");
+        const rows = filtered.map(l =>
+            [
+                l.id,
+                `"${l.exact_timestamp || ""}"`,
+                `"${l.time_ago || ""}"`,
+                `"${l.user_name || ""}"`,
+                `"${l.employee_id || ""}"`,
+                `"${l.user_role || ""}"`,
+                `"${l.module || ""}"`,
+                `"${(l.action || "").replace(/"/g, '""')}"`,
+                `"${l.severity || ""}"`,
+                `"${(l.details || "").replace(/"/g, '""')}"`
+            ].join(",")
+        );
+        const csv = [header, ...rows].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `EDRP_Audit_Logs_${dateStr}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("Audit logs CSV downloaded successfully!", "success", "Export Complete");
+        }
+    } 
+    else if (format === 'excel') {
+        if (typeof XLSX !== 'undefined') {
+            const wb = XLSX.utils.book_new();
+            const excelRows = [
+                ["Log ID", "Exact Timestamp (UTC)", "Time Ago", "User", "Employee ID", "Role", "Module", "Action", "Severity", "Details"]
+            ];
+            filtered.forEach(l => {
+                excelRows.push([
+                    l.id,
+                    l.exact_timestamp || "",
+                    l.time_ago || "",
+                    l.user_name || "",
+                    l.employee_id || "",
+                    l.user_role || "",
+                    l.module || "",
+                    l.action || "",
+                    l.severity || "",
+                    l.details || ""
+                ]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(excelRows);
+            XLSX.utils.book_append_sheet(wb, ws, "Audit_Logs");
+            XLSX.writeFile(wb, `EDRP_Audit_Logs_${dateStr}.xlsx`);
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("Audit logs Excel spreadsheet downloaded successfully!", "success", "Export Complete");
+            }
+        } else {
+            exportAuditAs('csv');
+        }
+    } 
+    else if (format === 'pdf') {
+        const reportEl = document.createElement("div");
+        reportEl.style.padding = "20px";
+        reportEl.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        reportEl.style.color = "#0f172a";
+        reportEl.style.background = "#ffffff";
+
+        const previewRows = filtered.slice(0, 100); // PDF optimized to first 100 matching entries
+        let rowsHtml = previewRows.map(l => `
+            <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+                <td style="padding: 6px 8px; color: #64748b; white-space: nowrap;">${escapeHtml(l.exact_timestamp || l.time_ago || "")}</td>
+                <td style="padding: 6px 8px; font-weight: 600;">${escapeHtml(l.user_name || "System")} <span style="font-size:10px; color:#64748b;">(${escapeHtml(l.user_role || "User")})</span></td>
+                <td style="padding: 6px 8px; color: #2563eb; font-weight: 600;">${escapeHtml(l.action || "")}</td>
+                <td style="padding: 6px 8px; color: #475569;">${escapeHtml(l.module || "")}</td>
+                <td style="padding: 6px 8px;"><span style="display:inline-block; padding:1px 6px; border-radius:10px; font-size:10px; font-weight:700; background:#f1f5f9;">${escapeHtml(l.severity || "Info")}</span></td>
+            </tr>
+        `).join("");
+
+        if (!rowsHtml) {
+            rowsHtml = `<tr><td colspan="5" style="padding: 16px; text-align: center; color: #94a3b8;">No audit records found</td></tr>`;
+        }
+
+        reportEl.innerHTML = `
+            <div style="border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #0f172a;">Expert Decision Replay Platform</h1>
+                    <p style="margin: 3px 0 0; color: #64748b; font-size: 12px;">Administrative Security & System Audit Trail</p>
+                </div>
+                <div style="text-align: right; font-size: 11px; color: #64748b;">
+                    <div><strong>Generated:</strong> ${timeStr}</div>
+                    <div><strong>Total Filtered Events:</strong> ${filtered.length}</div>
+                </div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 10.5px; text-transform: uppercase;">
+                        <th style="padding: 6px 8px;">Exact Time</th>
+                        <th style="padding: 6px 8px;">User & Role</th>
+                        <th style="padding: 6px 8px;">Action / Event</th>
+                        <th style="padding: 6px 8px;">Module</th>
+                        <th style="padding: 6px 8px;">Severity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+
+            <div style="border-top: 1px solid #e2e8f0; margin-top: 16px; padding-top: 10px; font-size: 10px; color: #94a3b8; text-align: center;">
+                &copy; 2026 Expert Decision Replay Platform (EDRP). Confidential Security Audit Trail. Showing ${previewRows.length} of ${filtered.length} entries.
+            </div>
+        `;
+
+        if (typeof html2pdf !== 'undefined') {
+            const opt = {
+                margin:       8,
+                filename:     `EDRP_Audit_Logs_${dateStr}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().from(reportEl).set(opt).save().then(() => {
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Audit logs PDF generated successfully!", "success", "Export Complete");
+                }
+            });
+        } else {
+            window.print();
+        }
+    }
 }
