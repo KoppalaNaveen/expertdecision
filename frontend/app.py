@@ -500,17 +500,6 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/logout")
-def logout():
-    uid = session.get("user_id")
-    name = session.get("full_name", "User")
-    if uid:
-        log_platform_audit(f"User logged out: {name}", "User ended active session", module="Auth", severity="Info", user_id=uid)
-    session.clear()
-    flash("You have been logged out successfully.", "info")
-    return redirect(url_for("login"))
-
-
 # ===========================
 # REGISTRATION WORKFLOW (STEPS 1 - 3)
 # ===========================
@@ -1714,8 +1703,10 @@ def email_service():
 @app.route("/logout")
 def logout():
     uid = session.get("user_id")
+    name = session.get("full_name", "User")
     if uid:
         try:
+            log_platform_audit(f"User logged out: {name}", "User ended active session", module="Auth", severity="Info", user_id=uid)
             make_backend_request("POST", "/users/logout-presence", json={"user_id": uid}, timeout=2)
         except Exception:
             pass
