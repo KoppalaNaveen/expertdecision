@@ -24,15 +24,17 @@ class TeamService:
     @staticmethod
     def _log_activity(db: Session, user_id: Optional[int], action: str, details: str = ""):
         try:
-            log = ActivityLog(
+            from app.services.audit_service import AuditService
+            AuditService.log_event(
+                db,
                 user_id=user_id or 1,
                 action=action,
-                details=details
+                details=details,
+                module="Teams",
+                severity="Critical" if "deleted" in action.lower() else ("Warning" if "updated" in action.lower() else "Success")
             )
-            db.add(log)
-            db.commit()
-        except Exception:
-            db.rollback()
+        except Exception as e:
+            print(f"[TEAM LOG ERROR] {e}")
 
     @staticmethod
     def _resolve_user_ids(db: Session, raw_identifiers: Optional[List[Union[int, str]]]) -> List[int]:

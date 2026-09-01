@@ -38,10 +38,16 @@ class RoleService:
                 detail="Role already exists"
             )
 
-        return RoleRepository.create_role(
+        res = RoleRepository.create_role(
             db,
             role
         )
+        try:
+            from app.services.audit_service import AuditService
+            AuditService.log_event(db, user_id=1, action=f"Created role: {role.role_name}", details=f"Description: {role.description or 'Custom role'}", module="Roles", severity="Success")
+        except Exception:
+            pass
+        return res
 
     @staticmethod
     def update_role(
@@ -75,11 +81,17 @@ class RoleService:
                     detail="Role name already exists"
                 )
 
-        return RoleRepository.update_role(
+        updated = RoleRepository.update_role(
             db,
             role_id,
             role
         )
+        try:
+            from app.services.audit_service import AuditService
+            AuditService.log_event(db, user_id=1, action=f"Updated role: {existing_role.role_name}", details=f"Role ID: {role_id}", module="Roles", severity="Warning")
+        except Exception:
+            pass
+        return updated
 
     @staticmethod
     def delete_role(
@@ -98,10 +110,16 @@ class RoleService:
                 detail="Role not found"
             )
 
+        role_name = existing_role.role_name
         RoleRepository.delete_role(
             db,
             role_id
         )
+        try:
+            from app.services.audit_service import AuditService
+            AuditService.log_event(db, user_id=1, action=f"Deleted role: {role_name}", details=f"Role ID: {role_id}", module="Roles", severity="Critical")
+        except Exception:
+            pass
 
         return {
             "message": "Role deleted successfully"

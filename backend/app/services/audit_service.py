@@ -36,11 +36,11 @@ def _severity_for_action(action: str, explicit_severity: str = None) -> str:
     if not action:
         return "Info"
     low = action.lower()
-    if any(k in low for k in ("fail", "denied", "blocked", "suspend", "deactivat", "breach", "critical", "delete", "remove", "error")):
-        return "Critical"
-    if any(k in low for k in ("warning", "attempt", "update", "role", "permission", "password reset", "reset", "reject", "change")):
+    if any(k in low for k in ("fail", "denied", "blocked", "suspend", "deactivat", "breach", "critical", "delete", "remove", "error", "rejected")):
+        return "Critical" if ("fail" in low or "breach" in low or "delete" in low or "error" in low) else "Warning"
+    if any(k in low for k in ("warning", "attempt", "update", "role", "permission", "password reset", "reset", "reject", "change", "edit", "restore", "draft")):
         return "Warning"
-    if any(k in low for k in ("approv", "success", "verified", "create", "login", "registered", "restore")):
+    if any(k in low for k in ("approv", "success", "verified", "create", "login", "registered", "submitted")):
         return "Success"
     return "Info"
 
@@ -50,9 +50,11 @@ def _module_for_action(action: str, explicit_module: str = None) -> str:
     if not action:
         return "System"
     low = action.lower()
-    if any(k in low for k in ("login", "logout", "auth", "password", "otp", "verify", "code", "token", "session", "credential")):
+    if any(k in low for k in ("login", "logout", "auth", "password", "otp", "verify", "code", "token", "session", "credential", "register")):
         return "Auth"
-    if "decision" in low or "draft" in low:
+    if "decision" in low or "draft" in low or "dec-" in low:
+        if "review" in low or "approv" in low or "reject" in low:
+            return "Reviews"
         return "Decisions"
     if "review" in low or "approv" in low or "reject" in low:
         return "Reviews"
@@ -62,13 +64,19 @@ def _module_for_action(action: str, explicit_module: str = None) -> str:
         return "Teams"
     if "role" in low or "permission" in low:
         return "Roles"
-    if "user" in low or "account" in low or "promote" in low:
+    if "user" in low or "account" in low or "promote" in low or "profile" in low:
         return "Users"
-    if "report" in low or "export" in low or "analytic" in low:
+    if "report" in low or "export" in low or "analytic" in low or "pdf" in low or "excel" in low or "csv" in low:
         return "Reports"
-    if "repository" in low or "document" in low or "attachment" in low:
+    if "repository" in low or "document" in low or "attachment" in low or "file" in low:
         return "Repository"
-    if "setting" in low or "config" in low or "backup" in low or "email service" in low:
+    if "support" in low or "ticket" in low:
+        return "Support"
+    if "email" in low or "mail" in low:
+        return "Email"
+    if "ai" in low or "chat" in low or "copilot" in low:
+        return "AI"
+    if "setting" in low or "config" in low or "backup" in low:
         return "Settings"
     return "System"
 
@@ -79,7 +87,6 @@ class AuditService:
         """
         Record a comprehensive, second-by-second platform activity log.
         """
-        global _AUDIT_CACHE
         try:
             target_uid = user_id
             if not target_uid or target_uid <= 0:
@@ -88,7 +95,7 @@ class AuditService:
 
             clean_action = str(action)[:95]
             clean_details = str(details) if details else ""
-            if module:
+            if module and not clean_details.startswith("["):
                 clean_details = f"[{module.upper()}] {clean_details}".strip()
 
             new_log = ActivityLog(
@@ -99,9 +106,6 @@ class AuditService:
             db.add(new_log)
             db.commit()
             db.refresh(new_log)
-
-            # Invalidate in-memory cache so real-time viewers immediately get the new event
-            _AUDIT_CACHE["ts"] = 0
             return new_log
         except Exception as e:
             try:
@@ -112,36 +116,28 @@ class AuditService:
             return None
 
     @staticmethod
-    def get_logs(db: Session, limit: int = 300, offset: int = 0):
+    def log_event_standalone(user_id: int, action: str, details: str = "", module: str = None, severity: str = None):
         """
-        Fetch all audit logs with second-level timestamps and enriched user context.
-        Fast batch lookup in 1 single database roundtrip.
+        Standalone helper that automatically manages its own DB session.
         """
-        global _AUDIT_CACHE
-        now = time.time()
-        if _AUDIT_CACHE["data"] is not None and (now - _AUDIT_CACHE["ts"] < 2):
-            return _AUDIT_CACHE["data"]
+        try:
+            from app.database.connection import SessionLocal
+            db = SessionLocal()
+            try:
+                return AuditService.log_event(db, user_id=user_id, action=action, details=details, module=module, severity=severity)
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[AUDIT STANDALONE ERROR] {e}")
+            return None
 
+    @staticmethod
+    def get_logs(db: Session, limit: int = 500, offset: int = 0):
+        """
+        Fetch all audit logs live from database with second-level timestamps and enriched user context.
+        Always queries live real-time data with zero stale caching.
+        """
         logs_raw = db.query(ActivityLog).order_by(ActivityLog.id.desc()).limit(limit).offset(offset).all()
-
-        # Seed initial system baseline logs if database has no activity yet
-        if not logs_raw:
-            system_user = db.query(User).first()
-            uid = system_user.id if system_user else 1
-            initial_actions = [
-                ("User login successful", "Auth", "Administrator session started"),
-                ("Platform system initialized", "System", "Audit logging service active"),
-                ("Created decision: Institutional Architecture Policy", "Decisions", "Module: Decisions"),
-                ("Assigned reviewer for Decision #1", "Reviews", "Sequential review assigned"),
-                ("Approved decision: Institutional Architecture Policy", "Reviews", "Status updated to Approved"),
-                ("Exported audit report Q3", "Reports", "CSV format download"),
-                ("System security verified", "Settings", "2FA & Auth configurations active")
-            ]
-            for act, mod, det in initial_actions:
-                new_log = ActivityLog(user_id=uid, action=act, details=det)
-                db.add(new_log)
-            db.commit()
-            logs_raw = db.query(ActivityLog).order_by(ActivityLog.id.desc()).limit(limit).all()
 
         user_ids = {log.user_id for log in logs_raw if log.user_id}
         users = db.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
@@ -161,20 +157,23 @@ class AuditService:
             exact_sec_str = dt.strftime("%Y-%m-%d %H:%M:%S UTC") if dt else "—"
             created_str = dt.strftime("%b %d, %Y %I:%M:%S %p") if dt else "—"
 
+            raw_details = log.details or ""
+            detected_mod = None
+            if raw_details.startswith("[") and "]" in raw_details:
+                detected_mod = raw_details[1:raw_details.index("]")].strip().capitalize()
+
             result.append({
                 "id": log.id,
                 "user_name": user_name,
                 "employee_id": emp_id,
                 "user_role": user_role,
                 "action": log.action,
-                "module": _module_for_action(log.action),
+                "module": _module_for_action(log.action, detected_mod),
                 "time_ago": _time_ago(dt),
                 "severity": _severity_for_action(log.action),
                 "created_at_str": created_str,
                 "exact_timestamp": exact_sec_str,
-                "details": log.details or "—"
+                "details": raw_details if raw_details else "—"
             })
 
-        _AUDIT_CACHE["data"] = result
-        _AUDIT_CACHE["ts"] = now
         return result

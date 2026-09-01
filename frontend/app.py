@@ -332,6 +332,40 @@ def invalidate_cache_key(prefix=""):
             if prefix in k:
                 _DATA_CACHE.pop(k, None)
 
+def log_platform_audit(action, details="", module=None, severity=None, user_id=None):
+    """
+    Directly or asynchronously records live platform audit events into the database.
+    """
+    def _do_log():
+        try:
+            uid = user_id or session.get("user_id", 1)
+            # Try direct service call first
+            try:
+                from backend.app.services.audit_service import AuditService
+                AuditService.log_event_standalone(user_id=uid, action=action, details=details, module=module, severity=severity)
+                return
+            except Exception:
+                pass
+            try:
+                from app.services.audit_service import AuditService
+                AuditService.log_event_standalone(user_id=uid, action=action, details=details, module=module, severity=severity)
+                return
+            except Exception:
+                pass
+
+            # Fallback to FastAPI HTTP proxy
+            make_backend_request("POST", "/audit/log", json={
+                "user_id": uid,
+                "action": action,
+                "details": details,
+                "module": module,
+                "severity": severity
+            }, timeout=2)
+        except Exception as err:
+            print(f"[AUDIT LOGGING NOTE] {err}")
+
+    threading.Thread(target=_do_log, daemon=True).start()
+
 @app.context_processor
 def inject_global_stats():
     base_data = {
@@ -464,6 +498,17 @@ def login():
             flash("Backend connection error. Ensure FastAPI server is running.", "danger")
 
     return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    uid = session.get("user_id")
+    name = session.get("full_name", "User")
+    if uid:
+        log_platform_audit(f"User logged out: {name}", "User ended active session", module="Auth", severity="Info", user_id=uid)
+    session.clear()
+    flash("You have been logged out successfully.", "info")
+    return redirect(url_for("login"))
 
 
 # ===========================
@@ -1041,6 +1086,59 @@ def universal_api_proxy(endpoint):
             headers=headers,
             timeout=30
         )
+
+        # Automatically record audit logs across all platform mutations
+        if method in ["POST", "PUT", "PATCH", "DELETE"] and resp is not None and resp.status_code < 400 and not endpoint.startswith("audit"):
+            try:
+                ep_low = endpoint.lower()
+                req_json = json_data or {}
+                
+                if "decision" in ep_low:
+                    title_str = req_json.get("title", "")
+                    if method == "POST":
+                        log_platform_audit(f"Created Decision: {title_str}" if title_str else "Created Decision", f"Endpoint: /{endpoint}", module="Decisions", severity="Success")
+                    elif method in ["PUT", "PATCH"]:
+                        status_str = req_json.get("status", "")
+                        if status_str:
+                            log_platform_audit(f"Decision Status Changed to {status_str}", f"Endpoint: /{endpoint}", module="Reviews", severity="Success" if status_str == "Approved" else "Warning")
+                        else:
+                            log_platform_audit(f"Updated Decision: {title_str}" if title_str else "Updated Decision", f"Endpoint: /{endpoint}", module="Decisions", severity="Warning")
+                    elif method == "DELETE":
+                        log_platform_audit(f"Deleted Decision", f"Endpoint: /{endpoint}", module="Decisions", severity="Critical")
+                elif "user" in ep_low:
+                    name_str = req_json.get("full_name", "")
+                    if method == "POST":
+                        log_platform_audit(f"Created User Account: {name_str}" if name_str else "Created User Account", f"Email: {req_json.get('email', '')}", module="Users", severity="Success")
+                    elif method in ["PUT", "PATCH"]:
+                        log_platform_audit(f"Updated User Details: {name_str}" if name_str else "Updated User Details", f"Endpoint: /{endpoint}", module="Users", severity="Warning")
+                    elif method == "DELETE":
+                        log_platform_audit(f"Deactivated User Account", f"Endpoint: /{endpoint}", module="Users", severity="Critical")
+                elif "team" in ep_low:
+                    t_name = req_json.get("team_name", "")
+                    if method == "POST":
+                        log_platform_audit(f"Created Team: {t_name}" if t_name else "Created Team", f"Description: {req_json.get('description', '')}", module="Teams", severity="Success")
+                    elif method in ["PUT", "PATCH"]:
+                        log_platform_audit(f"Updated Team: {t_name}" if t_name else "Updated Team", f"Endpoint: /{endpoint}", module="Teams", severity="Warning")
+                    elif method == "DELETE":
+                        log_platform_audit(f"Deleted Team", f"Endpoint: /{endpoint}", module="Teams", severity="Critical")
+                elif "role" in ep_low:
+                    r_name = req_json.get("role_name", "")
+                    log_platform_audit(f"Modified Role: {r_name}" if r_name else "Modified Role Permissions", f"Endpoint: /{endpoint}", module="Roles", severity="Warning")
+                elif "discuss" in ep_low or "comment" in ep_low:
+                    log_platform_audit("Posted Discussion Message", f"Endpoint: /{endpoint}", module="Discussions", severity="Info")
+                elif "support" in ep_low:
+                    if "ai-chat" in ep_low:
+                        log_platform_audit("AI Copilot Assistant Query", f"User queried AI Support ({req_json.get('mode', 'standard')})", module="AI", severity="Info")
+                    else:
+                        log_platform_audit(f"Submitted Support Ticket: {req_json.get('subject', '')}" if req_json.get('subject') else "Submitted Support Ticket", f"Category: {req_json.get('category', 'General')}", module="Support", severity="Info")
+                elif "email" in ep_low:
+                    log_platform_audit(f"Dispatched Email Notification", f"To: {req_json.get('to_email', 'User')}", module="Email", severity="Info")
+                elif "review" in ep_low:
+                    log_platform_audit("Submitted Review Evaluation", f"Endpoint: /{endpoint}", module="Reviews", severity="Success")
+                elif "repository" in ep_low:
+                    log_platform_audit("Updated Knowledge Repository", f"Endpoint: /{endpoint}", module="Repository", severity="Success")
+            except Exception as e:
+                print(f"[AUDIT PROXY LOG ERROR] {e}")
 
         # Forward only safe headers; exclude encoding headers since requests auto-decompresses
         excluded = {"content-encoding", "transfer-encoding", "connection", "content-length"}

@@ -56,12 +56,12 @@ const SEVERITY_STYLE = {
 
 document.addEventListener("DOMContentLoaded", () => {
     fetchAuditLogs(true);
-    // Real-time live polling every 3 seconds when the browser tab is focused
+    // Real-time live polling every 4 seconds when the browser tab is focused
     autoRefreshTimer = setInterval(() => {
         if (!document.hidden) {
             fetchAuditLogs(false);
         }
-    }, 15000);
+    }, 4000);
 });
 
 async function fetchAuditLogs(showSpinner = false) {
@@ -74,7 +74,7 @@ async function fetchAuditLogs(showSpinner = false) {
     }
 
     try {
-        const res = await fetch(`${API_URL}/audit/?limit=500`);
+        const res = await fetch(`${API_URL}/audit/?limit=500&_t=${Date.now()}`);
         if (!res.ok) {
             throw new Error(`Server returned ${res.status}`);
         }
