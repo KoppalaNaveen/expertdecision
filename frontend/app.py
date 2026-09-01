@@ -516,7 +516,7 @@ def register():
             print(f"[API ERROR] /users/register/step1 failed: {req_err}")
             flash("Backend connection error. Ensure FastAPI server is running on port 8000.", "danger")
 
-    return render_template("register.html")
+    return render_template("register.html", form_data=request.form if request.method == "POST" else None)
 
 
 @app.route("/verify-email", methods=["GET", "POST"])
