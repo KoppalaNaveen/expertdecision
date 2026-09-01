@@ -4,16 +4,16 @@
 
 let statusChartInstance = null;
 let trendChartInstance  = null;
+let cachedDashboardData = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     loadDashboardData();
 });
 
-let cachedDashboardData = null;
-
 async function loadDashboardData() {
     try {
-        const res = await fetch(`${API_URL}/dashboard/${USER_ID}`);
+        const uid = typeof USER_ID !== 'undefined' ? USER_ID : 1;
+        const res = await fetch(`${API_URL}/dashboard/${uid}`);
         if (!res.ok) throw new Error("Failed to load dashboard data");
         const data = await res.json();
         cachedDashboardData = data;
@@ -22,9 +22,175 @@ async function loadDashboardData() {
         renderTrendChart(data);
         renderApprovalFlow(data);
         renderRecentDecisions(data);
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     } catch (err) {
         console.error("Dashboard load error:", err.message);
     }
+}
+
+function renderStats(data) {
+    const total    = data.total_decisions    || 0;
+    const approved = data.approved_decisions || 0;
+    const pending  = data.pending_reviews    || 0;
+    const rejected = data.rejected_decisions || 0;
+
+    const elTotal = document.getElementById("rptTotal");
+    const elApproved = document.getElementById("rptApproved");
+    const elPending = document.getElementById("rptPending");
+    const elRejected = document.getElementById("rptRejected");
+
+    if (elTotal) elTotal.innerText = total;
+    if (elApproved) elApproved.innerText = approved;
+    if (elPending) elPending.innerText = pending;
+    if (elRejected) elRejected.innerText = rejected;
+
+    const pct = total > 0 ? Math.round(approved / total * 100) : 0;
+    const elPct = document.getElementById("rptApprovedPct");
+    if (elPct) elPct.innerText = `↑ ${pct}% approval rate`;
+}
+
+function renderStatusChart(data) {
+    const approved = data.approved_decisions || 0;
+    const pending  = data.pending_reviews    || 0;
+    const rejected = data.rejected_decisions || 0;
+    const draft    = data.draft_decisions    || 0;
+
+    if (statusChartInstance) statusChartInstance.destroy();
+
+    const canvas = document.getElementById("statusChart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    statusChartInstance = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+            labels  : ["Approved", "Pending Review", "Rejected", "Draft"],
+            datasets: [{
+                data           : [approved, pending, rejected, draft],
+                backgroundColor: ["#059669", "#D97706", "#DC2626", "#94A3B8"],
+                borderWidth    : 0,
+                hoverOffset    : 6,
+            }]
+        },
+        options: {
+            cutout  : "72%",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins : { legend: { display: false } },
+            animation: { animateScale: true }
+        }
+    });
+
+    const colors = ["#059669", "#D97706", "#DC2626", "#94A3B8"];
+    const labels = ["Approved", "Pending", "Rejected", "Draft"];
+    const vals   = [approved, pending, rejected, draft];
+    const legendEl = document.getElementById("statusLegend");
+    if (legendEl) {
+        legendEl.innerHTML = labels.map((l, i) => `
+            <div class="d-flex align-items-center gap-1">
+                <div style="width:10px;height:10px;border-radius:50%;background:${colors[i]};"></div>
+                <span class="text-muted">${l}: <strong>${vals[i]}</strong></span>
+            </div>`).join("");
+    }
+}
+
+function renderTrendChart(data) {
+    if (trendChartInstance) trendChartInstance.destroy();
+
+    const canvas = document.getElementById("trendChart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Use live decision trends directly from backend database
+    const trends = data.decision_trends || {};
+    const labels = trends.labels && trends.labels.length > 0 ? trends.labels : ["Mar", "Apr", "May", "Jun", "Jul", "Aug"];
+    const created  = trends.submitted || [0, 0, 0, 0, 0, 0];
+    const approved = trends.approved  || [0, 0, 0, 0, 0, 0];
+    const pending  = trends.pending   || [0, 0, 0, 0, 0, 0];
+
+    trendChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+                { label: "Created",  data: created,  backgroundColor: "#93C5FD", borderRadius: 6, borderSkipped: false },
+                { label: "Approved", data: approved, backgroundColor: "#34D399", borderRadius: 6, borderSkipped: false },
+                { label: "Pending",  data: pending,  backgroundColor: "#FBBF24", borderRadius: 6, borderSkipped: false },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: { mode: "index", intersect: false }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: "#F1F5F9" }, ticks: { precision: 0, stepSize: 1, beginAtZero: true } }
+            }
+        }
+    });
+}
+
+function renderApprovalFlow(data) {
+    const container = document.getElementById("approvalFlowContainer");
+    if (!container) return;
+    const flow = data.approval_flow || [];
+
+    if (flow.length === 0) {
+        container.innerHTML = `<p class="text-muted mb-0" style="font-size:13px;">No approval flow data available.</p>`;
+        return;
+    }
+
+    container.innerHTML = flow.map(f => `
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-semibold text-dark" style="font-size:13px;">${f.stage}</span>
+                <span class="text-muted" style="font-size:12px;">${f.count} decisions (${f.pct}%)</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:#F1F5F9;overflow:hidden;">
+                <div style="height:100%;width:${f.pct}%;background:${f.color || "#2563EB"};border-radius:4px;transition:width 0.6s ease;"></div>
+            </div>
+        </div>`).join("");
+}
+
+function renderRecentDecisions(data) {
+    const tbody    = document.getElementById("recentDecisionsBody");
+    if (!tbody) return;
+    const recents  = data.recent_decisions || [];
+
+    if (recents.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No recent decisions found.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = recents.map(d => {
+        let badgeStyle;
+        if (d.status === "Approved")      badgeStyle = "background:#ECFDF5;color:#059669;";
+        else if (d.status === "Rejected") badgeStyle = "background:#FEF2F2;color:#DC2626;";
+        else if (d.status === "Draft")    badgeStyle = "background:#F1F5F9;color:#64748B;";
+        else                              badgeStyle = "background:#FFF7ED;color:#D97706;";
+        return `
+        <tr>
+            <td class="px-3 py-2">
+                <a href="/decision/${d.id}" class="fw-bold text-primary text-decoration-none" style="font-size:12px;">DEC-${d.id}</a>
+            </td>
+            <td class="px-3 text-dark fw-medium" style="font-size:13px;max-width:200px;">
+                <div class="text-truncate">${escapeHtml(d.title)}</div>
+            </td>
+            <td class="px-3 text-muted" style="font-size:12px;">${escapeHtml(d.department || "—")}</td>
+            <td class="px-3 text-muted" style="font-size:12px;">${escapeHtml(d.approver_name || "—")}</td>
+            <td class="px-3 text-muted" style="font-size:12px;">${escapeHtml(d.created_at_str || "—")}</td>
+            <td class="px-3">
+                <span class="badge" style="${badgeStyle}font-size:10px;font-weight:700;">${escapeHtml(d.status)}</span>
+            </td>
+        </tr>`;
+    }).join("");
 }
 
 function exportReport() {
@@ -44,7 +210,6 @@ function exportReportAs(format = 'pdf') {
     const timeStr = new Date().toLocaleString();
 
     if (format === 'csv') {
-        const headers = ["Metric / Field", "Value / Detail"];
         const summaryRows = [
             ["Platform", "Expert Decision Replay Platform (EDRP)"],
             ["Report Type", "Reports & Analytics Executive Summary"],
@@ -123,12 +288,10 @@ function exportReportAs(format = 'pdf') {
                 showCenterNotification("Reports & Analytics Excel spreadsheet downloaded successfully!", "success", "Export Complete");
             }
         } else {
-            // Fallback to CSV if XLSX library is not yet loaded
             exportReportAs('csv');
         }
     } 
     else if (format === 'pdf') {
-        // Build a dedicated print/PDF element for crystal clear layout
         const reportEl = document.createElement("div");
         reportEl.style.padding = "24px";
         reportEl.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -219,11 +382,16 @@ function exportReportAs(format = 'pdf') {
                 }
             });
         } else {
-            // Native print dialog fallback
             window.print();
         }
     }
 }
 
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+window.loadDashboardData = loadDashboardData;
 window.exportReport = exportReport;
 window.exportReportAs = exportReportAs;
