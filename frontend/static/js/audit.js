@@ -402,3 +402,6 @@ function exportAuditAs(format = 'csv') {
         }
     }
 }
+
+window.exportCSV = exportCSV;
+window.exportAuditAs = exportAuditAs;

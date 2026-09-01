@@ -224,3 +224,6 @@ function exportReportAs(format = 'pdf') {
         }
     }
 }
+
+window.exportReport = exportReport;
+window.exportReportAs = exportReportAs;

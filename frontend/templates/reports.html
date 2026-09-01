@@ -189,5 +189,5 @@
     const API_URL = "/api";
     const USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3.2"></script>
 {% endblock %}
