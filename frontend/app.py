@@ -366,6 +366,70 @@ def log_platform_audit(action, details="", module=None, severity=None, user_id=N
 
     threading.Thread(target=_do_log, daemon=True).start()
 
+_ROUTE_NAME_MAP = {
+    "/dashboard": ("Auth", "Accessed Dashboard", "Executive overview and operational metrics"),
+    "/decisions": ("Decisions", "Viewed Decisions Hub", "Navigated to organizational decisions repository"),
+    "/create-decision": ("Decisions", "Opened Decision Studio", "Workspace opened to draft new decision workflow"),
+    "/replays": ("Decisions", "Accessed Decision Replays", "Viewed decision version history and audit replays"),
+    "/decision-replay": ("Decisions", "Accessed Decision Replays", "Viewed decision version history and audit replays"),
+    "/reviews": ("Reviews", "Accessed Reviews Queue", "Opened pending decision reviews and approvals"),
+    "/pending-approvals": ("Reviews", "Accessed Pending Approvals", "Viewed pending governance approvals"),
+    "/alternatives": ("Decisions", "Accessed Alternatives Studio", "Viewed decision alternative comparison matrices"),
+    "/discussions": ("Discussions", "Accessed Discussions Hub", "Opened team discussion threads and comments"),
+    "/users": ("Users", "Accessed User Management", "Admin opened user accounts and credentials console"),
+    "/teams": ("Teams", "Accessed Team Management", "Opened enterprise team structure and allocations"),
+    "/roles": ("Roles", "Accessed Role Management", "Opened role permissions and access governance"),
+    "/reports": ("Reports", "Accessed Reports & Analytics", "Viewed live organizational metrics, KPIs, and charts"),
+    "/repository": ("Repository", "Accessed Knowledge Repository", "Viewed institutional documents and knowledge assets"),
+    "/support": ("Support", "Accessed Help & Support Desk", "Opened AI copilot assistant and ticket center"),
+    "/email-service": ("Email", "Accessed Email Service", "Opened SMTP delivery logs and email manager"),
+    "/settings": ("Settings", "Accessed System Settings", "Opened platform security and general preferences"),
+    "/admin-backup": ("Settings", "Accessed Backup Console", "Opened database backup and snapshot manager"),
+    "/profile": ("Users", "Viewed User Profile", "Opened personal profile and account settings"),
+    "/notifications": ("System", "Viewed Notifications Center", "Opened alert notifications inbox"),
+    "/audit": ("System", "Accessed Live Audit Logs", "Administrator opened security audit trail"),
+}
+
+_LAST_PAGE_LOG = {}
+
+@app.before_request
+def log_user_page_navigation():
+    try:
+        if not session.get("logged_in") or "user_id" not in session:
+            return
+        
+        path = request.path.rstrip("/")
+        if not path:
+            path = "/"
+
+        # Match exact route or prefix
+        route_meta = _ROUTE_NAME_MAP.get(path)
+        if not route_meta:
+            if path.startswith("/decision/"):
+                route_meta = ("Decisions", f"Viewed Decision DEC-{path.split('/')[-1]}", f"Accessed full details for decision {path.split('/')[-1]}")
+            elif path.startswith("/discussion/"):
+                route_meta = ("Discussions", f"Viewed Discussion DEC-{path.split('/')[-1]}", f"Accessed discussion thread for decision {path.split('/')[-1]}")
+
+        if route_meta and request.method == "GET":
+            uid = session["user_id"]
+            user_name = session.get("full_name", "User")
+            now = time.time()
+            last_entry = _LAST_PAGE_LOG.get(uid)
+
+            # Prevent logging identical page transitions within 6 seconds
+            if not last_entry or last_entry.get("path") != path or (now - last_entry.get("ts", 0) > 6):
+                _LAST_PAGE_LOG[uid] = {"path": path, "ts": now}
+                mod, act, det = route_meta
+                log_platform_audit(
+                    action=f"{user_name}: {act}",
+                    details=det,
+                    module=mod,
+                    severity="Info",
+                    user_id=uid
+                )
+    except Exception:
+        pass
+
 @app.context_processor
 def inject_global_stats():
     base_data = {

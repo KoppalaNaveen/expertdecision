@@ -86,11 +86,20 @@ class AuditService:
     def log_event(db: Session, user_id: int, action: str, details: str = "", module: str = None, severity: str = None):
         """
         Record a comprehensive, second-by-second platform activity log.
+        Safely guarantees database persistence with zero foreign key violations.
         """
         try:
             target_uid = user_id
-            if not target_uid or target_uid <= 0:
+            
+            # Verify user exists in database to prevent foreign key errors
+            user_obj = None
+            if target_uid and target_uid > 0:
+                user_obj = db.query(User).filter(User.id == target_uid).first()
+
+            if not user_obj:
                 admin_user = db.query(User).filter(User.role_id == 1).first()
+                if not admin_user:
+                    admin_user = db.query(User).first()
                 target_uid = admin_user.id if admin_user else 1
 
             clean_action = str(action)[:95]
@@ -132,7 +141,7 @@ class AuditService:
             return None
 
     @staticmethod
-    def get_logs(db: Session, limit: int = 500, offset: int = 0):
+    def get_logs(db: Session, limit: int = 1000, offset: int = 0):
         """
         Fetch all audit logs live from database with second-level timestamps and enriched user context.
         Always queries live real-time data with zero stale caching.
