@@ -146,11 +146,11 @@ class UserRepository:
             clean_hash = getattr(user, 'email_hash', '') or ""
             email_params = {"e": clean_email, "eh": clean_hash, "eo": clean_orig, "uid": user_id}
 
-            # 1. Clean up activity logs
+            # 1. Safely reassign historical activity and audit logs to system account (ID 1)
             if "activity_logs" in existing_tables:
-                safe_exec("DELETE FROM activity_logs WHERE user_id = :uid", email_params)
+                safe_exec("UPDATE activity_logs SET user_id = 1 WHERE user_id = :uid", email_params)
             if "audit_logs" in existing_tables:
-                safe_exec("DELETE FROM audit_logs WHERE actor_id = :uid", email_params)
+                safe_exec("UPDATE audit_logs SET actor_id = 1 WHERE actor_id = :uid", email_params)
 
             # 2. Clean up notifications, support tickets, internal emails, and backup records
             if "notifications" in existing_tables:

@@ -78,6 +78,8 @@ class RoleRepository:
         if not role:
             return None
 
+        from app.models.user import User
+        db.query(User).filter(User.role_id == role_id).update({User.role_id: None}, synchronize_session=False)
         db.delete(role)
         db.commit()
 

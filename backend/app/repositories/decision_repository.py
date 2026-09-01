@@ -782,6 +782,7 @@ class DecisionRepository:
         from fastapi import HTTPException
         from app.models.user import User
         from app.models.role import Role
+        from sqlalchemy import text, inspect
 
         db_decision = DecisionRepository.get_decision_by_id(db, decision_id)
         if not db_decision:
@@ -804,16 +805,63 @@ class DecisionRepository:
                 detail=f"Decisions with status '{db_decision.status}' can only be deleted by an Administrator."
             )
 
-        if user_id:
-            act_log = ActivityLog(
-                user_id=user_id,
-                action=f"Deleted decision DEC-{decision_id} ({db_decision.title})",
-                details=f"Decision ID: DEC-{decision_id}"
+        title_snapshot = db_decision.title or f"DEC-{decision_id}"
+
+        # 1. Log activity before deletion
+        try:
+            from app.services.audit_service import AuditService
+            AuditService.log_event(
+                db,
+                user_id=user_id or 1,
+                action=f"Deleted decision DEC-{decision_id} ({title_snapshot[:40]})",
+                details=f"Decision ID: DEC-{decision_id}, Title: {title_snapshot}",
+                module="Decisions",
+                severity="Critical"
             )
-            db.add(act_log)
+        except Exception:
+            pass
+
+        # 2. Cleanly cascade delete child rows to prevent foreign key errors in Supabase / PostgreSQL
+        try:
+            params = {"did": decision_id}
+            inspector = inspect(db.get_bind())
+            existing_tables = set(inspector.get_table_names())
+
+            def safe_exec(sql):
+                try:
+                    db.execute(text(sql), params)
+                except Exception:
+                    pass
+
+            if "alternatives" in existing_tables:
+                safe_exec("DELETE FROM alternatives WHERE decision_id = :did")
+            if "reviews" in existing_tables:
+                safe_exec("DELETE FROM reviews WHERE decision_id = :did")
+            if "decision_versions" in existing_tables:
+                safe_exec("DELETE FROM decision_versions WHERE decision_id = :did")
+            if "replays" in existing_tables:
+                safe_exec("DELETE FROM replays WHERE decision_id = :did")
+            if "attachments" in existing_tables:
+                safe_exec("DELETE FROM attachments WHERE decision_id = :did")
+            if "meeting_notes" in existing_tables:
+                safe_exec("DELETE FROM meeting_notes WHERE decision_id = :did")
+            if "comments" in existing_tables and "discussion_threads" in existing_tables:
+                safe_exec("DELETE FROM comments WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id = :did)")
+            if "discussion_threads" in existing_tables:
+                safe_exec("DELETE FROM discussion_threads WHERE decision_id = :did")
+        except Exception as cascade_err:
+            print(f"[DECISION DELETE CASCADE NOTE] {cascade_err}")
 
         db.delete(db_decision)
         db.commit()
+
+        # Invalidate dashboard in-memory caches
+        try:
+            from app.repositories.dashboard_repository import _DASHBOARD_CACHE
+            _DASHBOARD_CACHE.clear()
+        except Exception:
+            pass
+
         return True
 
     @staticmethod
