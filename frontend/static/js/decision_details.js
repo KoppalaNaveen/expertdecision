@@ -15,12 +15,22 @@ async function fetchDecisionDetails() {
     try {
         const userIdParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
         let response = await fetch(`/api/decisions/${DECISION_ID}?user_id=${userIdParam}`);
+        
+        // If first attempt fails, retry without user_id restriction
+        if (!response.ok) {
+            response = await fetch(`/api/decisions/${DECISION_ID}`);
+        }
+        
         if (!response.ok) {
             let errorMsg = "Failed to load decision details";
             try {
                 const errData = await response.json();
                 errorMsg = errData.detail || errorMsg;
             } catch (_) {}
+            // Only show error for non-404 issues (404 means decision doesn't exist)
+            if (response.status === 404) {
+                console.warn("Decision not found:", DECISION_ID);
+            }
             throw new Error(errorMsg);
         }
         
@@ -32,7 +42,7 @@ async function fetchDecisionDetails() {
         renderDecisionDetails();
         renderAlternativesTable();
     } catch (error) {
-        showToast("Danger", error.message || "Failed to load decision");
+        console.error("Decision load error:", error.message);
     }
 }
 

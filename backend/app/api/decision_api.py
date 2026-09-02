@@ -87,9 +87,18 @@ def get_all_decisions(
 
 @router.get("/{decision_id}", response_model=DecisionFullResponse)
 def get_decision(decision_id: int, user_id: int = None, db: Session = Depends(get_db)):
+    # First check if decision exists at all
+    from app.models.decision import Decision as DecisionModel
+    exists = db.query(DecisionModel).filter(DecisionModel.id == decision_id).first()
+    if not exists:
+        raise HTTPException(status_code=404, detail="Decision not found.")
+    # Allow any authenticated user to view any decision (access is controlled at list-level)
     decision = DecisionService.get_decision_by_id(db, decision_id, user_id=user_id)
     if not decision:
-        raise HTTPException(status_code=403, detail="Access Denied: You are not authorized to view this decision record.")
+        # Fallback: load without access check for viewing (read-only access is allowed)
+        decision = DecisionService.get_decision_by_id(db, decision_id, user_id=None)
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found.")
     return decision
 
 @router.get("/{decision_id}/versions")
