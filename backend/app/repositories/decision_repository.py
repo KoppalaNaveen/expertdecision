@@ -408,8 +408,11 @@ class DecisionRepository:
             if user and user.role:
                 role_lower = user.role.role_name.strip().lower()
 
+                # Administrator has full unrestricted access
+                if role_lower in ["administrator", "admin", "ad", "system administrator"]:
+                    pass
                 # Approved decisions in institutional knowledge repository can be accessed by all authenticated users
-                if db_decision.status == "Approved":
+                elif db_decision.status == "Approved":
                     pass
                 elif role_lower in ["employee", "emp"]:
                     if db_decision.created_by not in target_uids:
@@ -784,9 +787,10 @@ class DecisionRepository:
         from app.models.role import Role
         from sqlalchemy import text, inspect
 
-        db_decision = DecisionRepository.get_decision_by_id(db, decision_id)
+        db_decision = db.query(Decision).filter(Decision.id == decision_id).first()
         if not db_decision:
-            return False
+            # Idempotent success: decision is already deleted/removed
+            return True
 
         # Determine if user is Administrator
         is_admin = False
@@ -797,6 +801,8 @@ class DecisionRepository:
             if user and user.role_id:
                 r = db.query(Role).filter(Role.id == user.role_id).first()
                 if r and "admin" in (r.role_name or "").lower():
+                    is_admin = True
+                elif user.role_id == 1:
                     is_admin = True
 
         if db_decision.status in ("Approved", "Rejected") and not is_admin:

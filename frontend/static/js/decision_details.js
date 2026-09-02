@@ -2440,10 +2440,15 @@ async function deleteCurrentDecision() {
     try {
         const roleParam = typeof CURRENT_USER_ROLE !== 'undefined' ? encodeURIComponent(CURRENT_USER_ROLE) : '';
         const userParam = typeof USER_ID !== 'undefined' ? USER_ID : 1;
-        const res = await fetch(`${API_URL}/decisions/${decisionId}?user_id=${userParam}&role_name=${roleParam}`, {
+        let res = await fetch(`/api/decisions/${decisionId}?user_id=${userParam}&role_name=${roleParam}`, {
             method: "DELETE"
         });
-        if (!res.ok) {
+        if (!res.ok && typeof API_URL !== 'undefined' && API_URL) {
+            res = await fetch(`${API_URL}/decisions/${decisionId}?user_id=${userParam}&role_name=${roleParam}`, {
+                method: "DELETE"
+            });
+        }
+        if (!res.ok && res.status !== 404) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || "Failed to delete decision");
         }

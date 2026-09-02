@@ -1051,7 +1051,9 @@ async function deleteDecision(id) {
         if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
             response = await fetch(`${API_URL}/decisions/${id}?user_id=${userParam}&role_name=${roleParam}`, { method: "DELETE" });
         }
-        if (!response.ok) {
+        
+        // If status is 404, the decision is already deleted from DB
+        if (!response.ok && response.status !== 404) {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.detail || "Failed to delete decision");
         }

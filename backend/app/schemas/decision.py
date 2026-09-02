@@ -55,13 +55,24 @@ class AlternativeCreateForDecision(BaseModel):
     pros: Optional[str] = None
     cons: Optional[str] = None
     cost: Optional[float] = None
+    budget: Optional[float] = None
     feasibility_score: Optional[int] = None
     risk_level: Optional[str] = None
+    resource_demand: Optional[str] = None
+    risk_mitigation: Optional[str] = None
+
+    model_config = {
+        "extra": "ignore"
+    }
 
 class ReviewerCreateForDecision(BaseModel):
     reviewer_id: int
     deadline: Optional[datetime] = None
     approval_type: Optional[str] = None
+
+    model_config = {
+        "extra": "ignore"
+    }
 
 class DecisionFullCreate(BaseModel):
     title: str
@@ -77,6 +88,10 @@ class DecisionFullCreate(BaseModel):
     reviewers: List[ReviewerCreateForDecision] = []
     temp_file_ids: List[int] = []
     change_reason: Optional[str] = None
+
+    model_config = {
+        "extra": "ignore"
+    }
 
 class DecisionVersionResponse(BaseModel):
     id: int

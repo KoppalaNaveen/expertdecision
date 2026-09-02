@@ -2435,18 +2435,9 @@ Return ONLY a valid JSON array of objects with the following exact keys:
                 body: JSON.stringify(payload)
             });
             
-            if (!res.ok) {
+            if (!res.ok && res.status === 404) {
                 const altUrl = isEditMode ? `/decisions/${editDecisionId}/full` : `/decisions/full`;
                 res = await fetch(altUrl, {
-                    method: method,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-            }
-
-            if (!res.ok) {
-                const directUrl = isEditMode ? `http://localhost:8000/decisions/${editDecisionId}/full` : `http://localhost:8000/decisions/full`;
-                res = await fetch(directUrl, {
                     method: method,
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
