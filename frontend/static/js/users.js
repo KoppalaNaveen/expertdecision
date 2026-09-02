@@ -127,6 +127,13 @@ function initUsersPage() {
             submitPromoteUser(e);
         });
     }
+
+    const demoteForm = document.getElementById("demoteUserForm");
+    if (demoteForm) {
+        demoteForm.addEventListener("submit", (e) => {
+            submitDemoteUser(e);
+        });
+    }
 }
 
 if (document.readyState === "loading") {
@@ -279,6 +286,15 @@ function renderTable() {
                    </button>`
                 : ``;
 
+            const currentLoggedInId = (typeof CURRENT_USER_ID !== 'undefined' && CURRENT_USER_ID) ? CURRENT_USER_ID : (parseInt(localStorage.getItem('user_id'), 10) || 0);
+            const isSelf = currentLoggedInId && Number(u.id) === Number(currentLoggedInId);
+
+            const demoteBtn = (isAdmin && isTargetAdmin && !isSelf)
+                ? `<button class="btn btn-sm btn-outline-warning px-2 py-1" style="color:#B45309; border-color:#FDE68A; background:#FFFBEB;" onclick="openDemoteModal(${u.id})" title="Depromote Administrator">
+                    <i data-lucide="shield-alert" style="width:11px;height:11px;"></i>Depromote
+                   </button>`
+                : ``;
+
             const viewBtn = `<button class="btn btn-sm btn-outline-primary px-2 py-1" onclick="viewUserDetails(${u.id})" title="View Details">
                 <i data-lucide="eye" style="width:11px;height:11px;"></i>View
             </button>`;
@@ -324,6 +340,7 @@ function renderTable() {
                     <div class="action-btn-group">
                         ${approveBtn}
                         ${promoteBtn}
+                        ${demoteBtn}
                         ${viewBtn}
                         ${editBtn}
                         ${deleteBtn}
@@ -775,6 +792,169 @@ async function submitPromoteUser(e) {
     }
 }
 window.submitPromoteUser = submitPromoteUser;
+
+// =========================================================
+// Depromote User Handlers (Admin Only)
+// =========================================================
+
+function updateDemotePreview() {
+    const userId = parseInt(document.getElementById("demoteUserId")?.value, 10);
+    const targetRoleId = parseInt(document.getElementById("demoteNewRoleId")?.value, 10);
+    const u = allUsers.find(user => user.id === userId);
+    if (!u) return;
+
+    const oldId = u.employee_id || "AD123456";
+    const newId = calculateNewEmpId(oldId, targetRoleId);
+
+    const prevEl = document.getElementById("demotePreviewOldId");
+    const nextEl = document.getElementById("demotePreviewNewId");
+    if (prevEl) prevEl.innerText = oldId;
+    if (nextEl) nextEl.innerText = newId;
+}
+window.updateDemotePreview = updateDemotePreview;
+
+function openDemoteModal(userId) {
+    const u = allUsers.find(user => user.id === userId);
+    if (!u) {
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("User details not found.", 'error', 'User Not Found');
+        } else {
+            alert("User details not found.");
+        }
+        return;
+    }
+
+    const currentLoggedInId = (typeof CURRENT_USER_ID !== 'undefined' && CURRENT_USER_ID) ? CURRENT_USER_ID : (parseInt(localStorage.getItem('user_id'), 10) || 0);
+    if (currentLoggedInId && Number(u.id) === Number(currentLoggedInId)) {
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("You cannot depromote your own logged-in administrator account.", 'warning', 'Action Not Allowed');
+        } else {
+            alert("You cannot depromote your own administrator account.");
+        }
+        return;
+    }
+
+    const currentRoleName = roleMap[u.role_id] || "Administrator";
+    const isTargetAdmin = currentRoleName.toLowerCase().includes('admin') || ['administrator', 'admin', 'system administrator'].includes(currentRoleName.toLowerCase()) || u.role_id === 1;
+    if (!isTargetAdmin) {
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("Only administrator accounts can be depromoted.", 'warning', 'Action Not Allowed');
+        } else {
+            alert("Only administrator accounts can be depromoted.");
+        }
+        return;
+    }
+
+    document.getElementById("demoteUserId").value = u.id;
+    document.getElementById("demoteUserName").innerText = u.full_name;
+    
+    const empIdEl = document.getElementById("demoteCurrentEmpId");
+    if (empIdEl) empIdEl.innerText = u.employee_id || "N/A";
+
+    const selectEl = document.getElementById("demoteNewRoleId");
+    if (selectEl) {
+        selectEl.value = "2"; // Default to Manager
+    }
+
+    const alertBox = document.getElementById("demoteAlert");
+    if (alertBox) alertBox.classList.add("d-none");
+
+    updateDemotePreview();
+
+    const modalEl = document.getElementById("demoteUserModal");
+    if (modalEl) {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
+}
+window.openDemoteModal = openDemoteModal;
+
+let isDemotingUser = false;
+
+async function submitDemoteUser(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    if (isDemotingUser) return;
+
+    const userId = parseInt(document.getElementById("demoteUserId")?.value, 10);
+    const newRoleId = parseInt(document.getElementById("demoteNewRoleId")?.value, 10);
+    const alertBox = document.getElementById("demoteAlert");
+    const submitBtn = document.getElementById("btnDemoteSubmit");
+
+    if (!userId || !newRoleId) return;
+
+    isDemotingUser = true;
+    if (alertBox) alertBox.classList.add("d-none");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Applying Depromotion...";
+    }
+
+    const currentLoggedInId = (typeof CURRENT_USER_ID !== 'undefined' && CURRENT_USER_ID) ? CURRENT_USER_ID : (parseInt(localStorage.getItem('user_id'), 10) || 1);
+    const currentLoggedInName = (typeof CURRENT_USER_NAME !== 'undefined' && CURRENT_USER_NAME) ? CURRENT_USER_NAME : "Administrator";
+
+    const payload = {
+        role_id: newRoleId,
+        actor_id: currentLoggedInId,
+        actor_role: typeof CURRENT_USER_ROLE !== 'undefined' ? CURRENT_USER_ROLE : "Administrator",
+        actor_name: currentLoggedInName
+    };
+
+    try {
+        const res = await fetch(`/api/users/${userId}/demote`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Failed to depromote user");
+        }
+
+        const data = await res.json();
+
+        // Close modal
+        const modalEl = document.getElementById("demoteUserModal");
+        if (modalEl) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.hide();
+        }
+
+        // Cleanup any leftover modal backdrop
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+
+        const successMsg = `Administrator "${data.full_name}" depromoted to ${data.new_role}! Employee ID updated: ${data.prev_employee_id} &rarr; ${data.new_employee_id}. Mail dispatched to user's email.`;
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(successMsg, 'success', 'User Depromoted Successfully');
+        } else {
+            alert(successMsg);
+        }
+
+        await fetchUsers();
+    } catch (err) {
+        console.error("Depromotion error:", err);
+        if (alertBox) {
+            alertBox.innerText = err.message || "Failed to depromote user";
+            alertBox.classList.remove("d-none");
+        }
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(err.message || "Failed to depromote user", 'error', 'Depromotion Error');
+        }
+    } finally {
+        isDemotingUser = false;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Apply Depromotion & Send Mail";
+        }
+    }
+}
+window.submitDemoteUser = submitDemoteUser;
 
 // =========================================================
 // Edit User Credentials & Access Handlers (Admin Only)

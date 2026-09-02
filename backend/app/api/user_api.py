@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional, List
 
 from app.database.connection import get_db
 from app.schemas.user import (
@@ -283,6 +284,7 @@ def admin_update_credentials(
 
 class UpdateUserRoleRequest(BaseModel):
     role_id: int
+    actor_id: Optional[int] = None
     actor_role: str = "Administrator"
     actor_name: str = "Administrator"
 
@@ -308,6 +310,21 @@ def promote_user_role(user_id: int, req: UpdateUserRoleRequest, db: Session = De
         db=db,
         user_id=user_id,
         new_role_id=req.role_id,
+        actor_role=req.actor_role or "Administrator",
+        actor_name=req.actor_name or "Administrator"
+    )
+
+# -------------------------------
+# Depromote Administrator (Admin Only)
+# -------------------------------
+@router.post("/{user_id}/demote", response_model=PromoteUserResponse)
+@router.post("/{user_id}/depromote", response_model=PromoteUserResponse)
+def demote_user_role(user_id: int, req: UpdateUserRoleRequest, db: Session = Depends(get_db)):
+    return UserService.demote_user(
+        db=db,
+        user_id=user_id,
+        new_role_id=req.role_id,
+        actor_id=req.actor_id,
         actor_role=req.actor_role or "Administrator",
         actor_name=req.actor_name or "Administrator"
     )

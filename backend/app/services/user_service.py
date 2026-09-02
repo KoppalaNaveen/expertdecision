@@ -1008,3 +1008,118 @@ class UserService:
             "prev_employee_id": prev_emp_id,
             "new_employee_id": new_emp_id
         }
+
+    @staticmethod
+    def demote_user(db: Session, user_id: int, new_role_id: int, actor_id: int = None, actor_role: str = "Administrator", actor_name: str = "Administrator"):
+        """
+        Administrator-Only User Demotion / Role Change for Administrator accounts.
+        Updates admin user's role to a non-admin role (Manager, Reviewer, Employee),
+        transforms Employee ID (e.g. AD030120 -> MN030120),
+        dispatches an email to the user's registered email with the new login ID, and records audit logs.
+        """
+        from app.models.role import Role
+
+        # 1. Authorization check: Only Administrators can demote users
+        actor_clean = (actor_role or "").strip().lower()
+        if not any(adm in actor_clean for adm in ["admin", "administrator", "system administrator"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access Denied: Only Administrators can depromote users."
+            )
+
+        # 2. Self-demotion guard
+        if actor_id and int(actor_id) == int(user_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot depromote your own administrator account."
+            )
+
+        # 3. Fetch target user
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        # 4. Target role check
+        new_role_obj = db.query(Role).filter(Role.id == new_role_id).first()
+        if not new_role_obj:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target role not found.")
+
+        prev_role_name = user.role.role_name if user.role else "Administrator"
+        
+        # User must currently be an admin
+        if user.role_id != 1 and prev_role_name.strip().lower() not in ["administrator", "admin", "system administrator"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only Administrator accounts can be depromoted."
+            )
+
+        # Target role cannot be administrator
+        if new_role_id == 1 or new_role_obj.role_name.strip().lower() in ["administrator", "admin", "system administrator"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Target role for depromotion must be a non-administrator role (e.g. Manager, Reviewer, Employee)."
+            )
+
+        new_role_name = new_role_obj.role_name
+
+        prev_emp_id = user.employee_id or f"AD{random.randint(100000, 999999)}"
+        new_prefix = UserService._get_role_prefix(db, new_role_id)
+        new_emp_id = UserService._transform_employee_id(prev_emp_id, new_prefix, db, user.id)
+
+        # 5. Update user record
+        from datetime import datetime, timezone
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        user.role_id = new_role_id
+        user.employee_id = new_emp_id
+        user.updated_at = now_str
+        db.commit()
+        db.refresh(user)
+
+        # 6. In-App Notification
+        try:
+            NotificationService.create_notification(
+                db,
+                user_id=user.id,
+                message=f"Your role was updated from Administrator to {new_role_name}. Your new Login Employee ID is {new_emp_id}.",
+                notification_type="Role Update"
+            )
+        except Exception as notif_err:
+            print(f"Role depromotion notification note: {notif_err}")
+
+        # 7. Automated Email via Gmail to user's real email address
+        target_email = get_recipient_email(user)
+        if target_email:
+            def _async_demote_email():
+                try:
+                    send_role_changed_email(
+                        to_email=target_email,
+                        recipient_name=user.full_name,
+                        prev_role=prev_role_name,
+                        new_role=new_role_name,
+                        prev_emp_id=prev_emp_id,
+                        new_emp_id=new_emp_id,
+                        change_time=now_str
+                    )
+                except Exception as mail_err:
+                    print(f"Role change email dispatch exception: {mail_err}")
+
+            threading.Thread(target=_async_demote_email, daemon=True).start()
+
+        # 8. Audit Log
+        UserService._log_activity(
+            db,
+            user.id,
+            f"Depromoted user {user.full_name}: {prev_role_name} ({prev_emp_id}) -> {new_role_name} ({new_emp_id})",
+            f"By {actor_name} ({actor_role})"
+        )
+
+        return {
+            "message": f"User successfully depromoted from {prev_role_name} to {new_role_name}. New Employee ID: {new_emp_id}",
+            "user_id": user.id,
+            "full_name": user.full_name,
+            "prev_role": prev_role_name,
+            "new_role": new_role_name,
+            "prev_employee_id": prev_emp_id,
+            "new_employee_id": new_emp_id
+        }
