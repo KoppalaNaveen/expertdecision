@@ -3678,21 +3678,54 @@
 
         window.downloadDocumentFile = function(docId, filename, customUrl) {
             const rawFilename = (filename || 'document').trim();
+            if (customUrl && customUrl.startsWith('blob:')) {
+                const a = document.createElement('a');
+                a.href = customUrl;
+                a.download = rawFilename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                if (typeof showToast === 'function') {
+                    showToast('Success', `Downloading ${rawFilename}...`);
+                }
+                return;
+            }
+
             let downloadUrl = customUrl ? customUrl : `/api/upload/${docId}?download=1`;
             if (customUrl && !customUrl.includes('download=1')) {
                 downloadUrl += (customUrl.includes('?') ? '&' : '?') + 'download=1';
             }
 
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = rawFilename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-
-            if (typeof showToast === 'function') {
-                showToast('Success', `Downloading ${rawFilename}...`);
-            }
+            fetch(downloadUrl)
+                .then(async res => {
+                    if (!res.ok) {
+                        const errJson = await res.json().catch(() => ({}));
+                        throw new Error(errJson.detail || `Server returned ${res.status}`);
+                    }
+                    return res.blob();
+                })
+                .then(blob => {
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = rawFilename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
+                    if (typeof showToast === 'function') {
+                        showToast('Success', `Downloaded ${rawFilename}`);
+                    }
+                })
+                .catch(err => {
+                    console.warn('Blob download fallback:', err);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = rawFilename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
         };
     </script>
 

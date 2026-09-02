@@ -1470,6 +1470,8 @@ Return ONLY a valid JSON array of objects with the following exact keys:
         const extIcon = isPdf ? 'bi-file-earmark-pdf text-danger' : (isSpreadsheet ? 'bi-file-earmark-spreadsheet text-success' : (isPresentation ? 'bi-file-earmark-slides text-warning' : 'bi-file-earmark-text text-primary'));
         const bgColor = isPdf ? 'bg-danger-subtle' : (isSpreadsheet ? 'bg-success-subtle' : (isPresentation ? 'bg-warning-subtle' : 'bg-primary-subtle'));
 
+        const liveUrl = (doc && doc._localUrl) || (window._localUploadedObjectUrls && window._localUploadedObjectUrls[doc.id]) || '';
+
         docList.innerHTML += `
             <div class="d-flex align-items-center justify-content-between border rounded-3 p-3 mb-3 bg-white shadow-sm" id="doc-${doc.id}">
                 <div class="d-flex align-items-center gap-3">
@@ -1486,10 +1488,10 @@ Return ONLY a valid JSON array of objects with the following exact keys:
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1.5" onclick="viewDocumentFile(${doc.id}, '${escapeHtml(filename)}', '${sizeMB}')" title="View Document in Viewer / New Tab">
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1.5" onclick="viewDocumentFile(${doc.id}, '${escapeHtml(filename)}', '${sizeMB}', '${liveUrl}')" title="View Document in Viewer / New Tab">
                         <i class="bi bi-eye"></i> View File
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1.5" onclick="downloadDocumentFile(${doc.id}, '${escapeHtml(filename)}')" title="Download Document">
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1.5" onclick="downloadDocumentFile(${doc.id}, '${escapeHtml(filename)}', '${liveUrl}')" title="Download Document">
                         <i class="bi bi-download"></i> Download
                     </button>
                     <button type="button" class="btn btn-sm btn-light text-danger border rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" onclick="removeTempDoc(${doc.id})" title="Remove Document">
@@ -1682,6 +1684,13 @@ Return ONLY a valid JSON array of objects with the following exact keys:
 
                 if (res.ok) {
                     const data = await res.json();
+                    try {
+                        const localBlobUrl = URL.createObjectURL(file);
+                        if (!window._localUploadedObjectUrls) window._localUploadedObjectUrls = {};
+                        window._localUploadedObjectUrls[data.id] = localBlobUrl;
+                        data._localUrl = localBlobUrl;
+                    } catch (blobErr) {}
+
                     if (!decisionPayload.temp_file_ids.includes(data.id)) {
                         decisionPayload.temp_file_ids.push(data.id);
                     }
