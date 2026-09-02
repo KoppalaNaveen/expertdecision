@@ -1123,7 +1123,9 @@
         if (!content || !currentThreadId) return;
 
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before sending messages.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before sending messages.", "warning", "Offline");
+            }
             return;
         }
 
@@ -1176,7 +1178,9 @@
 
     async function editCommentPrompt(commentId, currentContent) {
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before editing messages.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before editing messages.", "warning", "Offline");
+            }
             return;
         }
         const newContent = prompt("Edit your message:", currentContent);
@@ -1188,9 +1192,14 @@
             });
             if (res.ok) {
                 fetchThreadComments(currentThreadId, true);
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Message updated successfully.", "success", "Message Edited");
+                }
             } else {
                 const err = await res.json().catch(()=>({}));
-                alert(err.detail || "Failed to edit comment");
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification(err.detail || "Failed to edit comment", "error", "Edit Failed");
+                }
             }
         } catch(e){
             console.error(e);
@@ -1199,13 +1208,18 @@
 
     async function softDeleteComment(commentId) {
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before deleting messages.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before deleting messages.", "warning", "Offline");
+            }
             return;
         }
         if (!confirm("Are you sure you want to delete this comment?")) return;
         try {
-            await fetch(`${API_URL}/decisions/comments/${commentId}?user_id=${CURRENT_USER_ID}`, { method: "DELETE" });
+            const res = await fetch(`${API_URL}/decisions/comments/${commentId}?user_id=${CURRENT_USER_ID}`, { method: "DELETE" });
             fetchThreadComments(currentThreadId, true);
+            if (res.ok && typeof showCenterNotification === 'function') {
+                showCenterNotification("Message deleted successfully.", "success", "Message Deleted");
+            }
         } catch(e){}
     }
 
@@ -1297,7 +1311,9 @@
 
     async function saveDecisionRationale() {
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before saving rationale.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before saving rationale.", "warning", "Offline");
+            }
             return;
         }
         try {
@@ -1315,7 +1331,9 @@
             });
 
             if (res.ok) {
-                alert("Decision Rationale saved successfully!");
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Decision Rationale saved successfully!", "success", "Rationale Saved");
+                }
                 loadDecisionRationale(currentDecisionId);
             }
         } catch(e){}
@@ -1380,12 +1398,16 @@
         const dateVal = document.getElementById('noteDateInput').value;
 
         if (!title || !notes) {
-            alert("Title and Notes content are required.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("Title and Notes content are required.", "warning", "Validation Error");
+            }
             return;
         }
 
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before saving meeting notes.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before saving meeting notes.", "warning", "Offline");
+            }
             return;
         }
 
@@ -1406,6 +1428,9 @@
 
             if (res.ok) {
                 bootstrap.Modal.getInstance(document.getElementById('addMeetingNoteModal')).hide();
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Meeting Note recorded successfully!", "success", "Note Saved");
+                }
                 loadMeetingNotes(currentDecisionId);
             }
         } catch(e){}
@@ -1473,7 +1498,9 @@
 
     async function uploadFileBlob(file) {
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before uploading files.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before uploading files.", "warning", "Offline");
+            }
             return;
         }
         const formData = new FormData();
@@ -1487,7 +1514,9 @@
             });
 
             if (res.ok) {
-                alert("File uploaded successfully!");
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("File uploaded successfully!", "success", "Upload Successful");
+                }
                 loadSupportingFiles(currentDecisionId);
             }
         } catch(e){}
@@ -1495,12 +1524,17 @@
 
     async function deleteSupportingFile(fileId) {
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before deleting files.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before deleting files.", "warning", "Offline");
+            }
             return;
         }
         if (!confirm("Are you sure you want to delete this file?")) return;
         try {
-            await fetch(`${API_URL}/decisions/files/${fileId}?user_id=${CURRENT_USER_ID}`, { method: "DELETE" });
+            const res = await fetch(`${API_URL}/decisions/files/${fileId}?user_id=${CURRENT_USER_ID}`, { method: "DELETE" });
+            if (res.ok && typeof showCenterNotification === 'function') {
+                showCenterNotification("Supporting file deleted successfully.", "success", "File Deleted");
+            }
             loadSupportingFiles(currentDecisionId);
         } catch(e){}
     }
@@ -1619,7 +1653,9 @@
         if (!query) return;
 
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please check your network and try again.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please check your network and try again.", "warning", "Offline");
+            }
             return;
         }
 
@@ -1687,12 +1723,16 @@
     async function submitGlobalThread() {
         const topic = document.getElementById('startThreadTopicInput').value.trim();
         if (!topic) {
-            alert("Please enter a thread topic.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("Please enter a thread topic.", "warning", "Validation Error");
+            }
             return;
         }
 
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before creating threads.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before creating threads.", "warning", "Offline");
+            }
             return;
         }
 
@@ -1723,19 +1763,28 @@
                     await loadThreadsForDecision(currentDecisionId);
                     selectThread(created.id, created.topic, created.status, created.decision_id || 0);
                 }
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Discussion thread created successfully.", "success", "Thread Created");
+                }
             } else {
                 const err = await res.json().catch(() => ({}));
-                alert(err.detail || "Failed to create thread");
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification(err.detail || "Failed to create thread", "error", "Creation Failed");
+                }
             }
         } catch (e) {
             console.error(e);
-            alert("An error occurred while creating the discussion thread.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("An error occurred while creating the discussion thread.", "error", "Error");
+            }
         }
     }
 
     function confirmAdminDeleteThread(threadId, topicName = '') {
         if (!IS_ADMIN) {
-            alert("Access Denied: Only administrators can delete discussion threads.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("Access Denied: Only administrators can delete discussion threads.", "error", "Access Denied");
+            }
             return;
         }
         if (!threadId) return;
@@ -1750,7 +1799,9 @@
 
     async function deleteThreadConfirmed(threadId) {
         if (!isCurrentlyOnline) {
-            alert("No internet connection. Please reconnect before deleting threads.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("No internet connection. Please reconnect before deleting threads.", "warning", "Offline");
+            }
             return;
         }
 
@@ -1760,18 +1811,24 @@
             });
 
             if (res.ok) {
-                alert("Discussion thread deleted successfully.");
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("Discussion thread deleted successfully.", "success", "Thread Deleted");
+                }
                 if (currentThreadId === threadId) {
                     currentThreadId = null;
                 }
                 await loadThreadsForDecision(currentDecisionId);
             } else {
                 const err = await res.json().catch(() => ({}));
-                alert(err.detail || "Failed to delete thread.");
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification(err.detail || "Failed to delete thread.", "error", "Delete Failed");
+                }
             }
         } catch (e) {
             console.error(e);
-            alert("An error occurred while deleting the thread.");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification("An error occurred while deleting the thread.", "error", "Error");
+            }
         }
     }
 
