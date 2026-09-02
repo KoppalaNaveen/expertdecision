@@ -44,46 +44,45 @@ DEFAULT_SUPABASE_URL = "postgresql://postgres:ShabhanaaNaveen0320%40@db.myofagxp
 raw_env_url = os.getenv("DATABASE_URL")
 print(f"[DB] Raw DATABASE_URL from env: {'(set, ' + str(len(raw_env_url)) + ' chars)' if raw_env_url else '(NOT SET)'}")
 
-if not raw_env_url or raw_env_url.strip().startswith("sqlite") or raw_env_url.strip() in ("", "(NOT SET)"):
-    # Default to production Supabase PostgreSQL database
+# ALWAYS use Supabase PostgreSQL as the primary database
+# Only use explicit postgresql:// env var if provided; otherwise default to Supabase
+if raw_env_url and raw_env_url.strip().startswith("postgresql"):
+    DATABASE_URL = raw_env_url.strip()
+    print("[DB] Using DATABASE_URL from environment (postgresql)")
+elif raw_env_url and raw_env_url.strip().startswith("postgres://"):
+    DATABASE_URL = raw_env_url.strip().replace("postgres://", "postgresql://", 1)
+    print("[DB] Using DATABASE_URL from environment (converted postgres:// to postgresql://)")
+else:
+    # Default to production Supabase PostgreSQL for ALL cases (including sqlite env vars)
     DATABASE_URL = DEFAULT_SUPABASE_URL
     print("[DB] Using default production Supabase PostgreSQL")
-else:
-    DATABASE_URL = raw_env_url.strip()
 
-# Fix Supabase/Render postgres:// -> postgresql:// (SQLAlchemy requires postgresql://)
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    print("[DB] Converted postgres:// to postgresql://")
+# Create PostgreSQL engine - ALWAYS (never fall back to SQLite in production)
+print(f"[DB] Connecting to PostgreSQL database...")
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=30,
+    pool_recycle=300,
+    pool_pre_ping=True,
+    connect_args={"sslmode": "require", "connect_timeout": 30}
+)
 
-if "postgresql" in DATABASE_URL:
-    print(f"[DB] Attempting remote Supabase PostgreSQL connection...")
-    import time
-    for attempt in range(1, 4):
-        try:
-            engine = create_engine(
-                DATABASE_URL,
-                pool_size=10,
-                max_overflow=20,
-                pool_timeout=30,
-                pool_recycle=300,
-                pool_pre_ping=True,
-                connect_args={"sslmode": "require", "connect_timeout": 30}
-            )
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-                print(f"[DB] Remote Supabase PostgreSQL connection SUCCESSFUL (attempt {attempt})")
-            break
-        except Exception as remote_db_err:
-            print(f"[DB] Remote DB connection attempt {attempt} error: {remote_db_err}")
-            if attempt < 3:
-                time.sleep(1)
-            else:
-                print(f"[DB] Primary remote connection established with pre_ping enabled.")
-else:
-    DATABASE_URL = _get_local_sqlite_url()
-    print(f"[DB] Using LOCAL SQLite: {DATABASE_URL}")
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Verify connection at startup (non-blocking - engine uses pre_ping for auto-reconnect)
+import time
+for attempt in range(1, 4):
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            print(f"[DB] PostgreSQL connection VERIFIED (attempt {attempt})")
+        break
+    except Exception as db_err:
+        print(f"[DB] Connection verification attempt {attempt}: {db_err}")
+        if attempt < 3:
+            time.sleep(2)
+        else:
+            print("[DB] Startup verification failed but engine created with pool_pre_ping=True (will auto-reconnect on first query)")
 
 SessionLocal = sessionmaker(
     autocommit=False,
