@@ -10,7 +10,8 @@ from app.schemas.decision import (
     DecisionResponse,
     DecisionFullCreate,
     DecisionFullResponse,
-    DecisionVersionResponse
+    DecisionVersionResponse,
+    BulkDeleteDecisionsRequest
 )
 from app.services.decision_service import DecisionService
 
@@ -18,6 +19,51 @@ router = APIRouter(
     prefix="/decisions",
     tags=["Decisions"]
 )
+
+@router.post("/bulk-delete")
+def bulk_delete_decisions(payload: BulkDeleteDecisionsRequest, db: Session = Depends(get_db)):
+    from app.models.user import User
+    from app.models.role import Role
+    
+    # Verify Admin role
+    user_id = payload.user_id
+    role_name = payload.role_name or ""
+    
+    is_admin = False
+    if "admin" in role_name.lower():
+        is_admin = True
+    elif user_id:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.role_id:
+            r = db.query(Role).filter(Role.id == user.role_id).first()
+            if r and "admin" in (r.role_name or "").lower():
+                is_admin = True
+            elif user.role_id == 1:
+                is_admin = True
+                
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Access Denied: Only administrators can bulk delete decisions.")
+
+    if not payload.decision_ids:
+        raise HTTPException(status_code=400, detail="No decision IDs provided for deletion.")
+
+    deleted_count = 0
+    errors = []
+    for did in payload.decision_ids:
+        try:
+            success = DecisionService.delete_decision(db, did, user_id=user_id, role_name=role_name)
+            if success:
+                deleted_count += 1
+            else:
+                errors.append(f"DEC-{did}: Not found")
+        except Exception as e:
+            errors.append(f"DEC-{did}: {str(e)}")
+
+    return {
+        "message": f"Successfully deleted {deleted_count} decision(s).",
+        "deleted_count": deleted_count,
+        "errors": errors
+    }
 
 @router.post("", response_model=DecisionResponse, status_code=201)
 @router.post("/", response_model=DecisionResponse, status_code=201)

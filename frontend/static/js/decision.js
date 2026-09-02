@@ -14,6 +14,9 @@ let currentStatusFilter = 'All';
 let currentPage = 1;
 let rowsPerPage = 5;
 
+let isSelectModeActive = false;
+let selectedDecisionIds = new Set();
+
 function changeDecisionPageSize(size) {
     if (size === 'all') {
         rowsPerPage = 999999;
@@ -540,7 +543,8 @@ function renderTable() {
     tbody.innerHTML = "";
     
     if (paginated.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No decisions found.</td></tr>`;
+        const colSpan = isSelectModeActive ? 7 : 6;
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center py-4 text-muted">No decisions found.</td></tr>`;
     } else {
         paginated.forEach(d => {
             const dateStr = new Date(d.created_at).toLocaleDateString();
@@ -568,21 +572,28 @@ function renderTable() {
                 `;
             }
 
+            const checkboxHtml = `
+                <td class="ps-4 py-3 selection-col ${isSelectModeActive ? '' : 'd-none'}" style="width: 40px;">
+                    <input type="checkbox" class="form-check-input decision-select-checkbox" value="${d.id}" ${selectedDecisionIds.has(Number(d.id)) ? 'checked' : ''} onchange="onDecisionCheckboxChange(${d.id})">
+                </td>
+            `;
+
             tbody.innerHTML += `
-                <tr>
+                <tr class="${selectedDecisionIds.has(Number(d.id)) ? 'table-danger bg-danger-subtle bg-opacity-10' : ''}">
+                    ${checkboxHtml}
                     <td class="ps-4 fw-semibold">
                         <a href="/decision/${d.id}" class="text-decoration-none fw-bold text-primary">DEC-${d.id}</a>
-                        <div class="small text-muted text-truncate" style="max-width:200px;">${d.title}</div>
+                        <div class="small text-muted text-truncate" style="max-width:200px;">${escapeHtml(d.title)}</div>
                     </td>
-                    <td class="text-dark">${d.category_name || 'Uncategorized'}</td>
+                    <td class="text-dark">${escapeHtml(d.category_name || 'Uncategorized')}</td>
                     <td>
                         <div class="d-flex align-items-center gap-2">
-                            <div class="avatar-sm bg-light text-primary rounded-circle d-flex align-items-center justify-content-center" style="width:24px;height:24px;font-size:10px;font-weight:bold;">${d.creator_initials || 'U'}</div>
-                            <span class="text-dark small fw-medium">${d.creator_name || 'Unknown User'}</span>
+                            <div class="avatar-sm bg-light text-primary rounded-circle d-flex align-items-center justify-content-center" style="width:24px;height:24px;font-size:10px;font-weight:bold;">${escapeHtml(d.creator_initials || 'U')}</div>
+                            <span class="text-dark small fw-medium">${escapeHtml(d.creator_name || 'Unknown User')}</span>
                         </div>
                     </td>
                     <td class="text-muted small">${dateStr}</td>
-                    <td><span class="badge ${statusBadge}">${d.status}</span></td>
+                    <td><span class="badge ${statusBadge}">${escapeHtml(d.status)}</span></td>
                     <td class="text-end pe-4">
                         <a href="/decision/${d.id}" class="btn btn-sm btn-outline-primary fw-semibold px-2 me-1">View</a>
                         ${actionButtons}
@@ -596,7 +607,229 @@ function renderTable() {
     document.getElementById("paginationInfo").innerText = `Showing page ${currentPage} of ${totalPages} (${filtered.length} total)`;
     document.getElementById("btnPrev").disabled = currentPage === 1;
     document.getElementById("btnNext").disabled = currentPage === totalPages;
+
+    updateSelectedCountUI();
 }
+
+function toggleSelectDecisionsMode() {
+    isSelectModeActive = !isSelectModeActive;
+    if (!isSelectModeActive) {
+        selectedDecisionIds.clear();
+    }
+    updateSelectModeUI();
+    renderTable();
+}
+window.toggleSelectDecisionsMode = toggleSelectDecisionsMode;
+
+function cancelSelectDecisionsMode() {
+    isSelectModeActive = false;
+    selectedDecisionIds.clear();
+    updateSelectModeUI();
+    renderTable();
+}
+window.cancelSelectDecisionsMode = cancelSelectDecisionsMode;
+
+function updateSelectModeUI() {
+    const actionBar = document.getElementById("bulkDeleteActionBar");
+    const toggleBtn = document.getElementById("selectDecisionsToDeleteBtn");
+    const btnText = document.getElementById("selectDecisionsBtnText");
+    const selectAllTh = document.querySelectorAll(".selection-col");
+
+    if (isSelectModeActive) {
+        if (actionBar) {
+            actionBar.classList.remove("d-none");
+            actionBar.classList.add("d-flex");
+        }
+        if (toggleBtn) {
+            toggleBtn.classList.remove("btn-outline-danger");
+            toggleBtn.classList.add("btn-danger");
+        }
+        if (btnText) {
+            btnText.innerText = "Exit Selection";
+        }
+        selectAllTh.forEach(el => el.classList.remove("d-none"));
+    } else {
+        if (actionBar) {
+            actionBar.classList.remove("d-flex");
+            actionBar.classList.add("d-none");
+        }
+        if (toggleBtn) {
+            toggleBtn.classList.remove("btn-danger");
+            toggleBtn.classList.add("btn-outline-danger");
+        }
+        if (btnText) {
+            btnText.innerText = "Select decisions to delete";
+        }
+        selectAllTh.forEach(el => el.classList.add("d-none"));
+    }
+    updateSelectedCountUI();
+}
+
+function updateSelectedCountUI() {
+    const countBadge = document.getElementById("selectedDecisionsCountBadge");
+    const deleteBtn = document.getElementById("confirmDeleteSelectedBtn");
+    const count = selectedDecisionIds.size;
+
+    if (countBadge) {
+        countBadge.innerText = `${count} selected`;
+    }
+    if (deleteBtn) {
+        deleteBtn.disabled = count === 0;
+        deleteBtn.innerHTML = `<i class="bi bi-trash3-fill"></i> Delete Selected (${count})`;
+    }
+
+    // Update Select All Checkbox state
+    const selectAllCheckbox = document.getElementById("selectAllDecisionsCheckbox");
+    if (selectAllCheckbox) {
+        const rowCheckboxes = document.querySelectorAll(".decision-select-checkbox");
+        if (rowCheckboxes.length === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
+            const someChecked = Array.from(rowCheckboxes).some(cb => cb.checked);
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = !allChecked && someChecked;
+        }
+    }
+}
+
+function toggleSelectAllDecisions(isChecked) {
+    const rowCheckboxes = document.querySelectorAll(".decision-select-checkbox");
+    rowCheckboxes.forEach(cb => {
+        const id = parseInt(cb.value, 10);
+        cb.checked = isChecked;
+        if (isChecked) {
+            selectedDecisionIds.add(id);
+        } else {
+            selectedDecisionIds.delete(id);
+        }
+    });
+    renderTable();
+}
+window.toggleSelectAllDecisions = toggleSelectAllDecisions;
+
+function onDecisionCheckboxChange(id) {
+    id = parseInt(id, 10);
+    if (selectedDecisionIds.has(id)) {
+        selectedDecisionIds.delete(id);
+    } else {
+        selectedDecisionIds.add(id);
+    }
+    renderTable();
+}
+window.onDecisionCheckboxChange = onDecisionCheckboxChange;
+
+function openBulkDeleteConfirmModal() {
+    if (selectedDecisionIds.size === 0) {
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("Please select at least one decision to delete.", "warning", "No Decisions Selected");
+        } else if (typeof showToast === 'function') {
+            showToast("Warning", "Please select at least one decision to delete.");
+        }
+        return;
+    }
+
+    const countBadge = document.getElementById("bulkDeleteModalCountBadge");
+    if (countBadge) countBadge.innerText = selectedDecisionIds.size;
+
+    const listContainer = document.getElementById("bulkDeleteSelectedItemsList");
+    if (listContainer) {
+        let html = '';
+        selectedDecisionIds.forEach(id => {
+            const dec = allDecisions.find(d => Number(d.id) === Number(id));
+            const title = dec ? dec.title : `Decision #${id}`;
+            const owner = dec ? (dec.creator_name || 'Unknown Owner') : '';
+            const status = dec ? dec.status : '';
+            html += `
+                <div class="d-flex align-items-center justify-content-between py-1.5 px-2 border-bottom bg-white rounded mb-1 text-xs">
+                    <div>
+                        <strong class="text-primary me-1.5">DEC-${id}</strong>
+                        <span class="text-dark fw-medium">${escapeHtml(title)}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-1.5">
+                        <span class="text-muted text-xs">${escapeHtml(owner)}</span>
+                        <span class="badge bg-secondary-subtle text-secondary border text-2xs">${escapeHtml(status)}</span>
+                    </div>
+                </div>
+            `;
+        });
+        listContainer.innerHTML = html;
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('bulkDeleteConfirmModal'));
+    modal.show();
+}
+window.openBulkDeleteConfirmModal = openBulkDeleteConfirmModal;
+
+async function executeBulkDelete() {
+    const btn = document.getElementById("executeBulkDeleteBtn");
+    const originalText = btn ? btn.innerHTML : "Yes, Delete Decisions";
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Deleting...`;
+    }
+
+    const decisionIds = Array.from(selectedDecisionIds);
+    const payload = {
+        decision_ids: decisionIds,
+        user_id: typeof USER_ID !== 'undefined' ? USER_ID : 1,
+        role_name: typeof CURRENT_USER_ROLE !== 'undefined' ? CURRENT_USER_ROLE : 'Administrator'
+    };
+
+    try {
+        let res = await fetch("/api/decisions/bulk-delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok && typeof API_URL !== 'undefined' && API_URL) {
+            res = await fetch(`${API_URL}/decisions/bulk-delete`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Failed to delete decisions.");
+        }
+
+        const data = await res.json();
+        
+        // Hide modal
+        const modalEl = document.getElementById('bulkDeleteConfirmModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+
+        // Exit select mode and clear selections
+        isSelectModeActive = false;
+        selectedDecisionIds.clear();
+        updateSelectModeUI();
+
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(data.message || `Successfully deleted ${decisionIds.length} decision(s).`, "success", "Decisions Deleted");
+        } else if (typeof showToast === 'function') {
+            showToast("Success", data.message || "Decisions deleted successfully.");
+        }
+
+        await fetchDecisions();
+    } catch (err) {
+        console.error("Bulk delete error:", err);
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification(err.message || "Failed to delete decisions.", "error", "Bulk Delete Failed");
+        } else if (typeof showToast === 'function') {
+            showToast("Danger", err.message || "Failed to delete decisions.");
+        }
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+}
+window.executeBulkDelete = executeBulkDelete;
 
 function updateActiveFilterChips() {
     const container = document.getElementById("activeFiltersContainer");

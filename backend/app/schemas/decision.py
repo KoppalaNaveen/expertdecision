@@ -218,3 +218,8 @@ class DecisionFullResponse(DecisionResponse):
     threads: List[DiscussionThreadResponse] = []
     meeting_notes: List[MeetingNoteResponse] = []
     versions: List[DecisionVersionResponse] = []
+
+class BulkDeleteDecisionsRequest(BaseModel):
+    decision_ids: List[int]
+    user_id: Optional[int] = None
+    role_name: Optional[str] = None
