@@ -3321,44 +3321,41 @@
                 if (iconTag) iconTag.className = 'bi bi-file-earmark-slides';
                 if (subtitleEl) subtitleEl.innerText = `${sizeMB ? sizeMB + ' MB • ' : ''}Microsoft PowerPoint Presentation (.${ext})`;
 
-                const officeOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fullAbsUrl)}`;
-                const desktopAppUrl = `ms-powerpoint:ofe|u|${fullAbsUrl}`;
-
                 bodyEl.innerHTML = `
-                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center">
-                        <div class="card border-0 shadow-sm p-4 text-center mb-3" style="max-width: 620px; width: 100%; border-radius: 16px; background: #ffffff;">
-                            <div style="width: 64px; height: 64px; background: #FFF7ED; color: #EA580C; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;">
+                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center" style="min-height: 420px;">
+                        <div class="card border-0 shadow-sm p-4 text-center" style="max-width: 580px; width: 100%; border-radius: 16px; background: #ffffff;">
+                            <div style="width: 72px; height: 72px; background: #FFF7ED; color: #EA580C; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; border: 1px solid #FFEDD5;">
                                 <i class="bi bi-file-earmark-slides-fill"></i>
                             </div>
-                            <h5 class="fw-bold text-dark mb-1">${escapeHtml(rawFilename)}</h5>
-                            <p class="text-muted small mb-3">PowerPoint Presentation Document • ${sizeMB || '1.35'} MB</p>
-                            
-                            <div class="p-3 mb-4 rounded-3 text-start" style="background: #F8FAFC; border: 1px solid #E2E8F0;">
-                                <div class="d-flex align-items-center gap-2 mb-2 text-primary fw-semibold" style="font-size: 13px;">
-                                    <i class="bi bi-display"></i> Presentation Viewing Options:
-                                </div>
-                                <ul class="text-muted small mb-0 ps-3" style="line-height: 1.6; font-size: 12px;">
-                                    <li><strong>Open with Microsoft PowerPoint</strong>: Launch directly in desktop PowerPoint application.</li>
-                                    <li><strong>Microsoft 365 Office Online</strong>: View presentation slides in Microsoft Office Web Viewer.</li>
-                                    <li><strong>Download File</strong>: Save presentation to local device.</li>
-                                </ul>
+                            <h5 class="fw-bold text-dark mb-1 text-break">${escapeHtml(rawFilename)}</h5>
+                            <div class="d-flex align-items-center justify-content-center gap-2 text-muted small mb-4">
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">PowerPoint Deck</span>
+                                <span>•</span>
+                                <span>${sizeMB ? sizeMB + ' MB' : 'Attachment'}</span>
+                                <span>•</span>
+                                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Ready</span>
                             </div>
 
-                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2">
-                                <a href="${desktopAppUrl}" class="btn btn-warning text-dark fw-bold px-3 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm" style="background: #EA580C; border-color: #EA580C; color: #fff !important;">
-                                    <i class="bi bi-file-earmark-slides"></i> Open in PowerPoint App
-                                </a>
-                                <button type="button" class="btn btn-outline-primary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.open('${officeOnlineUrl}', '_blank')">
-                                    <i class="bi bi-window-fullscreen"></i> View in Office Online
+                            <div class="p-3 mb-4 rounded-3 text-start" style="background: #F8FAFC; border: 1px solid #E2E8F0;">
+                                <div class="d-flex align-items-center gap-2 mb-1.5 text-primary fw-semibold" style="font-size: 13px;">
+                                    <i class="bi bi-info-circle-fill"></i> Document Actions
+                                </div>
+                                <div class="text-muted small" style="font-size: 12px; line-height: 1.5;">
+                                    Click <strong>Open in PowerPoint</strong> to launch this presentation in your desktop PowerPoint app, or click <strong>Open in New Tab</strong> to stream it in your browser.
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2.5">
+                                <button type="button" class="btn btn-warning text-white fw-bold px-4 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm" style="background: #EA580C; border-color: #EA580C;" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                    <i class="bi bi-file-earmark-slides"></i> Open with PowerPoint
                                 </button>
-                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                <button type="button" class="btn btn-outline-primary px-3 py-2 d-flex align-items-center gap-2 rounded-3 fw-semibold" onclick="window.open('${fileUrl}', '_blank')">
+                                    <i class="bi bi-box-arrow-up-right"></i> Open in New Tab
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3 fw-semibold" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
                                     <i class="bi bi-download"></i> Download .${ext}
                                 </button>
                             </div>
-                        </div>
-
-                        <div class="w-100 mt-2" style="max-width: 900px;">
-                            <iframe src="${officeOnlineUrl}" style="width: 100%; height: 380px; border-radius: 12px; border: 1px solid #CBD5E1; background: #ffffff;" onerror="this.style.display='none'" allowfullscreen></iframe>
                         </div>
                     </div>
                 `;
@@ -3371,26 +3368,29 @@
                 if (iconTag) iconTag.className = 'bi bi-file-earmark-word';
                 if (subtitleEl) subtitleEl.innerText = `${sizeMB ? sizeMB + ' MB • ' : ''}Microsoft Word Document (.${ext})`;
 
-                const officeOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fullAbsUrl)}`;
-                const desktopAppUrl = `ms-word:ofe|u|${fullAbsUrl}`;
-
                 bodyEl.innerHTML = `
-                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center">
-                        <div class="card border-0 shadow-sm p-4 text-center mb-3" style="max-width: 620px; width: 100%; border-radius: 16px; background: #ffffff;">
-                            <div style="width: 64px; height: 64px; background: #EFF6FF; color: #2563EB; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;">
+                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center" style="min-height: 420px;">
+                        <div class="card border-0 shadow-sm p-4 text-center" style="max-width: 580px; width: 100%; border-radius: 16px; background: #ffffff;">
+                            <div style="width: 72px; height: 72px; background: #EFF6FF; color: #2563EB; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; border: 1px solid #DBEAFE;">
                                 <i class="bi bi-file-earmark-word-fill"></i>
                             </div>
-                            <h5 class="fw-bold text-dark mb-1">${escapeHtml(rawFilename)}</h5>
-                            <p class="text-muted small mb-3">Word Document • ${sizeMB || '—'} MB</p>
+                            <h5 class="fw-bold text-dark mb-1 text-break">${escapeHtml(rawFilename)}</h5>
+                            <div class="d-flex align-items-center justify-content-center gap-2 text-muted small mb-4">
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">Word Document</span>
+                                <span>•</span>
+                                <span>${sizeMB ? sizeMB + ' MB' : 'Attachment'}</span>
+                                <span>•</span>
+                                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Ready</span>
+                            </div>
 
-                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2">
-                                <a href="${desktopAppUrl}" class="btn btn-primary fw-bold px-3 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm">
-                                    <i class="bi bi-file-earmark-word"></i> Open in Word App
-                                </a>
-                                <button type="button" class="btn btn-outline-primary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.open('${officeOnlineUrl}', '_blank')">
-                                    <i class="bi bi-window-fullscreen"></i> View in Office Online
+                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2.5">
+                                <button type="button" class="btn btn-primary fw-bold px-4 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                    <i class="bi bi-file-earmark-word"></i> Open with Word
                                 </button>
-                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                <button type="button" class="btn btn-outline-primary px-3 py-2 d-flex align-items-center gap-2 rounded-3 fw-semibold" onclick="window.open('${fileUrl}', '_blank')">
+                                    <i class="bi bi-box-arrow-up-right"></i> Open in New Tab
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3 fw-semibold" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
                                     <i class="bi bi-download"></i> Download .${ext}
                                 </button>
                             </div>
@@ -3406,26 +3406,29 @@
                 if (iconTag) iconTag.className = 'bi bi-file-earmark-spreadsheet';
                 if (subtitleEl) subtitleEl.innerText = `${sizeMB ? sizeMB + ' MB • ' : ''}Spreadsheet Document (.${ext})`;
 
-                const officeOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fullAbsUrl)}`;
-                const desktopAppUrl = `ms-excel:ofe|u|${fullAbsUrl}`;
-
                 bodyEl.innerHTML = `
-                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center">
-                        <div class="card border-0 shadow-sm p-4 text-center mb-3" style="max-width: 620px; width: 100%; border-radius: 16px; background: #ffffff;">
-                            <div style="width: 64px; height: 64px; background: #F0FDF4; color: #16A34A; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;">
+                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center" style="min-height: 420px;">
+                        <div class="card border-0 shadow-sm p-4 text-center" style="max-width: 580px; width: 100%; border-radius: 16px; background: #ffffff;">
+                            <div style="width: 72px; height: 72px; background: #F0FDF4; color: #16A34A; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 16px; border: 1px solid #DCFCE7;">
                                 <i class="bi bi-file-earmark-spreadsheet-fill"></i>
                             </div>
-                            <h5 class="fw-bold text-dark mb-1">${escapeHtml(rawFilename)}</h5>
-                            <p class="text-muted small mb-3">Spreadsheet Data • ${sizeMB || '—'} MB</p>
+                            <h5 class="fw-bold text-dark mb-1 text-break">${escapeHtml(rawFilename)}</h5>
+                            <div class="d-flex align-items-center justify-content-center gap-2 text-muted small mb-4">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Spreadsheet Data</span>
+                                <span>•</span>
+                                <span>${sizeMB ? sizeMB + ' MB' : 'Attachment'}</span>
+                                <span>•</span>
+                                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Ready</span>
+                            </div>
 
-                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2">
-                                <a href="${desktopAppUrl}" class="btn btn-success fw-bold px-3 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm">
-                                    <i class="bi bi-file-earmark-spreadsheet"></i> Open in Excel App
-                                </a>
-                                <button type="button" class="btn btn-outline-success px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.open('${officeOnlineUrl}', '_blank')">
-                                    <i class="bi bi-window-fullscreen"></i> View in Office Online
+                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2.5">
+                                <button type="button" class="btn btn-success text-white fw-bold px-4 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                    <i class="bi bi-file-earmark-spreadsheet"></i> Open with Excel
                                 </button>
-                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                <button type="button" class="btn btn-outline-success px-3 py-2 d-flex align-items-center gap-2 rounded-3 fw-semibold" onclick="window.open('${fileUrl}', '_blank')">
+                                    <i class="bi bi-box-arrow-up-right"></i> Open in New Tab
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3 fw-semibold" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
                                     <i class="bi bi-download"></i> Download .${ext}
                                 </button>
                             </div>
