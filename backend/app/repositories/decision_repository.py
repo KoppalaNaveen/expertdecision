@@ -331,6 +331,11 @@ class DecisionRepository:
             return query.filter(Decision.status == "Approved").order_by(Decision.id.desc()).all()
 
         if user_id:
+            try:
+                user_id = int(user_id)
+            except (ValueError, TypeError):
+                pass
+
             current_role = role_name
             user = None
             if not current_role:
@@ -340,15 +345,21 @@ class DecisionRepository:
 
             role_lower = (current_role or "").strip().lower()
 
-            if role_lower in ["administrator", "admin", "ad"]:
+            if role_lower in ["administrator", "admin", "ad", "system administrator"]:
                 # Admin: All decisions (fast return without extra queries)
                 return query.order_by(Decision.id.desc()).all()
 
             if not user:
                 user = db.query(User).filter(User.id == user_id).first()
 
-            target_uids = {user_id}
+            target_uids = set()
+            try:
+                target_uids.add(int(user_id))
+            except (ValueError, TypeError):
+                target_uids.add(user_id)
+
             if user:
+                target_uids.add(user.id)
                 if user.email:
                     uids = db.query(User.id).filter((User.email == user.email) | (User.email_original == user.email)).all()
                     for (uid,) in uids:
@@ -367,13 +378,13 @@ class DecisionRepository:
                 query = query.filter(Decision.created_by.in_(list(target_uids)))
             elif role_lower in ["reviewer", "rw"]:
                 # Reviewer: ONLY assigned reviews OR created by user
-                assigned_decision_ids = db.query(Review.decision_id).filter(Review.reviewer_id.in_(list(target_uids))).subquery()
-                query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.id.in_(assigned_decision_ids)))
+                assigned_dec_ids = [r[0] for r in db.query(Review.decision_id).filter(Review.reviewer_id.in_(list(target_uids))).all()]
+                query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.id.in_(assigned_dec_ids)))
             elif role_lower in ["manager", "mn", "lead"]:
                 # Manager: Created by user OR team members' decisions / pending reviews
                 if user and user.team_id:
-                    team_user_ids = db.query(User.id).filter(User.team_id == user.team_id).subquery()
-                    query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.created_by.in_(team_user_ids)))
+                    team_uids = [u[0] for u in db.query(User.id).filter(User.team_id == user.team_id).all()]
+                    query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.created_by.in_(team_uids)))
                 else:
                     query = query.filter((Decision.created_by.in_(list(target_uids))) | (Decision.status.in_(["Pending", "In Review", "Approved", "Rejected"])))
             else:

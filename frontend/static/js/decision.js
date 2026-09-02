@@ -100,14 +100,15 @@ async function fetchDecisions() {
         let queryParams = [];
         if (userParam) queryParams.push(`user_id=${userParam}`);
         if (roleParam) queryParams.push(`role_name=${encodeURIComponent(roleParam)}`);
+        queryParams.push(`_t=${Date.now()}`);
         let queryStr = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
 
-        let response = await fetch(`/api/decisions${queryStr}`);
+        let response = await fetch(`/api/decisions${queryStr}`, { cache: "no-store" });
         if (!response.ok) {
-            response = await fetch(`/api/decisions/${queryStr}`);
+            response = await fetch(`/api/decisions/${queryStr}`, { cache: "no-store" });
         }
         if (!response.ok && typeof API_URL !== 'undefined' && API_URL) {
-            response = await fetch(`${API_URL}/decisions/${queryStr}`);
+            response = await fetch(`${API_URL}/decisions/${queryStr}`, { cache: "no-store" });
         }
         if (!response || !response.ok) throw new Error("Failed to load decisions");
         const data = await response.json();

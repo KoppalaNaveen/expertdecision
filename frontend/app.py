@@ -1018,14 +1018,26 @@ def proxy_get_all_decisions():
         return jsonify({"detail": f"Decisions fetch error: {e}"}), 500
 
 
+def invalidate_decision_caches():
+    try:
+        keys_to_remove = [k for k in _DATA_CACHE if "decision" in k or "dashboard" in k]
+        for k in keys_to_remove:
+            _DATA_CACHE.pop(k, None)
+    except Exception:
+        pass
+
 @app.route("/api/decisions/full", methods=["POST"])
 @app.route("/decisions/full", methods=["POST"])
 def proxy_create_decision_full():
     try:
         data = request.json or {}
-        if not data.get("created_by"):
-            data["created_by"] = session.get("user_id", 1)
+        session_uid = session.get("user_id")
+        if session_uid:
+            data["created_by"] = int(session_uid)
+        elif not data.get("created_by"):
+            data["created_by"] = 1
         resp = make_backend_request("POST", "/decisions/full", json=data, timeout=30)
+        invalidate_decision_caches()
         if resp is not None:
             if resp.status_code >= 400:
                 try:
@@ -1053,6 +1065,7 @@ def proxy_update_decision_full(decision_id):
     try:
         data = request.json or {}
         resp = make_backend_request("PUT", f"/decisions/{decision_id}/full", json=data, timeout=30)
+        invalidate_decision_caches()
         if resp is not None:
             if resp.status_code >= 400:
                 try:
@@ -1097,6 +1110,7 @@ def proxy_delete_decision(decision_id):
             params.append(f"role_name={role_name}")
         query_str = f"?{'&'.join(params)}" if params else ""
         resp = make_backend_request("DELETE", f"/decisions/{decision_id}{query_str}", timeout=15)
+        invalidate_decision_caches()
         return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
     except Exception as e:
         return jsonify({"detail": f"Decision delete error: {e}"}), 500
@@ -1109,6 +1123,7 @@ def proxy_update_decision_status(decision_id):
         user_id = session.get("user_id", 1)
         data = request.json or {}
         resp = make_backend_request("PATCH", f"/decisions/{decision_id}/status?user_id={user_id}", json=data, timeout=15)
+        invalidate_decision_caches()
         return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
     except Exception as e:
         return jsonify({"detail": f"Decision status update error: {e}"}), 500
@@ -1541,7 +1556,7 @@ def decisions():
     user_id = session.get("user_id", "")
     role_name = session.get("role_name", "")
     headers = {"Authorization": f"Bearer {session['token']}"} if "token" in session else {}
-    initial_decisions = get_cached_data(f"decisions_{user_id}_{role_name}", f"/decisions/?user_id={user_id}&role_name={role_name}", ttl=20, headers=headers)
+    initial_decisions = get_cached_data(f"decisions_{user_id}_{role_name}", f"/decisions/?user_id={user_id}&role_name={role_name}", ttl=0, headers=headers)
 
     return render_template("decisions.html", initial_decisions=initial_decisions)
 
