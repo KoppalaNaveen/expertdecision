@@ -3271,7 +3271,266 @@
             sendHeartbeat();
             setInterval(sendHeartbeat, 25000);
         })();
+
+        // =========================================================
+        // Universal Document & Presentation Viewer & Downloader
+        // =========================================================
+        window.viewDocumentFile = function(docId, filename, sizeMB, customUrl) {
+            const rawFilename = (filename || 'document').trim();
+            const ext = rawFilename.split('.').pop().toLowerCase();
+            const fileUrl = customUrl || `/api/upload/${docId}`;
+            const fullAbsUrl = window.location.origin + fileUrl;
+
+            // 1. PDF files: Directly open in new tab (native browser PDF reader)
+            if (ext === 'pdf') {
+                window.open(fileUrl, '_blank');
+                return;
+            }
+
+            const modalEl = document.getElementById('edrpDocViewerModal');
+            if (!modalEl) {
+                window.open(fileUrl, '_blank');
+                return;
+            }
+
+            const titleEl = document.getElementById('edrpDocViewerTitle');
+            const subtitleEl = document.getElementById('edrpDocViewerSubtitle');
+            const iconContainer = document.getElementById('edrpDocViewerIcon');
+            const iconTag = document.getElementById('edrpDocViewerIconTag');
+            const bodyEl = document.getElementById('edrpDocViewerBody');
+            const openNewTabBtn = document.getElementById('edrpDocViewerOpenNewTabBtn');
+            const downloadBtn = document.getElementById('edrpDocViewerDownloadBtn');
+
+            if (titleEl) titleEl.innerText = rawFilename;
+            if (subtitleEl) subtitleEl.innerText = `${sizeMB ? sizeMB + ' MB • ' : ''}${ext.toUpperCase()} File`;
+
+            if (openNewTabBtn) {
+                openNewTabBtn.onclick = () => window.open(fileUrl, '_blank');
+            }
+            if (downloadBtn) {
+                downloadBtn.onclick = () => window.downloadDocumentFile(docId, rawFilename, customUrl);
+            }
+
+            // Configure themes & UI for different file types
+            if (['pptx', 'ppt'].includes(ext)) {
+                // --- POWERPOINT PRESENTATION ---
+                if (iconContainer) {
+                    iconContainer.style.background = '#FFF7ED';
+                    iconContainer.style.color = '#EA580C';
+                }
+                if (iconTag) iconTag.className = 'bi bi-file-earmark-slides';
+                if (subtitleEl) subtitleEl.innerText = `${sizeMB ? sizeMB + ' MB • ' : ''}Microsoft PowerPoint Presentation (.${ext})`;
+
+                const officeOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fullAbsUrl)}`;
+                const desktopAppUrl = `ms-powerpoint:ofe|u|${fullAbsUrl}`;
+
+                bodyEl.innerHTML = `
+                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center">
+                        <div class="card border-0 shadow-sm p-4 text-center mb-3" style="max-width: 620px; width: 100%; border-radius: 16px; background: #ffffff;">
+                            <div style="width: 64px; height: 64px; background: #FFF7ED; color: #EA580C; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;">
+                                <i class="bi bi-file-earmark-slides-fill"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">${escapeHtml(rawFilename)}</h5>
+                            <p class="text-muted small mb-3">PowerPoint Presentation Document • ${sizeMB || '1.35'} MB</p>
+                            
+                            <div class="p-3 mb-4 rounded-3 text-start" style="background: #F8FAFC; border: 1px solid #E2E8F0;">
+                                <div class="d-flex align-items-center gap-2 mb-2 text-primary fw-semibold" style="font-size: 13px;">
+                                    <i class="bi bi-display"></i> Presentation Viewing Options:
+                                </div>
+                                <ul class="text-muted small mb-0 ps-3" style="line-height: 1.6; font-size: 12px;">
+                                    <li><strong>Open with Microsoft PowerPoint</strong>: Launch directly in desktop PowerPoint application.</li>
+                                    <li><strong>Microsoft 365 Office Online</strong>: View presentation slides in Microsoft Office Web Viewer.</li>
+                                    <li><strong>Download File</strong>: Save presentation to local device.</li>
+                                </ul>
+                            </div>
+
+                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2">
+                                <a href="${desktopAppUrl}" class="btn btn-warning text-dark fw-bold px-3 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm" style="background: #EA580C; border-color: #EA580C; color: #fff !important;">
+                                    <i class="bi bi-file-earmark-slides"></i> Open in PowerPoint App
+                                </a>
+                                <button type="button" class="btn btn-outline-primary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.open('${officeOnlineUrl}', '_blank')">
+                                    <i class="bi bi-window-fullscreen"></i> View in Office Online
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                    <i class="bi bi-download"></i> Download .${ext}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="w-100 mt-2" style="max-width: 900px;">
+                            <iframe src="${officeOnlineUrl}" style="width: 100%; height: 380px; border-radius: 12px; border: 1px solid #CBD5E1; background: #ffffff;" onerror="this.style.display='none'" allowfullscreen></iframe>
+                        </div>
+                    </div>
+                `;
+            } else if (['docx', 'doc'].includes(ext)) {
+                // --- WORD DOCUMENT ---
+                if (iconContainer) {
+                    iconContainer.style.background = '#EFF6FF';
+                    iconContainer.style.color = '#2563EB';
+                }
+                if (iconTag) iconTag.className = 'bi bi-file-earmark-word';
+                if (subtitleEl) subtitleEl.innerText = `${sizeMB ? sizeMB + ' MB • ' : ''}Microsoft Word Document (.${ext})`;
+
+                const officeOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fullAbsUrl)}`;
+                const desktopAppUrl = `ms-word:ofe|u|${fullAbsUrl}`;
+
+                bodyEl.innerHTML = `
+                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center">
+                        <div class="card border-0 shadow-sm p-4 text-center mb-3" style="max-width: 620px; width: 100%; border-radius: 16px; background: #ffffff;">
+                            <div style="width: 64px; height: 64px; background: #EFF6FF; color: #2563EB; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;">
+                                <i class="bi bi-file-earmark-word-fill"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">${escapeHtml(rawFilename)}</h5>
+                            <p class="text-muted small mb-3">Word Document • ${sizeMB || '—'} MB</p>
+
+                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2">
+                                <a href="${desktopAppUrl}" class="btn btn-primary fw-bold px-3 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm">
+                                    <i class="bi bi-file-earmark-word"></i> Open in Word App
+                                </a>
+                                <button type="button" class="btn btn-outline-primary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.open('${officeOnlineUrl}', '_blank')">
+                                    <i class="bi bi-window-fullscreen"></i> View in Office Online
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                    <i class="bi bi-download"></i> Download .${ext}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (['xlsx', 'xls', 'csv'].includes(ext)) {
+                // --- SPREADSHEET ---
+                if (iconContainer) {
+                    iconContainer.style.background = '#F0FDF4';
+                    iconContainer.style.color = '#16A34A';
+                }
+                if (iconTag) iconTag.className = 'bi bi-file-earmark-spreadsheet';
+                if (subtitleEl) subtitleEl.innerText = `${sizeMB ? sizeMB + ' MB • ' : ''}Spreadsheet Document (.${ext})`;
+
+                const officeOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fullAbsUrl)}`;
+                const desktopAppUrl = `ms-excel:ofe|u|${fullAbsUrl}`;
+
+                bodyEl.innerHTML = `
+                    <div class="p-4 d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center">
+                        <div class="card border-0 shadow-sm p-4 text-center mb-3" style="max-width: 620px; width: 100%; border-radius: 16px; background: #ffffff;">
+                            <div style="width: 64px; height: 64px; background: #F0FDF4; color: #16A34A; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;">
+                                <i class="bi bi-file-earmark-spreadsheet-fill"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">${escapeHtml(rawFilename)}</h5>
+                            <p class="text-muted small mb-3">Spreadsheet Data • ${sizeMB || '—'} MB</p>
+
+                            <div class="d-flex flex-wrap align-items-center justify-content-center gap-2">
+                                <a href="${desktopAppUrl}" class="btn btn-success fw-bold px-3 py-2 d-flex align-items-center gap-2 rounded-3 shadow-sm">
+                                    <i class="bi bi-file-earmark-spreadsheet"></i> Open in Excel App
+                                </a>
+                                <button type="button" class="btn btn-outline-success px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.open('${officeOnlineUrl}', '_blank')">
+                                    <i class="bi bi-window-fullscreen"></i> View in Office Online
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary px-3 py-2 d-flex align-items-center gap-2 rounded-3" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                    <i class="bi bi-download"></i> Download .${ext}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext)) {
+                // --- IMAGE ---
+                if (iconContainer) {
+                    iconContainer.style.background = '#FAF5FF';
+                    iconContainer.style.color = '#9333EA';
+                }
+                if (iconTag) iconTag.className = 'bi bi-file-earmark-image';
+                bodyEl.innerHTML = `
+                    <div class="p-3 d-flex align-items-center justify-content-center flex-grow-1" style="background: #0F172A;">
+                        <img src="${fileUrl}" alt="${escapeHtml(rawFilename)}" style="max-width: 100%; max-height: 68vh; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                    </div>
+                `;
+            } else {
+                // --- TEXT / CODE / OTHER ---
+                if (iconContainer) {
+                    iconContainer.style.background = '#F1F5F9';
+                    iconContainer.style.color = '#475569';
+                }
+                if (iconTag) iconTag.className = 'bi bi-file-earmark-text';
+
+                bodyEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div> Loading preview...</div>`;
+
+                fetch(fileUrl)
+                    .then(r => r.text())
+                    .then(text => {
+                        bodyEl.innerHTML = `
+                            <div class="p-4">
+                                <pre class="bg-white p-3 border rounded-3 font-monospace small" style="max-height: 60vh; overflow: auto; text-align: left; white-space: pre-wrap;"><code>${escapeHtml(text)}</code></pre>
+                            </div>
+                        `;
+                    })
+                    .catch(() => {
+                        bodyEl.innerHTML = `
+                            <div class="p-5 text-center">
+                                <i class="bi bi-file-earmark-arrow-down fs-1 text-primary mb-2"></i>
+                                <h6 class="fw-bold text-dark">File Ready for Download</h6>
+                                <p class="text-muted small mb-3">Click below to open or download the document.</p>
+                                <button class="btn btn-primary btn-sm px-4" onclick="window.downloadDocumentFile(${docId}, '${escapeHtml(rawFilename)}', '${customUrl || ''}')">
+                                    <i class="bi bi-download me-1"></i> Download File
+                                </button>
+                            </div>
+                        `;
+                    });
+            }
+
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        };
+
+        window.downloadDocumentFile = function(docId, filename, customUrl) {
+            const rawFilename = (filename || 'document').trim();
+            let downloadUrl = customUrl ? customUrl : `/api/upload/${docId}?download=1`;
+            if (customUrl && !customUrl.includes('download=1')) {
+                downloadUrl += (customUrl.includes('?') ? '&' : '?') + 'download=1';
+            }
+
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = rawFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            if (typeof showToast === 'function') {
+                showToast('Success', `Downloading ${rawFilename}...`);
+            }
+        };
     </script>
+
+    <!-- Universal Document & Presentation Viewer Modal -->
+    <div class="modal fade" id="edrpDocViewerModal" tabindex="-1" aria-labelledby="edrpDocViewerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden; background: #ffffff;">
+                <div class="modal-header border-bottom py-3 px-4" id="edrpDocViewerHeader" style="background: #F8FAFC;">
+                    <div class="d-flex align-items-center gap-3" style="min-width: 0;">
+                        <div id="edrpDocViewerIcon" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; background: #FFF7ED; color: #EA580C;">
+                            <i class="bi bi-file-earmark-slides" id="edrpDocViewerIconTag"></i>
+                        </div>
+                        <div style="min-width: 0;">
+                            <h5 class="modal-title fw-bold text-dark mb-0 text-truncate" id="edrpDocViewerTitle" style="font-size: 16px;">Document Viewer</h5>
+                            <p class="text-muted small mb-0" id="edrpDocViewerSubtitle" style="font-size: 12px;">PowerPoint Presentation</p>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold" id="edrpDocViewerOpenNewTabBtn">
+                            <i class="bi bi-box-arrow-up-right"></i> Open in New Tab
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary d-flex align-items-center gap-1.5 px-3 py-1.5 fw-semibold" id="edrpDocViewerDownloadBtn">
+                            <i class="bi bi-download"></i> Download
+                        </button>
+                        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body p-0" id="edrpDocViewerBody" style="min-height: 480px; max-height: 75vh; background: #F1F5F9; display: flex; flex-direction: column;">
+                    <!-- Dynamically rendered content -->
+                </div>
+            </div>
+        </div>
+    </div>
 
     {% block js %}{% endblock %}
 </body>

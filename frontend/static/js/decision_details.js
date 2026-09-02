@@ -2040,8 +2040,8 @@ async function loadDocuments() {
                     <td>${u.full_name}</td>
                     <td>${date}</td>
                     <td class="text-end pe-4">
-                        <a href="${API_URL}/upload/${att.id}" target="_blank" class="btn btn-sm btn-outline-secondary me-2" title="View Document"><i class="bi bi-eye"></i> View</a>
-                        <a href="${API_URL}/upload/${att.id}" class="btn btn-sm btn-outline-primary" download><i class="bi bi-download"></i> Download</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="viewDocumentFile(${att.id}, '${escapeHtml(att.filename)}', '${(att.file_size / (1024 * 1024)).toFixed(2)}')" title="View Document"><i class="bi bi-eye"></i> View File</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="downloadDocumentFile(${att.id}, '${escapeHtml(att.filename)}')" title="Download Document"><i class="bi bi-download"></i> Download</button>
                     </td>
                 </tr>
             `;

@@ -1486,8 +1486,11 @@ Return ONLY a valid JSON array of objects with the following exact keys:
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1.5" onclick="window.open('/upload/' + ${doc.id}, '_blank')" title="View / Download Document">
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1.5" onclick="viewDocumentFile(${doc.id}, '${escapeHtml(filename)}', '${sizeMB}')" title="View Document in Viewer / New Tab">
                         <i class="bi bi-eye"></i> View File
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1.5" onclick="downloadDocumentFile(${doc.id}, '${escapeHtml(filename)}')" title="Download Document">
+                        <i class="bi bi-download"></i> Download
                     </button>
                     <button type="button" class="btn btn-sm btn-light text-danger border rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" onclick="removeTempDoc(${doc.id})" title="Remove Document">
                         <i class="bi bi-trash3"></i>
@@ -1569,9 +1572,14 @@ Return ONLY a valid JSON array of objects with the following exact keys:
                                     <small class="text-muted" style="font-size: 11px;">${sizeMB} MB • Attachment File</small>
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-primary fw-semibold px-3 d-flex align-items-center gap-1" onclick="window.open('/api/upload/' + ${doc.id}, '_blank')" title="View / Check Document">
-                                <i class="bi bi-eye-fill"></i> View File
-                            </button>
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary fw-semibold px-3 d-flex align-items-center gap-1" onclick="viewDocumentFile(${doc.id}, '${escapeHtml(doc.filename)}', '${sizeMB}')" title="View Document">
+                                    <i class="bi bi-eye-fill"></i> View File
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold px-3 d-flex align-items-center gap-1" onclick="downloadDocumentFile(${doc.id}, '${escapeHtml(doc.filename)}')" title="Download Document">
+                                    <i class="bi bi-download"></i> Download
+                                </button>
+                            </div>
                         </div>
                     `;
                 });

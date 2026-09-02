@@ -56,12 +56,26 @@ async def upload_file(
     return attachment
 
 from fastapi.responses import FileResponse
+import mimetypes
 
 @router.get("/{attachment_id}")
-def get_uploaded_file(attachment_id: int, user_id: Optional[int] = None, db: Session = Depends(get_db)):
+def get_uploaded_file(
+    attachment_id: int, 
+    user_id: Optional[int] = None, 
+    download: Optional[bool] = False,
+    db: Session = Depends(get_db)
+):
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
-    if not att or not os.path.exists(att.file_path):
+    if not att:
         raise HTTPException(status_code=404, detail="File not found")
+        
+    real_path = att.file_path
+    if not os.path.exists(real_path):
+        alt_path = os.path.join(UPLOAD_DIR, att.filename)
+        if os.path.exists(alt_path):
+            real_path = alt_path
+        else:
+            raise HTTPException(status_code=404, detail="File content not found on server")
         
     if att.decision_id and user_id:
         try:
@@ -76,5 +90,30 @@ def get_uploaded_file(attachment_id: int, user_id: Optional[int] = None, db: Ses
         except Exception as e:
             print("Error logging document access:", e)
 
-    return FileResponse(att.file_path, filename=att.filename)
+    mime_type, _ = mimetypes.guess_type(att.filename)
+    if not mime_type:
+        ext = os.path.splitext(att.filename)[1].lower()
+        if ext in [".pptx", ".ppt"]:
+            mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        elif ext in [".docx", ".doc"]:
+            mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif ext in [".xlsx", ".xls"]:
+            mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        elif ext == ".pdf":
+            mime_type = "application/pdf"
+        elif ext in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]:
+            mime_type = f"image/{ext.lstrip('.')}"
+        elif ext in [".txt", ".csv", ".json", ".md", ".log"]:
+            mime_type = "text/plain; charset=utf-8"
+        else:
+            mime_type = "application/octet-stream"
+
+    disp_type = "attachment" if download else "inline"
+
+    return FileResponse(
+        real_path,
+        filename=att.filename,
+        media_type=mime_type,
+        content_disposition_type=disp_type
+    )
 

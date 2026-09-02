@@ -1470,7 +1470,8 @@
                             </div>
                         </div>
                         <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-outline-primary text-xs rounded-3 px-2.5" onclick="window.open('${API_URL}${f.file_path}', '_blank')"><i class="bi bi-download me-1"></i>Download</button>
+                            <button class="btn btn-sm btn-outline-primary text-xs rounded-3 px-2.5" onclick="viewDocumentFile(${f.id}, '${escapeHtml(f.filename)}', '${sizeMB}')"><i class="bi bi-eye me-1"></i>View File</button>
+                            <button class="btn btn-sm btn-outline-secondary text-xs rounded-3 px-2.5" onclick="downloadDocumentFile(${f.id}, '${escapeHtml(f.filename)}')"><i class="bi bi-download me-1"></i>Download</button>
                             <button class="btn btn-sm btn-outline-danger text-xs rounded-3 px-2" onclick="deleteSupportingFile(${f.id})"><i class="bi bi-trash"></i></button>
                         </div>
                     </div>

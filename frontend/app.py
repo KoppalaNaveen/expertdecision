@@ -975,7 +975,11 @@ def proxy_upload_file():
 def proxy_get_upload(attachment_id):
     try:
         user_id = session.get("user_id", 1)
-        resp = make_backend_request("GET", f"/upload/{attachment_id}?user_id={user_id}", timeout=15)
+        download = request.args.get("download", "")
+        query_str = f"?user_id={user_id}"
+        if download:
+            query_str += f"&download={download}"
+        resp = make_backend_request("GET", f"/upload/{attachment_id}{query_str}", timeout=15)
         headers = {}
         if "Content-Type" in resp.headers:
             headers["Content-Type"] = resp.headers["Content-Type"]
