@@ -870,7 +870,32 @@
             const textEl = document.getElementById("globalErrorNotificationText");
             const titleEl = document.getElementById("globalErrorNotificationTitle");
 
-            const msgStr = (message != null && message !== "") ? String(message).trim() : "Unexpected error occurred.";
+            let msgStr = "";
+            if (message == null || message === "") {
+                msgStr = "Unexpected error occurred.";
+            } else if (typeof message === 'string') {
+                msgStr = message.trim();
+            } else if (Array.isArray(message)) {
+                msgStr = message.map(item => {
+                    if (typeof item === 'string') return item;
+                    if (item && item.msg) {
+                        const field = (item.loc && item.loc.length > 0) ? item.loc[item.loc.length - 1] : 'Field';
+                        return `${field}: ${item.msg}`;
+                    }
+                    return JSON.stringify(item);
+                }).join("; ");
+            } else if (typeof message === 'object') {
+                if (message.detail) {
+                    return showGlobalErrorNotification(message.detail, durationMs, title);
+                }
+                if (message.message) {
+                    msgStr = message.message;
+                } else {
+                    msgStr = JSON.stringify(message);
+                }
+            } else {
+                msgStr = String(message);
+            }
             
             console.error("[GlobalErrorNotification]", msgStr);
 

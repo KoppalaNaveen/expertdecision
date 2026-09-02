@@ -1026,7 +1026,23 @@ def proxy_create_decision_full():
         if not data.get("created_by"):
             data["created_by"] = session.get("user_id", 1)
         resp = make_backend_request("POST", "/decisions/full", json=data, timeout=30)
-        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+        if resp is not None:
+            if resp.status_code >= 400:
+                try:
+                    err_json = resp.json()
+                    if isinstance(err_json.get("detail"), list):
+                        messages = []
+                        for item in err_json["detail"]:
+                            loc = item.get("loc", [])
+                            field = loc[-1] if loc else "field"
+                            msg = item.get("msg", "Invalid value")
+                            messages.append(f"{field}: {msg}")
+                        err_json["detail"] = "; ".join(messages)
+                        return jsonify(err_json), resp.status_code
+                except Exception:
+                    pass
+            return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+        return jsonify({"detail": "Backend connection error"}), 500
     except Exception as e:
         return jsonify({"detail": f"Decision creation error: {e}"}), 500
 
@@ -1037,7 +1053,23 @@ def proxy_update_decision_full(decision_id):
     try:
         data = request.json or {}
         resp = make_backend_request("PUT", f"/decisions/{decision_id}/full", json=data, timeout=30)
-        return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+        if resp is not None:
+            if resp.status_code >= 400:
+                try:
+                    err_json = resp.json()
+                    if isinstance(err_json.get("detail"), list):
+                        messages = []
+                        for item in err_json["detail"]:
+                            loc = item.get("loc", [])
+                            field = loc[-1] if loc else "field"
+                            msg = item.get("msg", "Invalid value")
+                            messages.append(f"{field}: {msg}")
+                        err_json["detail"] = "; ".join(messages)
+                        return jsonify(err_json), resp.status_code
+                except Exception:
+                    pass
+            return make_response(resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/json")})
+        return jsonify({"detail": "Backend connection error"}), 500
     except Exception as e:
         return jsonify({"detail": f"Decision update error: {e}"}), 500
 

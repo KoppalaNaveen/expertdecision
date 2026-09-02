@@ -2393,19 +2393,31 @@ Return ONLY a valid JSON array of objects with the following exact keys:
             }
         }
         
+        function formatIsoDate(dateStr, timeStr = "00:00:00") {
+            if (!dateStr) return null;
+            const str = String(dateStr).trim();
+            if (!str) return null;
+            if (str.includes('T')) {
+                // If it already contains an ISO time, extract clean YYYY-MM-DD
+                const cleanDate = str.split('T')[0];
+                return `${cleanDate}T${timeStr}Z`;
+            }
+            return `${str}T${timeStr}Z`;
+        }
+
         const payload = {
             title: decisionPayload.title,
             description: decisionPayload.description || "No description provided.",
             created_by: parseInt("{{ session.get('user_id', '') }}" || localStorage.getItem('user_id') || 1, 10),
             category_id: decisionPayload.category_id || 1,
-            priority_level: decisionPayload.priority_level,
-            department: decisionPayload.department,
-            decision_date: decisionPayload.decision_date ? decisionPayload.decision_date + "T00:00:00Z" : null,
+            priority_level: decisionPayload.priority_level || 'Medium',
+            department: decisionPayload.department || 'Operations',
+            decision_date: formatIsoDate(decisionPayload.decision_date, "00:00:00"),
             tags: Array.isArray(selectedTags) ? selectedTags.join(', ') : (decisionPayload.tags || ''),
             status: targetStatus || "Pending",
             alternatives: decisionPayload.alternatives.map(a => ({
                 title: a.title,
-                description: "",
+                description: a.description || "",
                 pros: a.pros || 'None',
                 cons: a.cons || 'None',
                 cost: parseFloat(a.cost) || 0,
@@ -2414,11 +2426,11 @@ Return ONLY a valid JSON array of objects with the following exact keys:
                 risk_level: a.risk_level || 'Low Risk'
             })),
             reviewers: decisionPayload.reviewers.map(r => ({
-                reviewer_id: r.reviewer_id,
+                reviewer_id: parseInt(r.reviewer_id, 10),
                 approval_type: r.approval_type || 'Sequential',
-                deadline: r.deadline ? r.deadline + "T23:59:59Z" : null
+                deadline: formatIsoDate(r.deadline, "23:59:59")
             })),
-            temp_file_ids: decisionPayload.temp_file_ids
+            temp_file_ids: decisionPayload.temp_file_ids || []
         };
         
         try {
@@ -2467,10 +2479,23 @@ Return ONLY a valid JSON array of objects with the following exact keys:
                 }
             } else {
                 const data = await res.json().catch(() => ({}));
+                let errorMsg = "Failed to save/submit decision";
+                if (data) {
+                    if (typeof data.detail === 'string') {
+                        errorMsg = data.detail;
+                    } else if (Array.isArray(data.detail)) {
+                        errorMsg = data.detail.map(err => {
+                            const field = (err.loc && err.loc.length > 0) ? err.loc[err.loc.length - 1] : 'Field';
+                            return `${field}: ${err.msg || 'Invalid value'}`;
+                        }).join("; ");
+                    } else if (data.message) {
+                        errorMsg = data.message;
+                    }
+                }
                 if (typeof showCenterNotification === 'function') {
-                    showCenterNotification(data.detail || "Failed to save/submit decision", "error", "Operation Failed");
+                    showCenterNotification(errorMsg, "error", "Operation Failed");
                 } else {
-                    showErrorOverlay(data.detail || "Failed to submit decision");
+                    showErrorOverlay(errorMsg);
                 }
                 if (btnDraft) {
                     btnDraft.innerHTML = '<i class="bi bi-file-earmark me-2"></i> Save as Draft';
