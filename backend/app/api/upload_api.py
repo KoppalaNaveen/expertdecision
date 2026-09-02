@@ -12,7 +12,8 @@ router = APIRouter(
     tags=["Uploads"]
 )
 
-UPLOAD_DIR = "uploads"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+UPLOAD_DIR = os.path.join(PROJECT_ROOT, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB in bytes
@@ -67,14 +68,24 @@ def get_uploaded_file(
 ):
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not att:
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail="File record not found")
         
     real_path = att.file_path
     if not os.path.exists(real_path):
-        alt_path = os.path.join(UPLOAD_DIR, att.filename)
-        if os.path.exists(alt_path):
-            real_path = alt_path
-        else:
+        candidates = [
+            os.path.join(UPLOAD_DIR, att.filename),
+            os.path.join(PROJECT_ROOT, "uploads", att.filename),
+            os.path.join(os.getcwd(), "uploads", att.filename),
+            os.path.join(PROJECT_ROOT, "backend", "uploads", att.filename),
+            os.path.join(PROJECT_ROOT, "frontend", "uploads", att.filename),
+        ]
+        found = False
+        for p in candidates:
+            if os.path.exists(p):
+                real_path = p
+                found = True
+                break
+        if not found:
             raise HTTPException(status_code=404, detail="File content not found on server")
         
     if att.decision_id and user_id:
