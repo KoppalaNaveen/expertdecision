@@ -3283,8 +3283,9 @@
         window.viewDocumentFile = function(docId, filename, sizeMB, customUrl) {
             const rawFilename = (filename || 'document').trim();
             const ext = rawFilename.split('.').pop().toLowerCase();
-            const fileUrl = customUrl || `/api/upload/${docId}`;
-            const fullAbsUrl = window.location.origin + fileUrl;
+            const localBlob = (window._localUploadedObjectUrls && docId && window._localUploadedObjectUrls[docId]) ? window._localUploadedObjectUrls[docId] : null;
+            const fileUrl = customUrl || localBlob || `/api/upload/${docId}?filename=${encodeURIComponent(rawFilename)}`;
+            const fullAbsUrl = fileUrl.startsWith('http') || fileUrl.startsWith('blob:') ? fileUrl : (window.location.origin + fileUrl);
 
             // 1. PDF files: Directly open in new tab (native browser PDF reader)
             if (ext === 'pdf') {
@@ -3678,9 +3679,12 @@
 
         window.downloadDocumentFile = function(docId, filename, customUrl) {
             const rawFilename = (filename || 'document').trim();
-            if (customUrl && customUrl.startsWith('blob:')) {
+            const localBlob = (window._localUploadedObjectUrls && docId && window._localUploadedObjectUrls[docId]) ? window._localUploadedObjectUrls[docId] : null;
+            const effectiveUrl = customUrl || localBlob;
+
+            if (effectiveUrl && effectiveUrl.startsWith('blob:')) {
                 const a = document.createElement('a');
-                a.href = customUrl;
+                a.href = effectiveUrl;
                 a.download = rawFilename;
                 document.body.appendChild(a);
                 a.click();
@@ -3691,9 +3695,12 @@
                 return;
             }
 
-            let downloadUrl = customUrl ? customUrl : `/api/upload/${docId}?download=1`;
-            if (customUrl && !customUrl.includes('download=1')) {
-                downloadUrl += (customUrl.includes('?') ? '&' : '?') + 'download=1';
+            let downloadUrl = effectiveUrl ? effectiveUrl : `/api/upload/${docId}?download=1&filename=${encodeURIComponent(rawFilename)}`;
+            if (downloadUrl.indexOf('filename=') === -1) {
+                downloadUrl += (downloadUrl.includes('?') ? '&' : '?') + `filename=${encodeURIComponent(rawFilename)}`;
+            }
+            if (downloadUrl.indexOf('download=1') === -1) {
+                downloadUrl += (downloadUrl.includes('?') ? '&' : '?') + 'download=1';
             }
 
             fetch(downloadUrl)

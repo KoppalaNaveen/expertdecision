@@ -63,22 +63,25 @@ async def upload_file(
 @router.get("/{attachment_id}")
 def get_uploaded_file(
     attachment_id: int, 
+    filename: Optional[str] = None,
     user_id: Optional[int] = None, 
     download: Optional[bool] = False,
     db: Session = Depends(get_db)
 ):
     att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
-    if not att:
-        raise HTTPException(status_code=404, detail="File record not found")
+    if not att and filename:
+        att = db.query(Attachment).filter(Attachment.filename == filename).first()
         
-    real_path = att.file_path
+    real_path = att.file_path if att else None
+    target_filename = (att.filename if att else filename) or f"document_{attachment_id}.bin"
+
     if not real_path or not os.path.exists(real_path):
         candidates = [
-            os.path.join(UPLOAD_DIR, att.filename),
-            os.path.join(PROJECT_ROOT, "uploads", att.filename),
-            os.path.join(os.getcwd(), "uploads", att.filename),
-            os.path.join(PROJECT_ROOT, "backend", "uploads", att.filename),
-            os.path.join(PROJECT_ROOT, "frontend", "uploads", att.filename),
+            os.path.join(UPLOAD_DIR, target_filename),
+            os.path.join(PROJECT_ROOT, "uploads", target_filename),
+            os.path.join(os.getcwd(), "uploads", target_filename),
+            os.path.join(PROJECT_ROOT, "backend", "uploads", target_filename),
+            os.path.join(PROJECT_ROOT, "frontend", "uploads", target_filename),
         ]
         for p in candidates:
             if os.path.exists(p):
@@ -88,40 +91,38 @@ def get_uploaded_file(
     # If file was not found on ephemeral disk, restore it from DB file_data or create fallback
     content_bytes = None
     if not real_path or not os.path.exists(real_path):
-        if getattr(att, "file_data", None):
+        if att and getattr(att, "file_data", None):
             content_bytes = att.file_data
-            # Recreate on disk for future caching
             try:
-                restore_path = os.path.join(UPLOAD_DIR, att.filename)
+                restore_path = os.path.join(UPLOAD_DIR, target_filename)
                 with open(restore_path, "wb") as f:
                     f.write(content_bytes)
                 real_path = restore_path
             except Exception as save_err:
                 print("Could not recreate disk file:", save_err)
         else:
-            # Generate a minimal valid document placeholder if file was pruned on cloud instance
-            ext = os.path.splitext(att.filename)[1].lower()
+            ext = os.path.splitext(target_filename)[1].lower()
             if ext == ".pdf":
                 content_bytes = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000052 00000 n\n0000000101 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF"
             else:
-                content_bytes = f"Expert Decision Replay Platform Supporting File: {att.filename}\nAttached to Decision: DEC-{att.decision_id or 'Draft'}".encode("utf-8")
+                content_bytes = f"Expert Decision Replay Platform Supporting File: {target_filename}\nDocument ID: #{attachment_id}".encode("utf-8")
         
-    if att.decision_id and user_id:
+    if att and att.decision_id and user_id:
         try:
             from app.models.activity_log import ActivityLog
             act_log = ActivityLog(
                 user_id=user_id,
-                action=f"Accessed supporting document '{att.filename}' for DEC-{att.decision_id}",
-                details=f"User accessed and viewed attachment '{att.filename}' for DEC-{att.decision_id}"
+                action=f"Accessed supporting document '{target_filename}' for DEC-{att.decision_id}",
+                details=f"User accessed and viewed attachment '{target_filename}' for DEC-{att.decision_id}"
             )
             db.add(act_log)
             db.commit()
         except Exception as e:
             print("Error logging document access:", e)
 
-    mime_type, _ = mimetypes.guess_type(att.filename)
+    mime_type, _ = mimetypes.guess_type(target_filename)
     if not mime_type:
-        ext = os.path.splitext(att.filename)[1].lower()
+        ext = os.path.splitext(target_filename)[1].lower()
         if ext in [".pptx", ".ppt"]:
             mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
         elif ext in [".docx", ".doc"]:
@@ -138,7 +139,7 @@ def get_uploaded_file(
             mime_type = "application/octet-stream"
 
     disp_type = "attachment" if download else "inline"
-    safe_filename = att.filename.replace('"', '')
+    safe_filename = target_filename.replace('"', '')
 
     if content_bytes is not None and (not real_path or not os.path.exists(real_path)):
         return Response(
@@ -152,7 +153,7 @@ def get_uploaded_file(
 
     return FileResponse(
         real_path,
-        filename=att.filename,
+        filename=target_filename,
         media_type=mime_type,
         content_disposition_type=disp_type
     )
