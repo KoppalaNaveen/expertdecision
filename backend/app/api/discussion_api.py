@@ -66,13 +66,22 @@ async def websocket_endpoint(websocket: WebSocket, decision_id: int):
 
 # --- 1. THREADS ---
 @router.post("/{decision_id}/threads", response_model=DiscussionThreadResponse)
-def create_thread(decision_id: int, thread: DiscussionThreadCreate, db: Session = Depends(get_db)):
-    db_decision = db.query(Decision).filter(Decision.id == decision_id).first()
-    if not db_decision:
-        raise HTTPException(status_code=404, detail="Decision not found")
+@router.post("/threads/create", response_model=DiscussionThreadResponse)
+def create_thread(decision_id: Optional[int] = 0, thread: DiscussionThreadCreate = None, db: Session = Depends(get_db)):
+    dec_id = None
+    if decision_id and int(decision_id) > 0:
+        db_decision = db.query(Decision).filter(Decision.id == int(decision_id)).first()
+        if not db_decision:
+            raise HTTPException(status_code=404, detail="Decision not found")
+        dec_id = int(decision_id)
+    elif thread and thread.decision_id and int(thread.decision_id) > 0:
+        db_decision = db.query(Decision).filter(Decision.id == int(thread.decision_id)).first()
+        if not db_decision:
+            raise HTTPException(status_code=404, detail="Decision not found")
+        dec_id = int(thread.decision_id)
         
     db_thread = DiscussionThread(
-        decision_id=decision_id,
+        decision_id=dec_id,
         topic=thread.topic,
         created_by=thread.created_by,
         status="Open"
@@ -82,9 +91,10 @@ def create_thread(decision_id: int, thread: DiscussionThreadCreate, db: Session 
     db.refresh(db_thread)
 
     try:
+        log_action = f"Created discussion thread on DEC-{dec_id}" if dec_id else "Created standalone general discussion thread"
         act_log = ActivityLog(
             user_id=thread.created_by,
-            action=f"Created discussion thread on DEC-{decision_id}",
+            action=log_action,
             details=f"Thread topic: '{thread.topic}'"
         )
         db.add(act_log)
@@ -96,6 +106,8 @@ def create_thread(decision_id: int, thread: DiscussionThreadCreate, db: Session 
 
 @router.get("/{decision_id}/threads", response_model=List[DiscussionThreadResponse])
 def get_threads(decision_id: int, db: Session = Depends(get_db)):
+    if decision_id == 0:
+        return db.query(DiscussionThread).filter(DiscussionThread.decision_id == None).all()
     return db.query(DiscussionThread).filter(DiscussionThread.decision_id == decision_id).all()
 
 @router.get("/threads/all", response_model=List[DiscussionThreadResponse])
@@ -117,9 +129,10 @@ def update_thread_status(thread_id: int, status: str = Query(...), user_id: int 
     db.commit()
 
     try:
+        log_action = f"Changed thread status on DEC-{thread.decision_id}" if thread.decision_id else "Changed standalone thread status"
         act_log = ActivityLog(
             user_id=user_id,
-            action=f"Changed thread status on DEC-{thread.decision_id}",
+            action=log_action,
             details=f"Thread '{thread.topic}' status changed from '{old_status}' to '{status}'"
         )
         db.add(act_log)
@@ -130,12 +143,22 @@ def update_thread_status(thread_id: int, status: str = Query(...), user_id: int 
     return {"message": "Thread status updated successfully", "status": status}
 
 @router.delete("/threads/{thread_id}")
-def delete_thread(thread_id: int, user_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
+def delete_thread(thread_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    # 1. Admin Verification: Only Admins can delete threads
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    
+    role_name = (user.role.role_name if user.role else "").strip().lower()
+    if role_name not in {"administrator", "admin"} and "admin" not in role_name and user.role_id != 1:
+        raise HTTPException(status_code=403, detail="Access Denied: Only administrators can delete discussion threads.")
+
+    # 2. Find thread
     thread = db.query(DiscussionThread).filter(DiscussionThread.id == thread_id).first()
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
     
-    # Delete dependent comments first
+    # 3. Delete dependent comments first
     db.query(Comment).filter(Comment.thread_id == thread_id).delete(synchronize_session=False)
     
     topic = thread.topic
@@ -143,19 +166,19 @@ def delete_thread(thread_id: int, user_id: Optional[int] = Query(None), db: Sess
     db.delete(thread)
     db.commit()
 
-    if user_id:
-        try:
-            act_log = ActivityLog(
-                user_id=user_id,
-                action=f"Deleted discussion thread on DEC-{decision_id}",
-                details=f"Thread '{topic}' was deleted"
-            )
-            db.add(act_log)
-            db.commit()
-        except Exception as e:
-            print("Error logging thread deletion:", e)
+    try:
+        log_action = f"Admin deleted discussion thread on DEC-{decision_id}" if decision_id else "Admin deleted standalone discussion thread"
+        act_log = ActivityLog(
+            user_id=user_id,
+            action=log_action,
+            details=f"Administrator {user.full_name} deleted thread '{topic}'"
+        )
+        db.add(act_log)
+        db.commit()
+    except Exception as e:
+        print("Error logging thread deletion:", e)
 
-    return {"message": "Thread deleted successfully"}
+    return {"message": "Thread deleted successfully by administrator"}
 
 # --- 2. COMMENTS ---
 @router.post("/threads/{thread_id}/comments", response_model=CommentResponse)

@@ -139,9 +139,11 @@ class CommentResponse(BaseModel):
 class DiscussionThreadCreate(BaseModel):
     topic: str
     created_by: int
+    decision_id: Optional[int] = None
 
 class DiscussionThreadResponse(BaseModel):
     id: int
+    decision_id: Optional[int] = None
     topic: str
     status: str
     is_pinned: Optional[bool] = False

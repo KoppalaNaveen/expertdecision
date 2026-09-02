@@ -185,10 +185,25 @@
             </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap flex-sm-nowrap">
-            <select id="globalDecisionSelect" class="form-select form-select-sm border-light-subtle shadow-sm rounded-3 py-1.5" style="min-width: 230px;" onchange="switchDecision(this.value)">
-                <option value="">Loading decisions...</option>
-            </select>
-            <button class="btn btn-primary btn-sm shadow-sm rounded-3 px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5" onclick="openStartThreadModal()">
+            <!-- Searchable & Manual Decision Selector Dropdown -->
+            <div class="dropdown position-relative" id="decisionPickerDropdownContainer">
+                <button class="btn btn-white border shadow-sm rounded-3 py-1.5 px-3 d-flex align-items-center justify-content-between text-start text-dark fw-medium text-xs dropdown-toggle" type="button" id="decisionPickerBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" style="min-width: 290px; max-width: 380px; background: #fff;">
+                    <span id="selectedDecisionLabel" class="text-truncate me-2"><i class="bi bi-journal-check text-primary me-1.5"></i>Loading decisions...</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 rounded-3 p-2" style="width: 360px; z-index: 1060;" id="decisionPickerMenu">
+                    <div class="p-1 mb-2 border-bottom pb-2">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light border-0 text-muted ps-2.5"><i class="bi bi-search"></i></span>
+                            <input type="text" id="decisionFilterInput" class="form-control bg-light border-0 ps-1 text-xs" placeholder="Search by DEC-# or title..." oninput="filterDecisionList(this.value)">
+                            <button class="btn btn-light border-0 text-muted btn-sm" type="button" onclick="clearDecisionFilter()"><i class="bi bi-x"></i></button>
+                        </div>
+                    </div>
+                    <div class="custom-scrollbar" id="decisionOptionsList" style="max-height: 260px; overflow-y: auto;">
+                        <!-- Options generated dynamically -->
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-sm shadow-sm rounded-3 px-3 py-1.5 fw-semibold d-flex align-items-center gap-1.5 flex-shrink-0" onclick="openStartThreadModal()">
                 <i class="bi bi-plus-circle-fill"></i> <span>New Thread</span>
             </button>
         </div>
@@ -289,6 +304,11 @@
                                 <li><a class="dropdown-item text-xs py-1.5" href="#" onclick="changeThreadStatus('Closed')">🔴 Closed</a></li>
                             </ul>
                         </div>
+                        {% if session.get('role_name') in ['Administrator', 'Admin'] or session.get('role_id') == 1 %}
+                        <button class="btn btn-outline-danger btn-sm rounded-3 py-1 px-2.5 text-xs fw-semibold d-flex align-items-center gap-1 shadow-2xs" id="adminDeleteThreadHeaderBtn" onclick="confirmAdminDeleteThread(currentThreadId)" title="Administrator Only: Permanently delete this discussion thread">
+                            <i class="bi bi-trash3-fill"></i> <span class="d-none d-sm-inline">Delete Thread</span>
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -481,8 +501,31 @@
             </div>
             <div class="modal-body p-4">
                 <div class="mb-3">
+                    <label class="form-label fw-semibold text-secondary text-xs">Discussion Type & Context</label>
+                    <div class="d-flex gap-3 p-2.5 bg-light rounded-3 border mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="threadContextType" id="threadContextDecision" value="decision" checked onchange="handleThreadContextRadioChange()">
+                            <label class="form-check-label text-xs fw-semibold text-dark cursor-pointer" for="threadContextDecision">
+                                <i class="bi bi-journal-text text-primary me-1"></i>Link to Decision
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="threadContextType" id="threadContextStandalone" value="standalone" onchange="handleThreadContextRadioChange()">
+                            <label class="form-check-label text-xs fw-semibold text-success cursor-pointer" for="threadContextStandalone">
+                                <i class="bi bi-globe me-1"></i>Standalone / General Discussion
+                            </label>
+                        </div>
+                    </div>
+                    <div id="threadDecisionSelectWrapper">
+                        <label class="form-label text-muted text-xs mb-1">Select Target Decision</label>
+                        <select id="modalThreadDecisionSelect" class="form-select form-select-sm rounded-3 text-xs">
+                            <!-- Populated dynamically with decisions -->
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
                     <label class="form-label fw-semibold text-secondary text-xs">Thread Topic</label>
-                    <input type="text" id="startThreadTopicInput" class="form-control rounded-3" placeholder="E.g., Infrastructure Budget & Risk Analysis...">
+                    <input type="text" id="startThreadTopicInput" class="form-control rounded-3" placeholder="E.g., Infrastructure Budget, Architecture Review, or Team Ideas...">
                 </div>
             </div>
             <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
@@ -571,7 +614,10 @@
 <script>
     const API_URL = "/api";
     const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
+    const CURRENT_USER_ROLE = "{{ session.get('role_name', 'User') }}";
+    const IS_ADMIN = {{ 'true' if (session.get('role_name') in ['Administrator', 'Admin'] or session.get('role_id') == 1) else 'false' }};
     
+    let allDecisionsList = [];
     let currentDecisionId = null;
     let currentThreadId = null;
     let replyToCommentId = null;
@@ -762,32 +808,128 @@
         try {
             const res = await fetch(`${API_URL}/decisions/`);
             if (!res.ok) return;
-            const decisions = await res.json();
-            const select = document.getElementById('globalDecisionSelect');
-            select.innerHTML = '';
-            if (decisions.length === 0) {
-                select.innerHTML = '<option value="">No decisions found</option>';
-                return;
+            allDecisionsList = await res.json();
+            
+            renderDecisionDropdownOptions(allDecisionsList);
+            
+            if (currentDecisionId === null) {
+                currentDecisionId = allDecisionsList.length > 0 ? allDecisionsList[0].id : 0;
             }
-            decisions.forEach((d, idx) => {
-                select.innerHTML += `<option value="${d.id}">DEC-${d.id} · ${escapeHtml(d.title)}</option>`;
-            });
-            if (!currentDecisionId) currentDecisionId = decisions[0].id;
             switchDecision(currentDecisionId);
         } catch (e) {
             console.error(e);
         }
     }
 
+    function renderDecisionDropdownOptions(decisions, query = "") {
+        const container = document.getElementById('decisionOptionsList');
+        if (!container) return;
+
+        let html = '';
+
+        // 1. General / Standalone Discussions item
+        const isGeneralSelected = currentDecisionId === 0 || currentDecisionId === "0";
+        html += `
+            <div class="p-2 mb-1 rounded-2 cursor-pointer transition d-flex align-items-center justify-content-between ${isGeneralSelected ? 'bg-primary-subtle text-primary fw-bold' : 'hover-bg text-dark'}" onclick="selectDecisionItem(0, '🌐 General / Standalone Discussions')">
+                <div class="d-flex align-items-center gap-2 text-truncate">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle text-xs">General</span>
+                    <span class="text-xs text-truncate">🌐 General Discussions (No Decision)</span>
+                </div>
+                ${isGeneralSelected ? '<i class="bi bi-check-lg text-primary"></i>' : ''}
+            </div>
+            <div class="dropdown-divider my-1"></div>
+        `;
+
+        if (!decisions || decisions.length === 0) {
+            html += '<div class="text-center py-3 text-muted text-xs">No matching decisions found</div>';
+            container.innerHTML = html;
+            return;
+        }
+
+        decisions.forEach(d => {
+            const isSelected = currentDecisionId === d.id;
+            const decNumText = `DEC-${d.id}`;
+            html += `
+                <div class="p-2 mb-1 rounded-2 cursor-pointer transition d-flex align-items-center justify-content-between ${isSelected ? 'bg-primary-subtle text-primary fw-bold' : 'hover-bg text-dark'}" onclick="selectDecisionItem(${d.id})">
+                    <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 290px;">
+                        <span class="badge bg-primary text-white text-xs font-monospace flex-shrink-0">${decNumText}</span>
+                        <span class="text-xs text-truncate" title="${escapeHtml(d.title)}">${escapeHtml(d.title)}</span>
+                    </div>
+                    ${isSelected ? '<i class="bi bi-check-lg text-primary flex-shrink-0"></i>' : ''}
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function filterDecisionList(query) {
+        const q = (query || "").trim().toLowerCase();
+        if (!q) {
+            renderDecisionDropdownOptions(allDecisionsList);
+            return;
+        }
+
+        const filtered = allDecisionsList.filter(d => {
+            const idStr = String(d.id);
+            const decCode = `dec-${d.id}`.toLowerCase();
+            const title = (d.title || "").toLowerCase();
+            const dept = (d.department || "").toLowerCase();
+            return idStr.includes(q) || decCode.includes(q) || title.includes(q) || dept.includes(q);
+        });
+
+        renderDecisionDropdownOptions(filtered, q);
+    }
+
+    function clearDecisionFilter() {
+        const input = document.getElementById('decisionFilterInput');
+        if (input) {
+            input.value = '';
+            filterDecisionList('');
+        }
+    }
+
+    function selectDecisionItem(decisionId) {
+        const btn = document.getElementById('decisionPickerBtn');
+        if (btn) {
+            const dropdownInstance = bootstrap.Dropdown.getInstance(btn);
+            if (dropdownInstance) dropdownInstance.hide();
+        }
+        
+        switchDecision(decisionId);
+    }
+
     async function switchDecision(decisionId) {
-        if (!decisionId) return;
-        currentDecisionId = parseInt(decisionId, 10);
+        currentDecisionId = parseInt(decisionId, 10) || 0;
+        
+        // Update Selected Decision Label in Header
+        const labelElem = document.getElementById('selectedDecisionLabel');
+        if (labelElem) {
+            if (currentDecisionId === 0) {
+                labelElem.innerHTML = '<i class="bi bi-globe text-success me-1.5"></i> <span class="fw-bold">General Discussions</span> <span class="text-muted">(Standalone)</span>';
+            } else {
+                const dec = allDecisionsList.find(d => d.id === currentDecisionId);
+                const title = dec ? dec.title : `Decision #${currentDecisionId}`;
+                labelElem.innerHTML = `<i class="bi bi-journal-check text-primary me-1.5"></i> <span class="fw-bold font-monospace">DEC-${currentDecisionId}</span> · ${escapeHtml(title)}`;
+            }
+        }
+
+        renderDecisionDropdownOptions(allDecisionsList);
+
         await loadThreadsForDecision(currentDecisionId);
-        loadDecisionRationale(currentDecisionId);
-        loadMeetingNotes(currentDecisionId);
-        loadSupportingFiles(currentDecisionId);
-        loadDecisionTimeline();
-        loadTeamPresence(currentDecisionId);
+        
+        if (currentDecisionId > 0) {
+            loadDecisionRationale(currentDecisionId);
+            loadMeetingNotes(currentDecisionId);
+            loadSupportingFiles(currentDecisionId);
+            loadDecisionTimeline();
+            loadTeamPresence(currentDecisionId);
+        } else {
+            document.getElementById('meetingNotesBadgeCount').innerText = '0';
+            document.getElementById('filesBadgeCount').innerText = '0';
+            loadTeamPresence(0);
+        }
+
         if (currentActiveTab === 'chat') {
             initWebSocket(currentDecisionId);
         }
@@ -799,7 +941,7 @@
             ws.close();
         }
         try {
-            ws = new WebSocket(`{{ backend_ws_url }}/decisions/ws/${decisionId}`);
+            ws = new WebSocket(`{{ backend_ws_url }}/decisions/ws/${decisionId || 0}`);
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 if (data.type === 'NEW_COMMENT' && data.thread_id === currentThreadId) {
@@ -845,9 +987,11 @@
             if (!res.ok) return;
             const threads = await res.json();
             if (threads.length === 0) {
-                container.innerHTML = '<div class="text-center py-3 text-muted small">No discussion topics.</div>';
+                container.innerHTML = `<div class="text-center py-3 text-muted small">${decisionId === 0 ? 'No standalone general topics.' : 'No discussion topics for this decision.'}</div>`;
                 document.getElementById('activeThreadTitle').innerText = "No topics found";
+                document.getElementById('activeThreadSubtitle').innerText = decisionId === 0 ? "General Discussions • Click '+ Add' to create one" : `Decision DEC-${decisionId} • Click '+ Add' to create a topic`;
                 document.getElementById('chatFeedContainer').innerHTML = '<div class="text-center py-5 text-muted"><p>Click "+ New Thread" above to create the first topic.</p></div>';
+                currentThreadId = null;
                 return;
             }
             container.innerHTML = '';
@@ -856,28 +1000,41 @@
                 if (isAct && !currentThreadId) currentThreadId = t.id;
                 
                 const badgeColor = t.status === 'Resolved' ? 'bg-success-subtle text-success border-success-subtle' : 'bg-primary-subtle text-primary border-primary-subtle';
+                const contextBadge = t.decision_id ? `<span class="badge bg-light text-secondary border me-1" style="font-size: 9px;">DEC-${t.decision_id}</span>` : `<span class="badge bg-success-subtle text-success border border-success-subtle me-1" style="font-size: 9px;">General</span>`;
+
                 container.innerHTML += `
-                    <div class="thread-card-item p-2.5 mb-1.5 cursor-pointer transition ${isAct ? 'active-thread' : ''}" onclick="selectThread(${t.id}, '${escapeHtml(t.topic)}', '${t.status}')">
+                    <div class="thread-card-item p-2.5 mb-1.5 cursor-pointer transition ${isAct ? 'active-thread' : ''}" onclick="selectThread(${t.id}, '${escapeHtml(t.topic).replace(/'/g, "\\'")}', '${t.status}', ${t.decision_id || 0})">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-semibold text-dark text-xs truncate" style="max-width: 140px;">${escapeHtml(t.topic)}</span>
-                            <span class="badge ${badgeColor} border text-xs px-1.5 py-0.5">${t.status}</span>
+                            <div class="d-flex align-items-center text-truncate" style="max-width: 155px;">
+                                ${contextBadge}
+                                <span class="fw-semibold text-dark text-xs truncate">${escapeHtml(t.topic)}</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="badge ${badgeColor} border text-xs px-1.5 py-0.5">${t.status}</span>
+                                ${IS_ADMIN ? `
+                                    <button class="btn btn-link btn-sm text-danger p-0 ms-1 opacity-75 hover-opacity-100" title="Admin: Delete Topic" onclick="event.stopPropagation(); confirmAdminDeleteThread(${t.id}, '${escapeHtml(t.topic).replace(/'/g, "\\'")}')">
+                                        <i class="bi bi-trash-fill" style="font-size: 11px;"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
                         </div>
                         <small class="text-muted text-xs d-block">${new Date(t.created_at).toLocaleDateString()}</small>
                     </div>
                 `;
             });
-            if (threads.length > 0 && !currentThreadId) {
-                selectThread(threads[0].id, threads[0].topic, threads[0].status);
+            if (threads.length > 0 && (!currentThreadId || !threads.some(th => th.id === currentThreadId))) {
+                selectThread(threads[0].id, threads[0].topic, threads[0].status, threads[0].decision_id || 0);
             }
         } catch (e) {
             console.error(e);
         }
     }
 
-    function selectThread(threadId, topic, status) {
+    function selectThread(threadId, topic, status, threadDecId = 0) {
         currentThreadId = threadId;
         document.getElementById('activeThreadTitle').innerText = topic;
-        document.getElementById('activeThreadSubtitle').innerText = `Decision ID: DEC-${currentDecisionId} • Status: ${status}`;
+        const contextLabel = threadDecId ? `Decision ID: DEC-${threadDecId}` : `Context: Standalone / General Discussion`;
+        document.getElementById('activeThreadSubtitle').innerText = `${contextLabel} • Status: ${status}`;
         document.getElementById('chatThreadAvatar').innerText = topic.substring(0, 2).toUpperCase();
         document.getElementById('threadStatusBtn').innerText = `Status: ${status}`;
         fetchThreadComments(threadId);
@@ -1500,30 +1657,122 @@
 
     function openStartThreadModal() {
         document.getElementById('startThreadTopicInput').value = '';
+        
+        // Populate modal target decision dropdown
+        const select = document.getElementById('modalThreadDecisionSelect');
+        if (select) {
+            select.innerHTML = allDecisionsList.map(d => `<option value="${d.id}" ${d.id === currentDecisionId ? 'selected' : ''}>DEC-${d.id} · ${escapeHtml(d.title)}</option>`).join('');
+        }
+
+        const radioDecision = document.getElementById('threadContextDecision');
+        const radioStandalone = document.getElementById('threadContextStandalone');
+        if (currentDecisionId === 0) {
+            if (radioStandalone) radioStandalone.checked = true;
+        } else {
+            if (radioDecision) radioDecision.checked = true;
+        }
+
+        handleThreadContextRadioChange();
         new bootstrap.Modal(document.getElementById('startThreadModal')).show();
+    }
+
+    function handleThreadContextRadioChange() {
+        const isStandalone = document.getElementById('threadContextStandalone').checked;
+        const wrapper = document.getElementById('threadDecisionSelectWrapper');
+        if (wrapper) {
+            wrapper.style.display = isStandalone ? 'none' : 'block';
+        }
     }
 
     async function submitGlobalThread() {
         const topic = document.getElementById('startThreadTopicInput').value.trim();
-        if (!topic || !currentDecisionId) return;
+        if (!topic) {
+            alert("Please enter a thread topic.");
+            return;
+        }
 
         if (!isCurrentlyOnline) {
             alert("No internet connection. Please reconnect before creating threads.");
             return;
         }
 
+        const isStandalone = document.getElementById('threadContextStandalone').checked;
+        let targetDecId = 0;
+        if (!isStandalone) {
+            targetDecId = parseInt(document.getElementById('modalThreadDecisionSelect').value, 10) || 0;
+        }
+
         try {
-            const res = await fetch(`${API_URL}/decisions/${currentDecisionId}/threads`, {
+            const res = await fetch(`${API_URL}/decisions/${targetDecId}/threads`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ topic: topic, created_by: CURRENT_USER_ID })
+                body: JSON.stringify({
+                    topic: topic,
+                    created_by: CURRENT_USER_ID,
+                    decision_id: targetDecId > 0 ? targetDecId : null
+                })
             });
 
             if (res.ok) {
+                const created = await res.json();
                 bootstrap.Modal.getInstance(document.getElementById('startThreadModal')).hide();
-                loadThreadsForDecision(currentDecisionId);
+                
+                if (targetDecId !== currentDecisionId) {
+                    switchDecision(targetDecId);
+                } else {
+                    await loadThreadsForDecision(currentDecisionId);
+                    selectThread(created.id, created.topic, created.status, created.decision_id || 0);
+                }
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || "Failed to create thread");
             }
-        } catch(e){}
+        } catch (e) {
+            console.error(e);
+            alert("An error occurred while creating the discussion thread.");
+        }
+    }
+
+    function confirmAdminDeleteThread(threadId, topicName = '') {
+        if (!IS_ADMIN) {
+            alert("Access Denied: Only administrators can delete discussion threads.");
+            return;
+        }
+        if (!threadId) return;
+
+        const topic = topicName || (document.getElementById('activeThreadTitle') ? document.getElementById('activeThreadTitle').innerText : 'this topic');
+        if (!confirm(`Are you sure you want to permanently delete the discussion thread "${topic}" and all its messages?\n\nThis action can only be performed by administrators.`)) {
+            return;
+        }
+
+        deleteThreadConfirmed(threadId);
+    }
+
+    async function deleteThreadConfirmed(threadId) {
+        if (!isCurrentlyOnline) {
+            alert("No internet connection. Please reconnect before deleting threads.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/decisions/threads/${threadId}?user_id=${CURRENT_USER_ID}`, {
+                method: "DELETE"
+            });
+
+            if (res.ok) {
+                alert("Discussion thread deleted successfully.");
+                if (currentThreadId === threadId) {
+                    currentThreadId = null;
+                }
+                await loadThreadsForDecision(currentDecisionId);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(err.detail || "Failed to delete thread.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("An error occurred while deleting the thread.");
+        }
     }
 
     function escapeHtml(str) {
