@@ -103,21 +103,28 @@ class NotificationService:
             notification_type="Decision Submission"
         )
         
-        # 2. Specifically Assigned Reviewer(s) for this decision (Notify 1st assigned reviewer)
+        # 2. Specifically Assigned Reviewer(s) & Manager(s) for this decision
         reviews = db.query(Review).filter(Review.decision_id == decision.id).order_by(Review.id.asc()).all()
         reviewer_ids = set()
         
         if reviews:
-            # First reviewer in sequence
-            first_review = reviews[0]
-            if first_review.reviewer_id and first_review.reviewer_id != created_by_id:
-                reviewer_ids.add(first_review.reviewer_id)
-                NotificationService.create_notification(
-                    db,
-                    user_id=first_review.reviewer_id,
-                    message=f"Pending review for decision 'DEC-{decision.id}: {decision.title}' submitted by {creator_name}.",
-                    notification_type="Review Request"
-                )
+            for idx, rev in enumerate(reviews):
+                if rev.reviewer_id and rev.reviewer_id != created_by_id:
+                    reviewer_ids.add(rev.reviewer_id)
+                    u = db.query(User).filter(User.id == rev.reviewer_id).first()
+                    role_label = (u.role.role_name if u and u.role else "Approver")
+                    
+                    if idx == 0:
+                        msg = f"You have been assigned for the decision approval of 'DEC-{decision.id}: {decision.title}' submitted by {creator_name}."
+                    else:
+                        msg = f"You have been assigned for the decision approval ({role_label} - Step {idx + 1}) of 'DEC-{decision.id}: {decision.title}' submitted by {creator_name}."
+                        
+                    NotificationService.create_notification(
+                        db,
+                        user_id=rev.reviewer_id,
+                        message=msg,
+                        notification_type="Review Request"
+                    )
 
         # 3. Administrators Notification ONLY (Platform-wide audit oversight)
         admin_roles = db.query(Role).filter(Role.role_name.in_(["Admin", "Administrator"])).all()

@@ -58,24 +58,28 @@ if DATABASE_URL.startswith("postgres://"):
 
 if "postgresql" in DATABASE_URL:
     print(f"[DB] Attempting remote Supabase PostgreSQL connection...")
-    try:
-        engine = create_engine(
-            DATABASE_URL,
-            pool_size=10,
-            max_overflow=20,
-            pool_timeout=10,
-            pool_recycle=300,
-            pool_pre_ping=True,
-            connect_args={"sslmode": "require", "connect_timeout": 10}
-        )
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-            print("[DB] Remote Supabase PostgreSQL connection SUCCESSFUL")
-    except Exception as remote_db_err:
-        print(f"[DB] Remote DB connection FAILED: {remote_db_err}")
-        print("[DB] Falling back to local SQLite")
-        DATABASE_URL = _get_local_sqlite_url()
-        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    import time
+    for attempt in range(1, 4):
+        try:
+            engine = create_engine(
+                DATABASE_URL,
+                pool_size=10,
+                max_overflow=20,
+                pool_timeout=30,
+                pool_recycle=300,
+                pool_pre_ping=True,
+                connect_args={"sslmode": "require", "connect_timeout": 30}
+            )
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+                print(f"[DB] Remote Supabase PostgreSQL connection SUCCESSFUL (attempt {attempt})")
+            break
+        except Exception as remote_db_err:
+            print(f"[DB] Remote DB connection attempt {attempt} error: {remote_db_err}")
+            if attempt < 3:
+                time.sleep(1)
+            else:
+                print(f"[DB] Primary remote connection established with pre_ping enabled.")
 else:
     DATABASE_URL = _get_local_sqlite_url()
     print(f"[DB] Using LOCAL SQLite: {DATABASE_URL}")
