@@ -8,13 +8,16 @@
         <div>
             <h3 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
                 <i data-lucide="archive" class="text-primary" style="width: 26px; height: 26px;"></i>
-                Backup Management
+                Backup & Restore Management
             </h3>
-            <p class="text-muted mb-0" style="font-size: 13.5px;">Create full system snapshots, download platform archives, and inspect backed-up data records.</p>
+            <p class="text-muted mb-0" style="font-size: 13.5px;">Create full system snapshots, restore backed-up records into live normal data, and inspect platform archives.</p>
         </div>
         <div class="d-flex align-items-center gap-2">
-            <button class="btn btn-outline-secondary px-3 py-2 d-inline-flex align-items-center gap-1.5 fw-semibold" style="font-size: 13px;" onclick="loadBackupHistory()">
+            <button class="btn btn-outline-secondary px-3 py-2 d-inline-flex align-items-center gap-1.5 fw-semibold" style="font-size: 13px; border-radius: 8px;" onclick="loadBackupHistory()">
                 <i data-lucide="refresh-cw" style="width: 15px; height: 15px;"></i> Refresh
+            </button>
+            <button class="btn btn-outline-primary px-3 py-2 d-inline-flex align-items-center gap-1.5 fw-semibold" style="font-size: 13px; border-radius: 8px;" onclick="openUploadRestoreModal()">
+                <i data-lucide="upload-cloud" style="width: 16px; height: 16px;"></i> Upload & Restore
             </button>
             <button class="btn btn-primary px-3.5 py-2 d-inline-flex align-items-center gap-2 fw-bold shadow-sm" style="font-size: 13px; border-radius: 8px;" id="btnCreateBackup" onclick="runAdminBackup()">
                 <i data-lucide="database-backup" style="width: 16px; height: 16px;"></i> Create Full Backup
@@ -54,11 +57,11 @@
             <div class="card border-0 shadow-sm p-3" style="border-radius: 12px; background: #FFFFFF;">
                 <div class="d-flex align-items-center gap-3">
                     <div style="width: 44px; height: 44px; border-radius: 10px; background: #FAF5FF; color: #9333EA; display: flex; align-items: center; justify-content: center;">
-                        <i data-lucide="shield-check" style="width: 22px; height: 22px;"></i>
+                        <i data-lucide="rotate-ccw" style="width: 22px; height: 22px;"></i>
                     </div>
                     <div>
-                        <div class="text-muted small fw-semibold">Snapshot Scope</div>
-                        <div class="fw-bold text-dark" style="font-size: 15px;">Full Platform Snapshot (17 Tables)</div>
+                        <div class="text-muted small fw-semibold">Restore Capability</div>
+                        <div class="fw-bold text-dark" style="font-size: 15px;">Full Platform Live Restore (20 Tables)</div>
                     </div>
                 </div>
             </div>
@@ -83,11 +86,11 @@
                 <thead class="table-light text-secondary" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">
                     <tr>
                         <th class="ps-4" width="60">ID</th>
-                        <th width="320">Archive Name</th>
-                        <th width="170">Created At</th>
-                        <th width="100">Size</th>
+                        <th width="300">Archive Name</th>
+                        <th width="160">Created At</th>
+                        <th width="90">Size</th>
                         <th>Data Scope & Entities</th>
-                        <th class="text-end pe-4" width="220">Actions</th>
+                        <th class="text-end pe-4" width="280">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="backupHistoryTableBody">
@@ -248,11 +251,16 @@
 
             </div>
 
-            <div class="modal-footer bg-light border-top py-2.5 px-4 d-flex justify-content-between">
+            <div class="modal-footer bg-light border-top py-2.5 px-4 d-flex justify-content-between align-items-center">
                 <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 fw-semibold" id="btnModalDownloadBackup" onclick="downloadActiveModalBackup()">
-                    <i data-lucide="download" style="width: 14px; height: 14px;"></i> Download This Backup (.json)
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 fw-semibold" id="btnModalDownloadBackup" onclick="downloadActiveModalBackup()">
+                        <i data-lucide="download" style="width: 14px; height: 14px;"></i> Download (.json)
+                    </button>
+                    <button type="button" class="btn btn-success text-white btn-sm px-3 d-inline-flex align-items-center gap-1.5 fw-bold shadow-sm" onclick="confirmRestoreActiveModalBackup()">
+                        <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Restore This Snapshot
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -322,6 +330,110 @@
     </div>
 </div>
 
+<!-- =============================================================
+     Upload & Restore Backup Modal
+     ============================================================= -->
+<div class="modal fade" id="uploadRestoreModal" tabindex="-1" aria-labelledby="uploadRestoreModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header border-bottom py-3 px-4 bg-light">
+                <div class="d-flex align-items-center gap-2.5">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: #ECFDF5; color: #059669; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="upload-cloud" style="width: 20px; height: 20px;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark mb-0" id="uploadRestoreModalTitle" style="font-size: 16px;">Upload & Restore Backup</h5>
+                        <span class="text-muted small" style="font-size: 12px;">Select an exported JSON backup file to restore into live platform tables</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4 bg-white">
+                <!-- Dropzone Box -->
+                <div class="p-4 text-center border-2 border-dashed rounded-3 mb-3" id="restoreDropZone" style="border-color: #CBD5E1; background: #F8FAFC; cursor: pointer; transition: all 0.2s ease;">
+                    <input type="file" id="restoreFileInput" accept=".json,application/json" style="display: none;" onchange="handleRestoreFileChange(event)">
+                    <div class="mb-2">
+                        <i data-lucide="file-json" style="width: 42px; height: 42px; color: #4F46E5;"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Click to browse or drag and drop your backup JSON file</h6>
+                    <p class="text-muted small mb-0">Supports full EDRP platform backup archive files (.json)</p>
+                </div>
+
+                <!-- File Summary Card (hidden until file parsed) -->
+                <div id="restoreFileSummaryCard" class="card border rounded-3 p-3 bg-light mb-3" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2 py-1" id="restorePreviewFilename">backup.json</span>
+                            <span class="text-muted small" id="restorePreviewFilesize">— KB</span>
+                        </div>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle fw-bold" id="restoreValidBadge">Valid Archive</span>
+                    </div>
+                    <div class="small text-muted mb-2" id="restorePreviewMeta">
+                        Platform: <strong class="text-dark" id="restorePreviewPlatform">EDRP</strong> • Exported At: <strong class="text-dark" id="restorePreviewDate">—</strong>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1.5" id="restorePreviewChips">
+                        <!-- Entity count badges -->
+                    </div>
+                </div>
+
+                <!-- Info Alert -->
+                <div class="alert alert-warning py-2.5 px-3 d-flex align-items-start gap-2 mb-0" style="font-size: 12.5px; border-radius: 8px;">
+                    <i data-lucide="alert-triangle" style="width: 18px; height: 18px;" class="text-warning-emphasis flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <strong>Safe Intelligent Merge:</strong> Restoring updates existing records with matching primary keys and adds missing records as active normal data. All foreign key relationships are restored in strict dependency order.
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer bg-light border-top py-2.5 px-4 d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success text-white btn-sm px-4 d-inline-flex align-items-center gap-1.5 fw-bold shadow-sm" id="btnExecuteUploadRestore" disabled onclick="executeUploadRestore()">
+                    <i data-lucide="rotate-ccw" style="width: 15px; height: 15px;"></i> Restore Platform Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================================
+     Confirm Restore Action Modal
+     ============================================================= -->
+<div class="modal fade" id="confirmRestoreActionModal" tabindex="-1" aria-labelledby="confirmRestoreActionModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header border-bottom py-3 px-4 bg-light">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width: 34px; height: 34px; border-radius: 8px; background: #DCFCE7; color: #16A34A; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="rotate-ccw" style="width: 18px; height: 18px;"></i>
+                    </div>
+                    <h5 class="modal-title fw-bold text-dark mb-0" id="confirmRestoreActionModalTitle" style="font-size: 16px;">Confirm Restore Operation</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-white">
+                <p class="text-dark mb-3" style="font-size: 13.5px;">
+                    Are you sure you want to restore the selected snapshot into live platform tables?
+                </p>
+                <div class="p-3 bg-light rounded-3 border mb-3">
+                    <div class="fw-bold text-dark mb-1 font-monospace" id="confirmRestoreArchiveName">edrp_backup.json</div>
+                    <div class="text-muted small" id="confirmRestoreArchiveDate">Created: —</div>
+                    <div class="mt-2 d-flex flex-wrap gap-1" id="confirmRestoreEntityChips"></div>
+                </div>
+                <p class="text-muted small mb-0">
+                    <i data-lucide="shield-alert" style="width: 14px; height: 14px;" class="me-1 text-primary"></i>
+                    Existing records will be updated and missing records added as normal active data.
+                </p>
+            </div>
+            <div class="modal-footer bg-light border-top py-2.5 px-4 d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success text-white btn-sm px-4 d-inline-flex align-items-center gap-1.5 fw-bold shadow-sm" id="btnDoConfirmRestore" onclick="executeConfirmedRestore()">
+                    <i data-lucide="check" style="width: 15px; height: 15px;"></i> Yes, Restore Platform Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <style>
 .data-chip {
@@ -355,6 +467,10 @@
     color: #64748B;
     margin-top: 3px;
 }
+#restoreDropZone:hover {
+    border-color: #4F46E5 !important;
+    background: #EEF2FF !important;
+}
 </style>
 
 <script>
@@ -362,11 +478,246 @@
     const CURRENT_USER_ID = parseInt("{{ session.get('user_id') or 48 }}", 10);
     let allBackupRecords = [];
     let currentInspectedBackup = null;
-
+    let pendingRestoreBackupId = null;
+    let pendingUploadedPayload = null;
 
     document.addEventListener("DOMContentLoaded", () => {
         loadBackupHistory();
+        setupDropZone();
     });
+
+    function setupDropZone() {
+        const dropZone = document.getElementById("restoreDropZone");
+        const fileInput = document.getElementById("restoreFileInput");
+
+        if (!dropZone || !fileInput) return;
+
+        dropZone.addEventListener("click", () => fileInput.click());
+
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "#4F46E5";
+            dropZone.style.background = "#EEF2FF";
+        });
+
+        dropZone.addEventListener("dragleave", () => {
+            dropZone.style.borderColor = "#CBD5E1";
+            dropZone.style.background = "#F8FAFC";
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = "#CBD5E1";
+            dropZone.style.background = "#F8FAFC";
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleRestoreFile(e.dataTransfer.files[0]);
+            }
+        });
+    }
+
+    function handleRestoreFileChange(event) {
+        if (event.target.files && event.target.files.length > 0) {
+            handleRestoreFile(event.target.files[0]);
+        }
+    }
+
+    function handleRestoreFile(file) {
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                pendingUploadedPayload = parsed;
+
+                const data = parsed.data || parsed;
+                const summaryCard = document.getElementById("restoreFileSummaryCard");
+                const btnExecute = document.getElementById("btnExecuteUploadRestore");
+
+                document.getElementById("restorePreviewFilename").innerText = file.name;
+                document.getElementById("restorePreviewFilesize").innerText = `${(file.size / 1024).toFixed(1)} KB`;
+                document.getElementById("restorePreviewPlatform").innerText = parsed.platform || "EDRP System";
+                document.getElementById("restorePreviewDate").innerText = parsed.exported_at || "Recent";
+
+                const chips = [
+                    data.users ? `<span class="data-chip"><i data-lucide="users" style="width:11px;height:11px;"></i> ${data.users.length} Users</span>` : '',
+                    data.teams ? `<span class="data-chip"><i data-lucide="network" style="width:11px;height:11px;"></i> ${data.teams.length} Teams</span>` : '',
+                    data.decisions ? `<span class="data-chip"><i data-lucide="file-check-2" style="width:11px;height:11px;"></i> ${data.decisions.length} Decisions</span>` : '',
+                    data.reviews ? `<span class="data-chip"><i data-lucide="check-square" style="width:11px;height:11px;"></i> ${data.reviews.length} Reviews</span>` : '',
+                    data.discussion_threads ? `<span class="data-chip"><i data-lucide="message-square" style="width:11px;height:11px;"></i> ${data.discussion_threads.length} Threads</span>` : '',
+                    data.comments ? `<span class="data-chip"><i data-lucide="message-circle" style="width:11px;height:11px;"></i> ${data.comments.length} Comments</span>` : '',
+                    data.activity_logs ? `<span class="data-chip"><i data-lucide="activity" style="width:11px;height:11px;"></i> ${data.activity_logs.length} Logs</span>` : ''
+                ].filter(Boolean).join(" ");
+
+                document.getElementById("restorePreviewChips").innerHTML = chips || '<span class="text-muted small">Full table dataset verified</span>';
+                summaryCard.style.display = "block";
+                btnExecute.disabled = false;
+
+                if (window.lucide) lucide.createIcons();
+            } catch (err) {
+                alert("Failed to parse JSON file: " + err.message);
+                pendingUploadedPayload = null;
+                document.getElementById("restoreFileSummaryCard").style.display = "none";
+                document.getElementById("btnExecuteUploadRestore").disabled = true;
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function openUploadRestoreModal() {
+        pendingUploadedPayload = null;
+        document.getElementById("restoreFileInput").value = "";
+        document.getElementById("restoreFileSummaryCard").style.display = "none";
+        document.getElementById("btnExecuteUploadRestore").disabled = true;
+
+        const modalEl = document.getElementById('uploadRestoreModal');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        if (window.lucide) lucide.createIcons();
+    }
+
+    async function executeUploadRestore() {
+        if (!pendingUploadedPayload) return;
+
+        const btn = document.getElementById("btnExecuteUploadRestore");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Restoring Data...';
+
+        const alertBox = document.getElementById("backupAlert");
+        alertBox.innerHTML = '<div class="alert alert-info py-2 px-3 d-flex align-items-center gap-2" style="font-size: 13px;"><div class="spinner-border spinner-border-sm"></div> Restoring data into database tables...</div>';
+
+        try {
+            const response = await fetch(`${API_URL}/settings/restore-data?user_id=${CURRENT_USER_ID}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: CURRENT_USER_ID,
+                    backup_data: pendingUploadedPayload
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.detail || "Restoration failed.");
+            }
+
+            const modalEl = document.getElementById('uploadRestoreModal');
+            bootstrap.Modal.getInstance(modalEl).hide();
+
+            const stats = result.restored_stats || {};
+            const breakdown = Object.entries(stats).map(([tbl, cnt]) => `<strong>${cnt}</strong> ${tbl}`).join(", ");
+
+            alertBox.innerHTML = `
+                <div class="alert alert-success py-2.5 px-3 d-flex align-items-start gap-2 shadow-sm" style="font-size: 13px; border-radius: 8px;">
+                    <i data-lucide="check-circle" style="width: 18px; height: 18px;" class="text-success flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <div class="fw-bold">Platform Data Restored Successfully!</div>
+                        <div class="small mt-0.5">${result.message || 'Records restored into live system tables.'}</div>
+                        ${breakdown ? `<div class="small mt-1 text-muted">Breakdown: ${breakdown}</div>` : ''}
+                    </div>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+
+            await loadBackupHistory();
+        } catch (err) {
+            alertBox.innerHTML = `<div class="alert alert-danger py-2 px-3" style="font-size: 13px;">${err.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="rotate-ccw" style="width: 15px; height: 15px;"></i> Restore Platform Data';
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+
+    function confirmRestoreFromBackupId(backupId) {
+        const item = allBackupRecords.find(b => b.id === backupId);
+        if (!item) return;
+
+        pendingRestoreBackupId = backupId;
+        const stats = item.stats || {};
+
+        document.getElementById("confirmRestoreArchiveName").innerText = item.backup_name;
+        document.getElementById("confirmRestoreArchiveDate").innerText = `Snapshot Created: ${item.created_at || '—'} | Size: ${item.size_kb || 0} KB`;
+
+        const chips = [
+            stats.users ? `<span class="data-chip"><i data-lucide="users" style="width:11px;height:11px;"></i> ${stats.users} Users</span>` : '',
+            stats.teams ? `<span class="data-chip"><i data-lucide="network" style="width:11px;height:11px;"></i> ${stats.teams} Teams</span>` : '',
+            stats.decisions ? `<span class="data-chip"><i data-lucide="file-check-2" style="width:11px;height:11px;"></i> ${stats.decisions} Decisions</span>` : '',
+            stats.reviews ? `<span class="data-chip"><i data-lucide="check-square" style="width:11px;height:11px;"></i> ${stats.reviews} Reviews</span>` : '',
+            stats.discussion_threads ? `<span class="data-chip"><i data-lucide="message-square" style="width:11px;height:11px;"></i> ${stats.discussion_threads} Threads</span>` : '',
+            stats.activity_logs ? `<span class="data-chip"><i data-lucide="activity" style="width:11px;height:11px;"></i> ${stats.activity_logs} Logs</span>` : ''
+        ].filter(Boolean).join(" ");
+
+        document.getElementById("confirmRestoreEntityChips").innerHTML = chips || '<span class="text-muted small">Full database snapshot</span>';
+
+        const modalEl = document.getElementById('confirmRestoreActionModal');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function confirmRestoreActiveModalBackup() {
+        if (!currentInspectedBackup) return;
+        
+        // Hide inspect modal first
+        const inspectModalEl = document.getElementById('inspectBackupModal');
+        const inspectModal = bootstrap.Modal.getInstance(inspectModalEl);
+        if (inspectModal) inspectModal.hide();
+
+        confirmRestoreFromBackupId(currentInspectedBackup.id);
+    }
+
+    async function executeConfirmedRestore() {
+        if (!pendingRestoreBackupId) return;
+
+        const btn = document.getElementById("btnDoConfirmRestore");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Restoring...';
+
+        const alertBox = document.getElementById("backupAlert");
+        alertBox.innerHTML = '<div class="alert alert-info py-2 px-3 d-flex align-items-center gap-2" style="font-size: 13px;"><div class="spinner-border spinner-border-sm"></div> Restoring snapshot data into live platform tables...</div>';
+
+        try {
+            const response = await fetch(`${API_URL}/settings/restore-backup/${pendingRestoreBackupId}?user_id=${CURRENT_USER_ID}`, {
+                method: "POST"
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.detail || "Restoration failed.");
+            }
+
+            const modalEl = document.getElementById('confirmRestoreActionModal');
+            bootstrap.Modal.getInstance(modalEl).hide();
+
+            const stats = result.restored_stats || {};
+            const breakdown = Object.entries(stats).map(([tbl, cnt]) => `<strong>${cnt}</strong> ${tbl}`).join(", ");
+
+            alertBox.innerHTML = `
+                <div class="alert alert-success py-2.5 px-3 d-flex align-items-start gap-2 shadow-sm" style="font-size: 13px; border-radius: 8px;">
+                    <i data-lucide="check-circle" style="width: 18px; height: 18px;" class="text-success flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <div class="fw-bold">Platform Data Restored Successfully!</div>
+                        <div class="small mt-0.5">${result.message || 'Records restored into live system tables.'}</div>
+                        ${breakdown ? `<div class="small mt-1 text-muted">Breakdown: ${breakdown}</div>` : ''}
+                    </div>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+
+            await loadBackupHistory();
+        } catch (err) {
+            alertBox.innerHTML = `<div class="alert alert-danger py-2 px-3" style="font-size: 13px;">${err.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="check" style="width: 15px; height: 15px;"></i> Yes, Restore Platform Data';
+            pendingRestoreBackupId = null;
+            if (window.lucide) lucide.createIcons();
+        }
+    }
 
     async function runAdminBackup() {
         const alertBox = document.getElementById("backupAlert");
@@ -472,11 +823,14 @@
                         </div>
                     </td>
                     <td class="text-end pe-4" style="white-space: nowrap;">
-                        <div class="d-inline-flex gap-1.5">
+                        <div class="d-inline-flex gap-1.5 align-items-center">
                             <button class="btn btn-sm btn-outline-primary px-2.5 py-1 d-inline-flex align-items-center gap-1 fw-semibold" style="font-size: 11.5px;" onclick="openInspectBackupModal(${item.id})" title="Inspect Backed Up Data">
-                                <i data-lucide="search" style="width: 12.5px; height: 12.5px;"></i> Inspect Data
+                                <i data-lucide="search" style="width: 12.5px; height: 12.5px;"></i> Inspect
                             </button>
-                            <button class="btn btn-sm btn-outline-secondary px-2.5 py-1 d-inline-flex align-items-center gap-1" style="font-size: 11.5px;" onclick="downloadBackupRecord(${item.id})" title="Download JSON File">
+                            <button class="btn btn-sm btn-success text-white px-2.5 py-1 d-inline-flex align-items-center gap-1 fw-bold shadow-sm" style="font-size: 11.5px;" onclick="confirmRestoreFromBackupId(${item.id})" title="Restore Data to Database">
+                                <i data-lucide="rotate-ccw" style="width: 12.5px; height: 12.5px;"></i> Restore
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary px-2 py-1 d-inline-flex align-items-center gap-1" style="font-size: 11.5px;" onclick="downloadBackupRecord(${item.id})" title="Download JSON File">
                                 <i data-lucide="download" style="width: 12.5px; height: 12.5px;"></i>
                             </button>
                         </div>
@@ -685,4 +1039,3 @@
     }
 </script>
 {% endblock %}
-

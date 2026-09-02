@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from datetime import datetime
 import json
 import threading
@@ -13,7 +14,6 @@ from app.models.review import Review
 from app.models.activity_log import ActivityLog
 from app.models.role import Role
 from app.models.team import Team
-from app.models.user import VerificationCode
 from app.models.alternative import Alternative
 from app.models.attachment import Attachment
 from app.models.comment import Comment, DiscussionThread
@@ -23,6 +23,7 @@ from app.models.meeting_note import MeetingNote
 from app.models.notification import Notification
 from app.models.replay import Replay
 from app.models.support_ticket import SupportTicket
+from app.models.internal_email import InternalEmail
 from app.schemas.settings_schema import (
     SystemSettingUpdate, SystemSettingResponse, ChangePasswordRequest, DeleteAccountRequest, TestEmailRequest
 )
@@ -338,6 +339,166 @@ def _serialize_rows(rows):
     return serialized
 
 
+def _parse_column_val(col, val):
+    if val is None:
+        return None
+    from datetime import datetime, date
+    from sqlalchemy import DateTime, Date, Integer, Float, Numeric, Boolean
+    
+    col_type = col.type
+    if isinstance(col_type, (DateTime, Date)):
+        if isinstance(val, (datetime, date)):
+            return val
+        if isinstance(val, str):
+            val_clean = val.strip().replace('Z', '+00:00')
+            try:
+                return datetime.fromisoformat(val_clean)
+            except Exception:
+                pass
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d", "%d/%m/%Y"):
+                try:
+                    return datetime.strptime(val_clean, fmt)
+                except Exception:
+                    pass
+            return None
+    elif isinstance(col_type, Boolean):
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, (int, float)):
+            return bool(val)
+        if isinstance(val, str):
+            return val.lower() in ("true", "1", "yes", "y", "t")
+        return bool(val)
+    elif isinstance(col_type, Integer):
+        try:
+            return int(val)
+        except Exception:
+            return None
+    elif isinstance(col_type, (Float, Numeric)):
+        try:
+            return float(val)
+        except Exception:
+            return None
+    return val
+
+
+def _restore_backup_data(db: Session, backup_payload: dict, admin_user: User) -> dict:
+    if not isinstance(backup_payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid backup payload format.")
+    
+    data_dict = backup_payload.get("data", backup_payload)
+    if not isinstance(data_dict, dict):
+        raise HTTPException(status_code=400, detail="Backup data must contain a dictionary of table records.")
+
+    RESTORE_TABLE_DEFS = [
+        ("roles", Role, "id"),
+        ("teams", Team, "id"),
+        ("categories", Category, "id"),
+        ("users", User, "id"),
+        ("system_settings", SystemSetting, "id"),
+        ("decisions", Decision, "id"),
+        ("alternatives", Alternative, "id"),
+        ("reviews", Review, "id"),
+        ("replays", Replay, "id"),
+        ("discussion_threads", DiscussionThread, "id"),
+        ("meeting_notes", MeetingNote, "id"),
+        ("comments", Comment, "id"),
+        ("attachments", Attachment, "id"),
+        ("decision_versions", DecisionVersion, "id"),
+        ("verification_codes", VerificationCode, "id"),
+        ("email_verifications", EmailVerification, "email"),
+        ("activity_logs", ActivityLog, "id"),
+        ("notifications", Notification, "id"),
+        ("support_tickets", SupportTicket, "id"),
+        ("internal_emails", InternalEmail, "id"),
+    ]
+
+    restored_stats = {}
+    
+    for table_name, model_class, pk_name in RESTORE_TABLE_DEFS:
+        rows = data_dict.get(table_name)
+        if not rows or not isinstance(rows, list):
+            continue
+        
+        pk_vals = [r.get(pk_name) for r in rows if isinstance(r, dict) and r.get(pk_name) is not None]
+        existing_map = {}
+        if pk_vals:
+            try:
+                found = db.query(model_class).filter(getattr(model_class, pk_name).in_(pk_vals)).all()
+                existing_map = {getattr(f, pk_name): f for f in found}
+            except Exception:
+                existing_map = {}
+        
+        count = 0
+        for row_dict in rows:
+            if not isinstance(row_dict, dict):
+                continue
+            
+            pk_val = row_dict.get(pk_name)
+            existing_record = existing_map.get(pk_val)
+            
+            valid_fields = {}
+            for col in model_class.__table__.columns:
+                if col.name in row_dict:
+                    val = row_dict[col.name]
+                    valid_fields[col.name] = _parse_column_val(col, val)
+            
+            try:
+                if existing_record:
+                    for k, v in valid_fields.items():
+                        setattr(existing_record, k, v)
+                else:
+                    new_record = model_class(**valid_fields)
+                    db.add(new_record)
+                count += 1
+            except Exception as e:
+                print(f"[RESTORE ROW NOTE] Failed on {table_name} pk={pk_val}: {e}")
+                continue
+                
+        if count > 0:
+            restored_stats[table_name] = count
+
+    try:
+        db.commit()
+    except Exception as commit_err:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database commit failed during restore: {str(commit_err)}")
+
+    # Update sequence for PostgreSQL if applicable
+    try:
+        engine_str = str(db.get_bind().engine.url).lower()
+        if "postgres" in engine_str:
+            for table_name, model_class, pk_name in RESTORE_TABLE_DEFS:
+                if pk_name == "id":
+                    try:
+                        db.execute(text(f"SELECT setval(pg_get_serial_sequence('{model_class.__tablename__}', 'id'), coalesce(max(id), 1)) FROM {model_class.__tablename__};"))
+                        db.commit()
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    total_records = sum(restored_stats.values())
+    
+    # Add audit log entry
+    try:
+        act = ActivityLog(
+            user_id=admin_user.id,
+            action="Backup Data Restored",
+            details=f"Admin {admin_user.full_name} restored {total_records} records across {len(restored_stats)} tables into live system data."
+        )
+        db.add(act)
+        db.commit()
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "message": f"Successfully restored {total_records} records across {len(restored_stats)} tables into normal platform data.",
+        "restored_stats": restored_stats,
+        "total_records": total_records
+    }
+
 
 @router.get("/backup-data/{user_id}")
 @router.get("/backup-data")
@@ -354,7 +515,6 @@ def backup_all_data(user_id: int = None, db: Session = Depends(get_db)):
     if role_name not in {"administrator", "admin"} and "admin" not in role_name and user.role_id != 1:
         raise HTTPException(status_code=403, detail="Only administrators can perform a full backup.")
 
-
     backup_payload = {
         "platform": "Expert Decision Replay Platform (EDRP)",
         "backup_type": "full",
@@ -364,9 +524,9 @@ def backup_all_data(user_id: int = None, db: Session = Depends(get_db)):
         "data": {
             "roles": _serialize_rows(db.query(Role).all()),
             "teams": _serialize_rows(db.query(Team).all()),
+            "categories": _serialize_rows(db.query(Category).all()),
             "users": _serialize_rows(db.query(User).all()),
-            "verification_codes": _serialize_rows(db.query(VerificationCode).all()),
-            "email_verifications": _serialize_rows(db.query(EmailVerification).all()),
+            "system_settings": _serialize_rows(db.query(SystemSetting).all()),
             "decisions": _serialize_rows(db.query(Decision).all()),
             "reviews": _serialize_rows(db.query(Review).all()),
             "replays": _serialize_rows(db.query(Replay).all()),
@@ -376,9 +536,12 @@ def backup_all_data(user_id: int = None, db: Session = Depends(get_db)):
             "meeting_notes": _serialize_rows(db.query(MeetingNote).all()),
             "attachments": _serialize_rows(db.query(Attachment).all()),
             "decision_versions": _serialize_rows(db.query(DecisionVersion).all()),
+            "verification_codes": _serialize_rows(db.query(VerificationCode).all()),
+            "email_verifications": _serialize_rows(db.query(EmailVerification).all()),
             "activity_logs": _serialize_rows(db.query(ActivityLog).all()),
             "notifications": _serialize_rows(db.query(Notification).all()),
-            "support_tickets": _serialize_rows(db.query(SupportTicket).all())
+            "support_tickets": _serialize_rows(db.query(SupportTicket).all()),
+            "internal_emails": _serialize_rows(db.query(InternalEmail).all())
         }
     }
 
@@ -414,7 +577,6 @@ def get_backup_history(user_id: int = None, db: Session = Depends(get_db)):
     if role_name not in {"administrator", "admin"} and "admin" not in role_name and user.role_id != 1:
         raise HTTPException(status_code=403, detail="Only administrators can view backup history.")
 
-
     records = db.query(BackupRecord).order_by(BackupRecord.id.desc()).all()
     results = []
     for record in records:
@@ -440,6 +602,74 @@ def get_backup_history(user_id: int = None, db: Session = Depends(get_db)):
             "preview": parsed
         })
     return results
+
+
+@router.post("/restore-backup/{backup_id}")
+def restore_backup_by_id(backup_id: int, user_id: int = None, db: Session = Depends(get_db)):
+    admin_user = None
+    if user_id:
+        admin_user = db.query(User).filter(User.id == user_id).first()
+    if not admin_user:
+        admin_user = db.query(User).filter(User.role_id == 1, User.is_active == True).first() or db.query(User).first()
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="Admin user not found.")
+
+    role_name = (admin_user.role.role_name if admin_user.role else "").strip().lower()
+    if role_name not in {"administrator", "admin"} and "admin" not in role_name and admin_user.role_id != 1:
+        raise HTTPException(status_code=403, detail="Only administrators can restore backup data.")
+
+    record = db.query(BackupRecord).filter(BackupRecord.id == backup_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Backup record not found.")
+
+    try:
+        backup_payload = json.loads(record.backup_payload)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Corrupted backup payload in record.")
+
+    return _restore_backup_data(db, backup_payload, admin_user)
+
+
+@router.post("/restore-data")
+def restore_backup_json(payload: dict = Body(...), user_id: int = None, db: Session = Depends(get_db)):
+    admin_user = None
+    uid = payload.get("user_id") or user_id
+    if uid:
+        admin_user = db.query(User).filter(User.id == int(uid)).first()
+    if not admin_user:
+        admin_user = db.query(User).filter(User.role_id == 1, User.is_active == True).first() or db.query(User).first()
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="Admin user not found.")
+
+    role_name = (admin_user.role.role_name if admin_user.role else "").strip().lower()
+    if role_name not in {"administrator", "admin"} and "admin" not in role_name and admin_user.role_id != 1:
+        raise HTTPException(status_code=403, detail="Only administrators can restore backup data.")
+
+    backup_content = payload.get("backup_data", payload)
+    return _restore_backup_data(db, backup_content, admin_user)
+
+
+@router.post("/restore-upload")
+async def restore_backup_file(file: UploadFile = File(...), user_id: int = None, db: Session = Depends(get_db)):
+    admin_user = None
+    if user_id:
+        admin_user = db.query(User).filter(User.id == user_id).first()
+    if not admin_user:
+        admin_user = db.query(User).filter(User.role_id == 1, User.is_active == True).first() or db.query(User).first()
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="Admin user not found.")
+
+    role_name = (admin_user.role.role_name if admin_user.role else "").strip().lower()
+    if role_name not in {"administrator", "admin"} and "admin" not in role_name and admin_user.role_id != 1:
+        raise HTTPException(status_code=403, detail="Only administrators can restore backup data.")
+
+    try:
+        content = await file.read()
+        backup_payload = json.loads(content.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON backup file: {str(e)}")
+
+    return _restore_backup_data(db, backup_payload, admin_user)
 
 
 @router.post("/test-email")
