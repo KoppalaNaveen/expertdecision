@@ -634,6 +634,7 @@ function updateSelectModeUI() {
     const toggleBtn = document.getElementById("selectDecisionsToDeleteBtn");
     const btnText = document.getElementById("selectDecisionsBtnText");
     const selectAllTh = document.querySelectorAll(".selection-col");
+    const headerDeleteBtn = document.getElementById("deleteSelectedHeaderBtn");
 
     if (isSelectModeActive) {
         if (actionBar) {
@@ -660,6 +661,10 @@ function updateSelectModeUI() {
         if (btnText) {
             btnText.innerText = "Select decisions to delete";
         }
+        if (headerDeleteBtn) {
+            headerDeleteBtn.classList.remove("d-flex");
+            headerDeleteBtn.classList.add("d-none");
+        }
         selectAllTh.forEach(el => el.classList.add("d-none"));
     }
     updateSelectedCountUI();
@@ -668,6 +673,8 @@ function updateSelectModeUI() {
 function updateSelectedCountUI() {
     const countBadge = document.getElementById("selectedDecisionsCountBadge");
     const deleteBtn = document.getElementById("confirmDeleteSelectedBtn");
+    const headerDeleteBtn = document.getElementById("deleteSelectedHeaderBtn");
+    const headerCountBadge = document.getElementById("headerSelectedCountBadge");
     const count = selectedDecisionIds.size;
 
     if (countBadge) {
@@ -676,6 +683,19 @@ function updateSelectedCountUI() {
     if (deleteBtn) {
         deleteBtn.disabled = count === 0;
         deleteBtn.innerHTML = `<i class="bi bi-trash3-fill"></i> Delete Selected (${count})`;
+    }
+
+    if (headerDeleteBtn) {
+        if (isSelectModeActive && count > 0) {
+            headerDeleteBtn.classList.remove("d-none");
+            headerDeleteBtn.classList.add("d-flex");
+            if (headerCountBadge) {
+                headerCountBadge.innerText = count;
+            }
+        } else {
+            headerDeleteBtn.classList.remove("d-flex");
+            headerDeleteBtn.classList.add("d-none");
+        }
     }
 
     // Update Select All Checkbox state
