@@ -55,8 +55,18 @@ class UserService:
     @staticmethod
     def _find_user_by_email(db: Session, raw_email: str):
         clean_email = (raw_email or "").strip().lower()
+        from app.core.security import hash_email
+        secret_email = hash_email(clean_email)
         hashed_email = hashlib.sha256(clean_email.encode('utf-8')).hexdigest() if '@' in clean_email else clean_email
-        user = db.query(User).filter((User.email == clean_email) | (User.email == hashed_email) | (User.email_hash == clean_email) | (User.email_hash == hashed_email)).first()
+        user = db.query(User).filter(
+            (User.email == clean_email) | 
+            (User.email == secret_email) |
+            (User.email == hashed_email) | 
+            (User.email_hash == clean_email) | 
+            (User.email_hash == secret_email) |
+            (User.email_hash == hashed_email) |
+            (User.email_original == clean_email)
+        ).first()
         return user
 
     @staticmethod

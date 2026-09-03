@@ -13,11 +13,15 @@ class UserRepository:
         clean_email = email.strip().lower()
         import hashlib
         from sqlalchemy import func
-        email_hash = hashlib.sha256(clean_email.encode('utf-8')).hexdigest() if '@' in clean_email else clean_email
+        from app.core.security import hash_email
+        secret_email_hash = hash_email(clean_email)
+        standard_email_hash = hashlib.sha256(clean_email.encode('utf-8')).hexdigest() if '@' in clean_email else clean_email
         return db.query(User).filter(
-            (func.lower(User.email) == email_hash) | 
+            (func.lower(User.email) == secret_email_hash) |
+            (func.lower(User.email) == standard_email_hash) | 
             (func.lower(User.email) == clean_email) | 
-            (func.lower(User.email_hash) == email_hash) | 
+            (func.lower(User.email_hash) == secret_email_hash) |
+            (func.lower(User.email_hash) == standard_email_hash) | 
             (func.lower(User.email_hash) == clean_email) |
             (func.lower(User.email_original) == clean_email)
         ).first()
@@ -35,9 +39,9 @@ class UserRepository:
 
     @staticmethod
     def create_user(db: Session, user: UserRegister, hashed_password: str):
-        import hashlib
+        from app.core.security import hash_email
         clean_email = (user.email or "").strip().lower()
-        email_hash = hashlib.sha256(clean_email.encode('utf-8')).hexdigest() if '@' in clean_email else clean_email
+        email_hash = hash_email(clean_email) if clean_email else ""
         new_user = User(
             full_name=user.full_name,
             email=email_hash,
@@ -61,9 +65,9 @@ class UserRepository:
     @staticmethod
     def create_pending_user(db: Session, email: str, full_name: str, hashed_password: str, employee_id: str, role_id: int, team_id: int = 1, designation: str = None, phone: str = None):
         from datetime import datetime
-        import hashlib
+        from app.core.security import hash_email
         clean_email = (email or "").strip().lower()
-        email_hash = hashlib.sha256(clean_email.encode('utf-8')).hexdigest() if '@' in clean_email else clean_email
+        email_hash = hash_email(clean_email) if clean_email else ""
         new_user = User(
             full_name=full_name,
             email=email_hash,

@@ -22,6 +22,7 @@ def _find_env_file():
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///edrp.db"
     SECRET_KEY: str = "afbq ktmu njch bgdd"
+    SECURITY_SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
