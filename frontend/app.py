@@ -99,23 +99,24 @@ def debug_info():
     db_url_raw = os.getenv("DATABASE_URL", "(NOT SET)")
     db_url_safe = db_url_raw[:20] + "..." if len(db_url_raw) > 20 else db_url_raw
     db_type = "unknown"
+    active_db_host = "unknown"
     try:
-        from backend.app.database.connection import DATABASE_URL as active_db_url
+        from app.database.connection import DATABASE_URL as active_db_url
+        if "@" in (active_db_url or ""):
+            active_db_host = active_db_url.split("@")[-1].split("/")[0]
+        else:
+            active_db_host = active_db_url
         if "sqlite" in (active_db_url or ""):
             db_type = "sqlite"
         elif "postgresql" in (active_db_url or ""):
             db_type = "postgresql"
-    except Exception:
-        try:
-            from app.database.connection import DATABASE_URL as active_db_url
-            if "sqlite" in (active_db_url or ""):
-                db_type = "sqlite"
-            elif "postgresql" in (active_db_url or ""):
-                db_type = "postgresql"
-        except Exception:
-            pass
+    except Exception as e:
+        active_db_host = f"err: {e}"
 
     return jsonify({
+        "deploy_version": "v2.2-pooler-ipv4",
+        "active_db_host": active_db_host,
+        "active_db_type": db_type,
         "cwd": os.getcwd(),
         "frontend_dir": _FRONTEND_DIR,
         "static_folder": static_folder,
@@ -128,7 +129,6 @@ def debug_info():
         "python_path_0": sys.path[0] if sys.path else "empty",
         "database_url_env_set": db_url_raw != "(NOT SET)",
         "database_url_preview": db_url_safe,
-        "active_db_type": db_type,
     }), 200
 
 @app.after_request
