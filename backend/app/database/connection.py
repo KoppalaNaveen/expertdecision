@@ -39,23 +39,25 @@ def _get_local_sqlite_url():
             return f"sqlite:///{p}"
     return f"sqlite:///{candidates[0]}"
 
-DEFAULT_SUPABASE_URL = "postgresql://postgres:ShabhanaaNaveen0320%40@db.myofagxphtmzuldbtijc.supabase.co:5432/postgres"
+DEFAULT_SUPABASE_URL = "postgresql://postgres.myofagxphtmzuldbtijc:ShabhanaaNaveen0320%40@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
 
 raw_env_url = os.getenv("DATABASE_URL")
 print(f"[DB] Raw DATABASE_URL from env: {'(set, ' + str(len(raw_env_url)) + ' chars)' if raw_env_url else '(NOT SET)'}")
 
-# ALWAYS use Supabase PostgreSQL as the primary database
-# Only use explicit postgresql:// env var if provided; otherwise default to Supabase
-if raw_env_url and raw_env_url.strip().startswith("postgresql"):
-    DATABASE_URL = raw_env_url.strip()
-    print("[DB] Using DATABASE_URL from environment (postgresql)")
-elif raw_env_url and raw_env_url.strip().startswith("postgres://"):
+# ALWAYS use Supabase PostgreSQL (IPv4 Pooler) as the primary database
+# Supports platforms without outbound IPv6 (Render, AWS Lambda, Docker, etc.)
+if raw_env_url and (raw_env_url.strip().startswith("postgresql") or raw_env_url.strip().startswith("postgres://")):
     DATABASE_URL = raw_env_url.strip().replace("postgres://", "postgresql://", 1)
-    print("[DB] Using DATABASE_URL from environment (converted postgres:// to postgresql://)")
+    # Auto-convert IPv6-only direct hostname to IPv4-compatible pooler
+    if "db.myofagxphtmzuldbtijc.supabase.co" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace("db.myofagxphtmzuldbtijc.supabase.co", "aws-1-ap-south-1.pooler.supabase.com")
+        if "postgres:" in DATABASE_URL and "postgres.myofagxphtmzuldbtijc:" not in DATABASE_URL:
+            DATABASE_URL = DATABASE_URL.replace("postgres:", "postgres.myofagxphtmzuldbtijc:", 1)
+    print("[DB] Using DATABASE_URL from environment (with IPv4 pooler)")
 else:
-    # Default to production Supabase PostgreSQL for ALL cases (including sqlite env vars)
+    # Default to production Supabase IPv4 Pooler
     DATABASE_URL = DEFAULT_SUPABASE_URL
-    print("[DB] Using default production Supabase PostgreSQL")
+    print("[DB] Using default production Supabase IPv4 Connection Pooler")
 
 # Create PostgreSQL engine - ALWAYS (never fall back to SQLite in production)
 print(f"[DB] Connecting to PostgreSQL database...")
