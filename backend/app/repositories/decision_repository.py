@@ -827,9 +827,14 @@ class DecisionRepository:
         # 1. Log activity before deletion
         try:
             from app.services.audit_service import AuditService
+            audit_uid = user_id
+            if not audit_uid or audit_uid <= 0:
+                admin_u = db.query(User).filter(User.role_id == 1).first()
+                audit_uid = admin_u.id if admin_u else (db_decision.created_by or None)
+
             AuditService.log_event(
                 db,
-                user_id=user_id or 1,
+                user_id=audit_uid,
                 action=f"Deleted decision DEC-{decision_id} ({title_snapshot[:40]})",
                 details=f"Decision ID: DEC-{decision_id}, Title: {title_snapshot}",
                 module="Decisions",
@@ -846,10 +851,46 @@ class DecisionRepository:
 
             def safe_exec(sql):
                 try:
-                    db.execute(text(sql), params)
-                except Exception:
-                    pass
+                    with db.begin_nested():
+                        db.execute(text(sql), params)
+                except Exception as cascade_stmt_err:
+                    print(f"[CASCADE DELETE NOTE] {cascade_stmt_err}")
 
+            # Step 1: Break self-referential reply links in comments
+            if "comments" in existing_tables:
+                if "discussion_threads" in existing_tables and "meeting_notes" in existing_tables:
+                    safe_exec("""
+                        UPDATE comments SET reply_to_id = NULL 
+                        WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id = :did)
+                           OR meeting_note_id IN (SELECT id FROM meeting_notes WHERE decision_id = :did)
+                    """)
+                elif "discussion_threads" in existing_tables:
+                    safe_exec("""
+                        UPDATE comments SET reply_to_id = NULL 
+                        WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id = :did)
+                    """)
+
+            # Step 2: Delete comments referencing discussion threads or meeting notes
+            if "comments" in existing_tables:
+                if "discussion_threads" in existing_tables and "meeting_notes" in existing_tables:
+                    safe_exec("""
+                        DELETE FROM comments 
+                        WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id = :did)
+                           OR meeting_note_id IN (SELECT id FROM meeting_notes WHERE decision_id = :did)
+                    """)
+                elif "discussion_threads" in existing_tables:
+                    safe_exec("""
+                        DELETE FROM comments 
+                        WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id = :did)
+                    """)
+
+            # Step 3: Delete meeting notes and discussion threads
+            if "meeting_notes" in existing_tables:
+                safe_exec("DELETE FROM meeting_notes WHERE decision_id = :did")
+            if "discussion_threads" in existing_tables:
+                safe_exec("DELETE FROM discussion_threads WHERE decision_id = :did")
+
+            # Step 4: Delete direct child relations
             if "alternatives" in existing_tables:
                 safe_exec("DELETE FROM alternatives WHERE decision_id = :did")
             if "reviews" in existing_tables:
@@ -860,12 +901,6 @@ class DecisionRepository:
                 safe_exec("DELETE FROM replays WHERE decision_id = :did")
             if "attachments" in existing_tables:
                 safe_exec("DELETE FROM attachments WHERE decision_id = :did")
-            if "meeting_notes" in existing_tables:
-                safe_exec("DELETE FROM meeting_notes WHERE decision_id = :did")
-            if "comments" in existing_tables and "discussion_threads" in existing_tables:
-                safe_exec("DELETE FROM comments WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id = :did)")
-            if "discussion_threads" in existing_tables:
-                safe_exec("DELETE FROM discussion_threads WHERE decision_id = :did")
         except Exception as cascade_err:
             print(f"[DECISION DELETE CASCADE NOTE] {cascade_err}")
 

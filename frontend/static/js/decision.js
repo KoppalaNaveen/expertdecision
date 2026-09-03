@@ -791,11 +791,27 @@ async function executeBulkDelete() {
         btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Deleting...`;
     }
 
-    const decisionIds = Array.from(selectedDecisionIds);
+    const decisionIds = Array.from(selectedDecisionIds).map(id => Number(id)).filter(id => !isNaN(id) && id > 0);
+    if (decisionIds.length === 0) {
+        if (typeof showCenterNotification === 'function') {
+            showCenterNotification("Please select at least one valid decision to delete.", "warning", "No Decisions Selected");
+        } else if (typeof showToast === 'function') {
+            showToast("Warning", "Please select at least one valid decision to delete.");
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+        return;
+    }
+
+    const resolvedUserId = (typeof USER_ID !== 'undefined' && USER_ID) ? Number(USER_ID) : (Number(localStorage.getItem('user_id')) || 0);
+    const resolvedRole = (typeof CURRENT_USER_ROLE !== 'undefined' && CURRENT_USER_ROLE) ? CURRENT_USER_ROLE : (localStorage.getItem('role_name') || 'Administrator');
+
     const payload = {
         decision_ids: decisionIds,
-        user_id: typeof USER_ID !== 'undefined' ? USER_ID : 1,
-        role_name: typeof CURRENT_USER_ROLE !== 'undefined' ? CURRENT_USER_ROLE : 'Administrator'
+        user_id: resolvedUserId,
+        role_name: resolvedRole
     };
 
     try {
@@ -829,10 +845,27 @@ async function executeBulkDelete() {
         selectedDecisionIds.clear();
         updateSelectModeUI();
 
-        if (typeof showCenterNotification === 'function') {
-            showCenterNotification(data.message || `Successfully deleted ${decisionIds.length} decision(s).`, "success", "Decisions Deleted");
-        } else if (typeof showToast === 'function') {
-            showToast("Success", data.message || "Decisions deleted successfully.");
+        if (data.deleted_count === 0 && data.errors && data.errors.length > 0) {
+            const errorMsg = data.errors.join("<br>");
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification(errorMsg, "error", "Bulk Delete Failed");
+            } else if (typeof showToast === 'function') {
+                showToast("Danger", errorMsg);
+            }
+        } else if (data.deleted_count < decisionIds.length && data.errors && data.errors.length > 0) {
+            const warnMsg = `Deleted ${data.deleted_count} of ${decisionIds.length} decision(s).<br>${data.errors.join("<br>")}`;
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification(warnMsg, "warning", "Partial Deletion");
+            } else if (typeof showToast === 'function') {
+                showToast("Warning", warnMsg);
+            }
+        } else {
+            const successMsg = data.message || `Successfully deleted ${data.deleted_count || decisionIds.length} decision(s).`;
+            if (typeof showCenterNotification === 'function') {
+                showCenterNotification(successMsg, "success", "Decisions Deleted");
+            } else if (typeof showToast === 'function') {
+                showToast("Success", successMsg);
+            }
         }
 
         await fetchDecisions();

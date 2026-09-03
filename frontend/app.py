@@ -1116,6 +1116,26 @@ def proxy_delete_decision(decision_id):
         return jsonify({"detail": f"Decision delete error: {e}"}), 500
 
 
+@app.route("/api/decisions/bulk-delete", methods=["POST"])
+@app.route("/decisions/bulk-delete", methods=["POST"])
+def proxy_bulk_delete_decisions():
+    try:
+        data = request.get_json(silent=True) or {}
+        # Ensure user_id and role_name from session if missing or 0
+        if (not data.get("user_id") or data.get("user_id") == 0) and session.get("user_id"):
+            data["user_id"] = session["user_id"]
+        if not data.get("role_name") and session.get("role_name"):
+            data["role_name"] = session["role_name"]
+
+        resp = make_backend_request("POST", "/decisions/bulk-delete", json=data, timeout=30)
+        invalidate_decision_caches()
+        if resp is not None:
+            return make_response(resp.content, resp.status_code, {"Content-Type": "application/json"})
+        return jsonify({"detail": "Backend unavailable. Please ensure FastAPI server is running."}), 500
+    except Exception as e:
+        return jsonify({"detail": f"Bulk delete error: {e}"}), 500
+
+
 @app.route("/api/decisions/<int:decision_id>/status", methods=["PATCH"])
 @app.route("/decisions/<int:decision_id>/status", methods=["PATCH"])
 def proxy_update_decision_status(decision_id):

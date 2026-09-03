@@ -57,7 +57,14 @@ def bulk_delete_decisions(payload: BulkDeleteDecisionsRequest, db: Session = Dep
             else:
                 errors.append(f"DEC-{did}: Not found")
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             errors.append(f"DEC-{did}: {str(e)}")
+
+    if deleted_count == 0 and errors:
+        raise HTTPException(status_code=400, detail=f"Failed to delete decisions: {'; '.join(errors)}")
 
     return {
         "message": f"Successfully deleted {deleted_count} decision(s).",
