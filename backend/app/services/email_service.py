@@ -697,9 +697,10 @@ def send_account_rejected_email(to_email: str, recipient_name: str, reason: str 
     return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Administration")
 
 
-def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time: str = None) -> bool:
+def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time: str = None, admin_name: str = None) -> bool:
     """
     Automated Account Email -> Sent when an account is permanently deleted.
+    Includes the name of the administrator who performed the deletion.
     """
     if not ENABLE_ROUTINE_EMAILS:
         print(f"[ACCOUNT DELETED LOG - SILENCED] Account deleted email skipped for {to_email}")
@@ -708,6 +709,7 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
     from datetime import datetime, timezone
     time_str = deletion_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     name_str = f" {recipient_name}" if recipient_name else ""
+    admin_display = admin_name or "an Administrator"
     subject = "Your EDRP account has been deleted"
     body_html = f"""
     <!DOCTYPE html>
@@ -719,12 +721,13 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
             </div>
             <div style="padding: 24px;">
                 <p>Hello{name_str},</p>
-                <p>This email confirms that your account on the <strong>Expert Decision Replay Platform (EDRP)</strong> has been permanently deleted.</p>
+                <p>This email confirms that your account on the <strong>Expert Decision Replay Platform (EDRP)</strong> has been permanently deleted by <strong>{admin_display}</strong>.</p>
                 <div style="background: #f1f5f9; border-left: 4px solid #475569; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
                     <div><strong>Status:</strong> Account Permanently Deleted</div>
-                    <div style="margin-top: 4px;"><strong>Date & Time:</strong> {time_str}</div>
+                    <div style="margin-top: 4px;"><strong>Deleted By:</strong> {admin_display}</div>
+                    <div style="margin-top: 4px;"><strong>Date &amp; Time:</strong> {time_str}</div>
                 </div>
-                <p style="font-size: 12px; color: #64748b;">All associated personal records and profile data have been permanently removed. If you have any questions, please contact Support.</p>
+                <p style="font-size: 12px; color: #64748b;">All associated personal records and profile data have been permanently removed. If you believe this was done in error, please contact your organization's administrator or Support immediately.</p>
                 <br>
                 <p style="font-size: 12px; color: #64748b;">Regards,<br><strong>The EDRP Team</strong></p>
             </div>
@@ -732,7 +735,7 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
     </body>
     </html>
     """
-    body_text = f"Hello{name_str},\n\nYour account on the Expert Decision Replay Platform has been permanently deleted.\nDate/Time: {time_str}\n\nRegards,\nThe EDRP Team"
+    body_text = f"Hello{name_str},\n\nYour account on the Expert Decision Replay Platform has been permanently deleted by {admin_display}.\n\nDeleted By: {admin_display}\nDate/Time: {time_str}\n\nIf you believe this was done in error, please contact your organization's administrator or Support.\n\nRegards,\nThe EDRP Team"
     return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Team")
 
 

@@ -861,12 +861,29 @@ class UserService:
 
 
     @staticmethod
-    def delete_user(db: Session, user_id: int):
+    def delete_user(db: Session, user_id: int, admin_name: str = "Administrator"):
         user = UserRepository.get_user_by_id(db, user_id)
         target_email = get_recipient_email(user)
         target_name = user.full_name if user else "User"
 
-        UserService._log_activity(db, 1, f"Administrator deleted user account ID: {user_id}", "")
+        # Log activity in a standalone session to avoid poisoning the
+        # main transaction if the log insert fails for any reason.
+        try:
+            from app.services.audit_service import AuditService
+            AuditService.log_event_standalone(
+                user_id=1,
+                action=f"Administrator ({admin_name}) deleted user account ID: {user_id}",
+                details=""
+            )
+        except Exception as log_err:
+            print(f"[DELETE] Activity log failed (non-blocking): {log_err}")
+
+        # Ensure the session is in a clean state before starting deletion
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
         success, err_msg = UserRepository.delete_user(db, user_id)
         if not success:
             if err_msg == "User not found":
@@ -876,13 +893,13 @@ class UserService:
 
         # Send account deletion email after successful database deletion
         if target_email:
-            def _async_del_email(em, nm):
+            def _async_del_email(em, nm, adm):
                 try:
-                    send_account_deleted_email(em, nm)
+                    send_account_deleted_email(em, nm, admin_name=adm)
                 except Exception as mail_err:
                     print(f"Account deletion email dispatch exception: {mail_err}")
 
-            threading.Thread(target=_async_del_email, args=(target_email, target_name), daemon=True).start()
+            threading.Thread(target=_async_del_email, args=(target_email, target_name, admin_name), daemon=True).start()
 
         return {"message": "User deleted successfully"}
 

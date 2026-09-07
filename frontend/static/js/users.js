@@ -377,7 +377,8 @@ async function deleteUserPermanently(userId, userName) {
     }
 
     try {
-        const res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+        const adminName = (typeof CURRENT_USER_NAME !== 'undefined' && CURRENT_USER_NAME) ? CURRENT_USER_NAME : 'Administrator';
+        const res = await fetch(`/api/users/${userId}?admin_name=${encodeURIComponent(adminName)}`, { method: "DELETE" });
 
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));

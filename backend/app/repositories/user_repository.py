@@ -140,10 +140,18 @@ class UserRepository:
 
             def safe_exec(sql: str, params: dict):
                 try:
+                    # Use a savepoint so that a failed statement doesn't
+                    # abort the entire PostgreSQL transaction.
+                    nested = db.begin_nested()
                     db.execute(text(sql), params)
+                    nested.commit()
                 except Exception as _e:
-                    # Ignore missing tables / columns gracefully
-                    pass
+                    # Rollback only the savepoint – the outer transaction
+                    # stays usable for subsequent statements.
+                    try:
+                        nested.rollback()
+                    except Exception:
+                        pass
 
             clean_email = user.email.strip().lower() if user.email else ""
             clean_orig = getattr(user, 'email_original', '') or ""
