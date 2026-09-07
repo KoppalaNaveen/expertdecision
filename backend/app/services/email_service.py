@@ -366,7 +366,8 @@ def _dispatch_resend_email(to_email: str, subject: str, body_html: str, body_tex
     # Essential account emails (OTP, password reset, account approval/credentials) are always permitted
     is_essential_account_email = any(k.lower() in subject.lower() for k in [
         "verification", "password reset", "credentials", "security notice", 
-        "approved", "verified", "account application", "account status", "registration"
+        "approved", "verified", "account application", "account status", "registration",
+        "deleted"
     ])
 
     # If security and routine emails are disabled, silence non-essential background emails
@@ -701,10 +702,9 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
     """
     Automated Account Email -> Sent when an account is permanently deleted.
     Includes the name of the administrator who performed the deletion.
+    This is treated as an essential/critical email — always sent regardless
+    of ENABLE_ROUTINE_EMAILS setting.
     """
-    if not ENABLE_ROUTINE_EMAILS:
-        print(f"[ACCOUNT DELETED LOG - SILENCED] Account deleted email skipped for {to_email}")
-        return True
 
     from datetime import datetime, timezone
     time_str = deletion_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
