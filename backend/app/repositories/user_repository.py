@@ -131,110 +131,106 @@ class UserRepository:
     def delete_user(db: Session, user_id: int):
         """
         Permanently delete a user and ALL their references across the database.
-        Uses a raw DB connection to bypass SQLAlchemy session/transaction quirks.
+        Uses AUTOCOMMIT isolation so each cleanup statement is independent —
+        a failure in one cannot roll back another.
         """
-        from sqlalchemy import text
-
-        # First, verify user exists using the ORM session
+        # First, verify user exists
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return (False, "User not found")
 
-        # Collect user info before deleting
+        # Collect user info before we touch anything
         clean_email = user.email.strip().lower() if user.email else ""
         clean_orig = getattr(user, 'email_original', '') or ""
         clean_hash = getattr(user, 'email_hash', '') or ""
+        email_values = list({v for v in [clean_email, clean_orig, clean_hash] if v})
 
-        # Close any pending ORM transaction to free the connection
+        # Close ORM session so it doesn't hold locks
         try:
             db.rollback()
+            db.close()
         except Exception:
             pass
 
-        # Use a completely separate raw connection for the deletion
-        try:
-            from app.database.connection import SessionLocal
-            raw_db = SessionLocal()
-            try:
-                conn = raw_db.get_bind().raw_connection()
-                conn.autocommit = False
-                cursor = conn.cursor()
+        from sqlalchemy import text
+        from app.database.connection import engine
 
+        # ── Phase 1: AUTOCOMMIT cleanup ──
+        # Each statement is its own transaction. If one fails, it does NOT
+        # affect any other statement — no rollback cascade possible.
+        try:
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+
+                # Find every FK constraint pointing at users.id
                 try:
-                    # Step 1: Dynamically find ALL FK constraints referencing 'users' table
-                    cursor.execute("""
+                    fk_rows = conn.execute(text("""
                         SELECT tc.table_name, kcu.column_name
                         FROM information_schema.table_constraints tc
                         JOIN information_schema.key_column_usage kcu
                             ON tc.constraint_name = kcu.constraint_name
-                            AND tc.table_schema = kcu.table_schema
+                            AND tc.table_schema  = kcu.table_schema
                         JOIN information_schema.constraint_column_usage ccu
                             ON tc.constraint_name = ccu.constraint_name
-                            AND tc.table_schema = ccu.table_schema
+                            AND tc.table_schema  = ccu.table_schema
                         WHERE tc.constraint_type = 'FOREIGN KEY'
-                          AND ccu.table_name = 'users'
+                          AND ccu.table_name  = 'users'
                           AND ccu.column_name = 'id'
                           AND tc.table_schema = 'public'
-                    """)
-                    fk_refs = cursor.fetchall()
+                    """)).fetchall()
+                except Exception:
+                    fk_rows = []
 
-                    # Step 2: For each FK reference, try to nullify or delete
-                    for ref_table, ref_column in fk_refs:
-                        # Try UPDATE SET NULL first
+                # For each referencing table, remove every row that points at this user
+                for ref_table, ref_column in fk_rows:
+                    # Try SET NULL first (preserves historical data)
+                    try:
+                        conn.execute(
+                            text(f'UPDATE "{ref_table}" SET "{ref_column}" = NULL WHERE "{ref_column}" = :uid'),
+                            {"uid": user_id}
+                        )
+                    except Exception:
+                        pass  # autocommit — no rollback needed
+
+                    # Then DELETE any remaining rows (NOT NULL columns)
+                    try:
+                        conn.execute(
+                            text(f'DELETE FROM "{ref_table}" WHERE "{ref_column}" = :uid'),
+                            {"uid": user_id}
+                        )
+                    except Exception:
+                        pass
+
+                # Clean up email-based records (verification_codes, email_verifications)
+                if email_values:
+                    for tbl in ['verification_codes', 'email_verifications']:
                         try:
-                            cursor.execute(
-                                f'UPDATE "{ref_table}" SET "{ref_column}" = NULL WHERE "{ref_column}" = %s',
-                                (user_id,)
-                            )
+                            for ev in email_values:
+                                conn.execute(
+                                    text(f'DELETE FROM "{tbl}" WHERE email = :e'),
+                                    {"e": ev}
+                                )
                         except Exception:
-                            conn.rollback()
-                            # If NULL not allowed, DELETE the rows
-                            try:
-                                cursor.execute(
-                                    f'DELETE FROM "{ref_table}" WHERE "{ref_column}" = %s',
-                                    (user_id,)
-                                )
-                            except Exception:
-                                conn.rollback()
+                            pass
 
-                    # Step 3: Also clean up email-based references
-                    email_values = [v for v in [clean_email, clean_orig, clean_hash] if v]
-                    if email_values:
-                        for tbl in ['verification_codes', 'email_verifications']:
-                            try:
-                                placeholders = ','.join(['%s'] * len(email_values))
-                                cursor.execute(
-                                    f'DELETE FROM "{tbl}" WHERE email IN ({placeholders})',
-                                    email_values
-                                )
-                            except Exception:
-                                conn.rollback()
+        except Exception as cleanup_err:
+            print(f"[DELETE USER] FK cleanup phase error (non-fatal): {cleanup_err}")
 
-                    # Step 4: Delete the user
-                    cursor.execute('DELETE FROM users WHERE id = %s', (user_id,))
-                    conn.commit()
+        # ── Phase 2: Delete the user in a normal transaction ──
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": user_id})
+                conn.commit()
+        except Exception as del_err:
+            return (False, f"Delete failed: {str(del_err)}")
 
-                except Exception as inner_err:
-                    conn.rollback()
-                    return (False, f"Delete failed: {str(inner_err)}")
-                finally:
-                    cursor.close()
-                    conn.close()
+        # Invalidate dashboard caches
+        try:
+            from app.repositories.dashboard_repository import _DASHBOARD_CACHE
+            _DASHBOARD_CACHE.clear()
+        except Exception:
+            pass
 
-            finally:
-                raw_db.close()
-
-            # Invalidate dashboard in-memory caches
-            try:
-                from app.repositories.dashboard_repository import _DASHBOARD_CACHE
-                _DASHBOARD_CACHE.clear()
-            except Exception:
-                pass
-
-            return (True, None)
-
-        except Exception as err:
-            return (False, f"Delete failed: {str(err)}")
+        return (True, None)
 
     @staticmethod
     def get_all_users(db: Session):

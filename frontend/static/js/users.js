@@ -376,6 +376,25 @@ async function deleteUserPermanently(userId, userName) {
         return;
     }
 
+    // Show loading overlay
+    let overlay = document.getElementById('deleteLoadingOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'deleteLoadingOverlay';
+        overlay.innerHTML = `
+            <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;">
+                <div style="background:#fff;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                    <div style="width:40px;height:40px;border:4px solid #e2e8f0;border-top:4px solid #6366f1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>
+                    <div style="font-size:15px;font-weight:600;color:#1e293b;">Deleting account...</div>
+                    <div style="font-size:12px;color:#94a3b8;margin-top:4px;">Please wait while we remove all associated data</div>
+                </div>
+            </div>
+            <style>@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>
+        `;
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'block';
+
     try {
         const adminName = (typeof CURRENT_USER_NAME !== 'undefined' && CURRENT_USER_NAME) ? CURRENT_USER_NAME : 'Administrator';
         const res = await fetch(`/api/users/${userId}?admin_name=${encodeURIComponent(adminName)}`, { method: "DELETE" });
@@ -398,6 +417,9 @@ async function deleteUserPermanently(userId, userName) {
         if (typeof showCenterNotification === 'function') {
             showCenterNotification(err.message || "Failed to delete user", 'error', 'Error Deleting Account');
         }
+    } finally {
+        // Always hide the loading overlay
+        if (overlay) overlay.style.display = 'none';
     }
 }
 
