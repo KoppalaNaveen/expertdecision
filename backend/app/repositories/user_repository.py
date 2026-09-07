@@ -140,14 +140,10 @@ class UserRepository:
 
             def safe_exec(sql: str, params: dict):
                 try:
-                    # Use a savepoint so that a failed statement doesn't
-                    # abort the entire PostgreSQL transaction.
                     nested = db.begin_nested()
                     db.execute(text(sql), params)
                     nested.commit()
                 except Exception as _e:
-                    # Rollback only the savepoint – the outer transaction
-                    # stays usable for subsequent statements.
                     try:
                         nested.rollback()
                     except Exception:
@@ -158,11 +154,11 @@ class UserRepository:
             clean_hash = getattr(user, 'email_hash', '') or ""
             email_params = {"e": clean_email, "eh": clean_hash, "eo": clean_orig, "uid": user_id}
 
-            # 1. Safely reassign historical activity and audit logs to system account (ID 1)
+            # 1. DELETE activity and audit logs (not reassign — avoids FK issues with target user)
             if "activity_logs" in existing_tables:
-                safe_exec("UPDATE activity_logs SET user_id = 1 WHERE user_id = :uid", email_params)
+                safe_exec("DELETE FROM activity_logs WHERE user_id = :uid", email_params)
             if "audit_logs" in existing_tables:
-                safe_exec("UPDATE audit_logs SET actor_id = 1 WHERE actor_id = :uid", email_params)
+                safe_exec("DELETE FROM audit_logs WHERE actor_id = :uid", email_params)
 
             # 2. Clean up notifications, support tickets, internal emails, and backup records
             if "notifications" in existing_tables:
@@ -237,8 +233,33 @@ class UserRepository:
                 except Exception:
                     pass
 
-            # 9. Delete the user
+            # 9. Dynamic FK cleanup — find and remove ALL remaining references
+            #    to this user across every table that has a FK to users.
+            try:
+                fk_query = text("""
+                    SELECT tc.table_name, kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                    JOIN information_schema.constraint_column_usage ccu
+                        ON tc.constraint_name = ccu.constraint_name
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND ccu.table_name = 'users'
+                      AND ccu.column_name = 'id'
+                """)
+                fk_refs = db.execute(fk_query).fetchall()
+                for ref_table, ref_column in fk_refs:
+                    if ref_table in existing_tables:
+                        # Try to nullify first; if the column is NOT NULL, delete the rows
+                        safe_exec(f"UPDATE {ref_table} SET {ref_column} = NULL WHERE {ref_column} = :uid", email_params)
+                        safe_exec(f"DELETE FROM {ref_table} WHERE {ref_column} = :uid", email_params)
+            except Exception:
+                pass
+
+            # 10. Delete the user
+            nested = db.begin_nested()
             db.execute(text("DELETE FROM users WHERE id = :uid"), email_params)
+            nested.commit()
             db.commit()
 
             # Invalidate dashboard in-memory caches
