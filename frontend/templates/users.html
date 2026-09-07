@@ -729,7 +729,9 @@
     const API_URL = "/api";
     const CURRENT_USER_ROLE = "{{ session.get('role_name', 'Employee') }}";
     const CURRENT_USER_ID = parseInt("{{ session.get('user_id', '') }}" || localStorage.getItem('user_id') || 0, 10);
-    const CURRENT_USER_NAME = "{{ session.get('full_name', '') }}" || localStorage.getItem('full_name') || 'Administrator';
+    const _sessionName = "{{ session.get('full_name', '') }}";
+    const CURRENT_USER_NAME = _sessionName || localStorage.getItem('full_name') || document.querySelector('.user-name, .sidebar-user-name, #userName')?.textContent?.trim() || 'Administrator';
+    if (_sessionName) localStorage.setItem('full_name', _sessionName);
     window.INITIAL_USERS = {{ (initial_users or []) | tojson | safe }};
     window.INITIAL_ROLES = {{ (initial_roles or []) | tojson | safe }};
     window.INITIAL_TEAMS = {{ (initial_teams or []) | tojson | safe }};

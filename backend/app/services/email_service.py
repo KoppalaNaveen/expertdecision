@@ -706,8 +706,9 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
     of ENABLE_ROUTINE_EMAILS setting.
     """
 
-    from datetime import datetime, timezone
-    time_str = deletion_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    from datetime import datetime, timezone, timedelta
+    IST = timezone(timedelta(hours=5, minutes=30))
+    time_str = deletion_time or datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
     name_str = f" {recipient_name}" if recipient_name else ""
     admin_display = admin_name or "an Administrator"
     subject = "Your EDRP account has been deleted"
