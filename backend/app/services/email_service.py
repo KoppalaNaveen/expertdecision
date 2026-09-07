@@ -27,10 +27,10 @@ DEFAULT_MAIL_FROM = "expertdecisionplatform.noreply@gmail.com"
 DEFAULT_SMTP_EMAIL = "expertdecisionplatform.noreply@gmail.com"
 DEFAULT_SMTP_PASSWORD = " ".join(["hgkr", "mdmj", "lbvy", "hotc"])
 
-# Global toggles to silence unsolicited automated/routine emails
-ENABLE_ROUTINE_EMAILS = os.getenv("ENABLE_ROUTINE_EMAILS", "false").strip().lower() in ("true", "1", "yes")
-ENABLE_SECURITY_EMAILS = os.getenv("ENABLE_SECURITY_EMAILS", "false").strip().lower() in ("true", "1", "yes")
-ENABLE_NOTIFICATION_EMAILS = os.getenv("ENABLE_NOTIFICATION_EMAILS", "false").strip().lower() in ("true", "1", "yes")
+# Global toggles for automated emails (default: enabled — set env vars to "false" to silence)
+ENABLE_ROUTINE_EMAILS = os.getenv("ENABLE_ROUTINE_EMAILS", "true").strip().lower() in ("true", "1", "yes")
+ENABLE_SECURITY_EMAILS = os.getenv("ENABLE_SECURITY_EMAILS", "true").strip().lower() in ("true", "1", "yes")
+ENABLE_NOTIFICATION_EMAILS = os.getenv("ENABLE_NOTIFICATION_EMAILS", "true").strip().lower() in ("true", "1", "yes")
 
 _KNOWN_VALID_DOMAINS = {
     "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "yahoo.co.uk", "yahoo.ca", "yahoo.com.au",
