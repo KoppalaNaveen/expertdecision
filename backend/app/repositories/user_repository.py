@@ -129,138 +129,100 @@ class UserRepository:
 
     @staticmethod
     def delete_user(db: Session, user_id: int):
-        from sqlalchemy import text, inspect
+        """
+        Permanently delete a user and ALL their references across the database.
+        Uses a raw DB connection to bypass SQLAlchemy session/transaction quirks.
+        """
+        from sqlalchemy import text
+
+        # First, verify user exists using the ORM session
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return (False, "User not found")
 
+        # Collect user info before deleting
+        clean_email = user.email.strip().lower() if user.email else ""
+        clean_orig = getattr(user, 'email_original', '') or ""
+        clean_hash = getattr(user, 'email_hash', '') or ""
+
+        # Close any pending ORM transaction to free the connection
         try:
-            inspector = inspect(db.get_bind())
-            existing_tables = set(inspector.get_table_names())
+            db.rollback()
+        except Exception:
+            pass
 
-            def safe_exec(sql: str, params: dict):
-                try:
-                    nested = db.begin_nested()
-                    db.execute(text(sql), params)
-                    nested.commit()
-                except Exception as _e:
-                    try:
-                        nested.rollback()
-                    except Exception:
-                        pass
-
-            clean_email = user.email.strip().lower() if user.email else ""
-            clean_orig = getattr(user, 'email_original', '') or ""
-            clean_hash = getattr(user, 'email_hash', '') or ""
-            email_params = {"e": clean_email, "eh": clean_hash, "eo": clean_orig, "uid": user_id}
-
-            # 1. DELETE activity and audit logs (not reassign — avoids FK issues with target user)
-            if "activity_logs" in existing_tables:
-                safe_exec("DELETE FROM activity_logs WHERE user_id = :uid", email_params)
-            if "audit_logs" in existing_tables:
-                safe_exec("DELETE FROM audit_logs WHERE actor_id = :uid", email_params)
-
-            # 2. Clean up notifications, support tickets, internal emails, and backup records
-            if "notifications" in existing_tables:
-                safe_exec("DELETE FROM notifications WHERE user_id = :uid", email_params)
-            if "support_tickets" in existing_tables:
-                safe_exec("DELETE FROM support_tickets WHERE user_id = :uid", email_params)
-            if "internal_emails" in existing_tables:
-                safe_exec("DELETE FROM internal_emails WHERE sender_id = :uid", email_params)
-            if "backup_records" in existing_tables:
-                safe_exec("DELETE FROM backup_records WHERE user_id = :uid", email_params)
-
-            # 3. Clean up reviews and replays performed by user
-            if "reviews" in existing_tables:
-                safe_exec("DELETE FROM reviews WHERE reviewer_id = :uid", email_params)
-            if "replays" in existing_tables:
-                safe_exec("DELETE FROM replays WHERE performed_by = :uid", email_params)
-
-            # 4. Clean up email verification records
-            if "verification_codes" in existing_tables:
-                safe_exec("DELETE FROM verification_codes WHERE email = :e OR email = :eh OR email = :eo", email_params)
-            if "email_verifications" in existing_tables:
-                safe_exec("DELETE FROM email_verifications WHERE email = :e OR email = :eh OR email = :eo", email_params)
-
-            # 5. Nullify user references in configs, meeting notes, attachments, versions & decisions
-            if "approval_chain_configs" in existing_tables:
-                safe_exec("UPDATE approval_chain_configs SET created_by = NULL WHERE created_by = :uid", email_params)
-            if "meeting_notes" in existing_tables:
-                safe_exec("UPDATE meeting_notes SET created_by = NULL WHERE created_by = :uid", email_params)
-                safe_exec("UPDATE meeting_notes SET updated_by = NULL WHERE updated_by = :uid", email_params)
-            if "attachments" in existing_tables:
-                safe_exec("UPDATE attachments SET uploaded_by = NULL WHERE uploaded_by = :uid", email_params)
-            if "decision_versions" in existing_tables:
-                safe_exec("UPDATE decision_versions SET changed_by = NULL WHERE changed_by = :uid", email_params)
-            if "decisions" in existing_tables:
-                safe_exec("UPDATE decisions SET rationale_updated_by = NULL WHERE rationale_updated_by = :uid", email_params)
-            if "discussion_threads" in existing_tables:
-                safe_exec("UPDATE discussion_threads SET pinned_by = NULL WHERE pinned_by = :uid", email_params)
-
-            # 6. Nullify self-referential comment replies & delete comments by user
-            if "comments" in existing_tables:
-                safe_exec("UPDATE comments SET reply_to_id = NULL WHERE reply_to_id IN (SELECT id FROM comments WHERE user_id = :uid)", email_params)
-                safe_exec("DELETE FROM comments WHERE user_id = :uid", email_params)
-
-            # 7. Clean up discussion threads created by user
-            if "discussion_threads" in existing_tables:
-                if "comments" in existing_tables:
-                    safe_exec("DELETE FROM comments WHERE thread_id IN (SELECT id FROM discussion_threads WHERE created_by = :uid)", email_params)
-                safe_exec("DELETE FROM discussion_threads WHERE created_by = :uid", email_params)
-
-            # 8. Clean up decisions created by user and their cascaded dependencies
-            if "decisions" in existing_tables:
-                try:
-                    user_decision_ids = [d[0] for d in db.execute(text("SELECT id FROM decisions WHERE created_by = :uid"), email_params).fetchall()]
-                    if user_decision_ids:
-                        if "alternatives" in existing_tables:
-                            safe_exec("DELETE FROM alternatives WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
-                        if "reviews" in existing_tables:
-                            safe_exec("DELETE FROM reviews WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
-                        if "replays" in existing_tables:
-                            safe_exec("DELETE FROM replays WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
-                        if "comments" in existing_tables and "discussion_threads" in existing_tables:
-                            safe_exec("DELETE FROM comments WHERE thread_id IN (SELECT id FROM discussion_threads WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid))", email_params)
-                        if "discussion_threads" in existing_tables:
-                            safe_exec("DELETE FROM discussion_threads WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
-                        if "meeting_notes" in existing_tables:
-                            safe_exec("DELETE FROM meeting_notes WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
-                        if "attachments" in existing_tables:
-                            safe_exec("DELETE FROM attachments WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
-                        if "decision_versions" in existing_tables:
-                            safe_exec("DELETE FROM decision_versions WHERE decision_id IN (SELECT id FROM decisions WHERE created_by = :uid)", email_params)
-                        safe_exec("DELETE FROM decisions WHERE created_by = :uid", email_params)
-                except Exception:
-                    pass
-
-            # 9. Dynamic FK cleanup — find and remove ALL remaining references
-            #    to this user across every table that has a FK to users.
+        # Use a completely separate raw connection for the deletion
+        try:
+            from app.database.connection import SessionLocal
+            raw_db = SessionLocal()
             try:
-                fk_query = text("""
-                    SELECT tc.table_name, kcu.column_name
-                    FROM information_schema.table_constraints tc
-                    JOIN information_schema.key_column_usage kcu
-                        ON tc.constraint_name = kcu.constraint_name
-                    JOIN information_schema.constraint_column_usage ccu
-                        ON tc.constraint_name = ccu.constraint_name
-                    WHERE tc.constraint_type = 'FOREIGN KEY'
-                      AND ccu.table_name = 'users'
-                      AND ccu.column_name = 'id'
-                """)
-                fk_refs = db.execute(fk_query).fetchall()
-                for ref_table, ref_column in fk_refs:
-                    if ref_table in existing_tables:
-                        # Try to nullify first; if the column is NOT NULL, delete the rows
-                        safe_exec(f"UPDATE {ref_table} SET {ref_column} = NULL WHERE {ref_column} = :uid", email_params)
-                        safe_exec(f"DELETE FROM {ref_table} WHERE {ref_column} = :uid", email_params)
-            except Exception:
-                pass
+                conn = raw_db.get_bind().raw_connection()
+                conn.autocommit = False
+                cursor = conn.cursor()
 
-            # 10. Delete the user
-            nested = db.begin_nested()
-            db.execute(text("DELETE FROM users WHERE id = :uid"), email_params)
-            nested.commit()
-            db.commit()
+                try:
+                    # Step 1: Dynamically find ALL FK constraints referencing 'users' table
+                    cursor.execute("""
+                        SELECT tc.table_name, kcu.column_name
+                        FROM information_schema.table_constraints tc
+                        JOIN information_schema.key_column_usage kcu
+                            ON tc.constraint_name = kcu.constraint_name
+                            AND tc.table_schema = kcu.table_schema
+                        JOIN information_schema.constraint_column_usage ccu
+                            ON tc.constraint_name = ccu.constraint_name
+                            AND tc.table_schema = ccu.table_schema
+                        WHERE tc.constraint_type = 'FOREIGN KEY'
+                          AND ccu.table_name = 'users'
+                          AND ccu.column_name = 'id'
+                          AND tc.table_schema = 'public'
+                    """)
+                    fk_refs = cursor.fetchall()
+
+                    # Step 2: For each FK reference, try to nullify or delete
+                    for ref_table, ref_column in fk_refs:
+                        # Try UPDATE SET NULL first
+                        try:
+                            cursor.execute(
+                                f'UPDATE "{ref_table}" SET "{ref_column}" = NULL WHERE "{ref_column}" = %s',
+                                (user_id,)
+                            )
+                        except Exception:
+                            conn.rollback()
+                            # If NULL not allowed, DELETE the rows
+                            try:
+                                cursor.execute(
+                                    f'DELETE FROM "{ref_table}" WHERE "{ref_column}" = %s',
+                                    (user_id,)
+                                )
+                            except Exception:
+                                conn.rollback()
+
+                    # Step 3: Also clean up email-based references
+                    email_values = [v for v in [clean_email, clean_orig, clean_hash] if v]
+                    if email_values:
+                        for tbl in ['verification_codes', 'email_verifications']:
+                            try:
+                                placeholders = ','.join(['%s'] * len(email_values))
+                                cursor.execute(
+                                    f'DELETE FROM "{tbl}" WHERE email IN ({placeholders})',
+                                    email_values
+                                )
+                            except Exception:
+                                conn.rollback()
+
+                    # Step 4: Delete the user
+                    cursor.execute('DELETE FROM users WHERE id = %s', (user_id,))
+                    conn.commit()
+
+                except Exception as inner_err:
+                    conn.rollback()
+                    return (False, f"Delete failed: {str(inner_err)}")
+                finally:
+                    cursor.close()
+                    conn.close()
+
+            finally:
+                raw_db.close()
 
             # Invalidate dashboard in-memory caches
             try:
@@ -270,8 +232,8 @@ class UserRepository:
                 pass
 
             return (True, None)
+
         except Exception as err:
-            db.rollback()
             return (False, f"Delete failed: {str(err)}")
 
     @staticmethod
