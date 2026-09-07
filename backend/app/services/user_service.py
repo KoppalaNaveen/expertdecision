@@ -861,14 +861,21 @@ class UserService:
 
 
     @staticmethod
-    def delete_user(db: Session, user_id: int, admin_name: str = "Administrator"):
+    def delete_user(db: Session, user_id: int, admin_name: str = "Administrator", user_email: str = None):
         from sqlalchemy import text
         from app.database.connection import engine
 
-        # ── Step 1: Get user's REAL email using a raw DB query ──
-        # This is independent of the ORM session and guaranteed to work
+        # ── Step 1: Resolve user's email ──
+        # Priority: admin-provided email > email_original > email > email_hash
         target_email = None
         target_name = "User"
+
+        # Use admin-provided email first (from the delete modal)
+        if user_email and '@' in user_email and '.' in user_email:
+            target_email = user_email.strip().lower()
+            print(f"[DELETE USER] Using admin-provided email: {target_email}")
+
+        # Get user name and fallback email from DB
         try:
             with engine.connect() as raw_conn:
                 row = raw_conn.execute(
@@ -876,27 +883,25 @@ class UserService:
                     {"uid": user_id}
                 ).fetchone()
                 if row:
-                    db_email = str(row[0] or '').strip()
-                    db_orig = str(row[1] or '').strip()
-                    db_hash = str(row[2] or '').strip()
                     target_name = str(row[3] or 'User').strip()
-
-                    # Priority: email_original > email > email_hash
-                    for candidate in [db_orig, db_email, db_hash]:
-                        if candidate and '@' in candidate and '.' in candidate:
-                            target_email = candidate.lower()
-                            break
-
-                    print(f"[DELETE USER] Raw DB query: email='{db_email[:30]}', email_original='{db_orig[:30]}', target_email='{target_email}', name='{target_name}'")
+                    if not target_email:
+                        for candidate in [str(row[1] or ''), str(row[0] or ''), str(row[2] or '')]:
+                            candidate = candidate.strip()
+                            if candidate and '@' in candidate and '.' in candidate:
+                                target_email = candidate.lower()
+                                break
+                        print(f"[DELETE USER] DB fallback email: {target_email}")
                 else:
                     print(f"[DELETE USER] User {user_id} not found in DB")
         except Exception as q_err:
-            print(f"[DELETE USER] Raw email query failed: {q_err}")
+            print(f"[DELETE USER] DB query error: {q_err}")
 
-        # Verify user exists via ORM (for the repository)
+        # Verify user exists via ORM
         user = UserRepository.get_user_by_id(db, user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        if not target_name or target_name == "User":
+            target_name = str(getattr(user, 'full_name', None) or 'User')
 
         # ── Step 2: Log activity ──
         try:
@@ -923,17 +928,16 @@ class UserService:
             else:
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err_msg or "Failed to delete user")
 
-        # ── Step 4: Send deletion email SYNCHRONOUSLY ──
-        print(f"[DELETE USER] Deletion successful. target_email='{target_email}', admin='{admin_name}'")
+        # ── Step 4: Send deletion email ──
+        print(f"[DELETE USER] Deletion successful. Sending email to '{target_email}', admin='{admin_name}'")
         if target_email:
             try:
-                print(f"[DELETE USER] Sending deletion email to {target_email}...")
                 result = send_account_deleted_email(target_email, target_name, admin_name=admin_name)
-                print(f"[DELETE USER] Email send result: {result}")
+                print(f"[DELETE USER] Email sent: {result}")
             except Exception as mail_err:
-                print(f"[DELETE USER] Email send exception: {mail_err}")
+                print(f"[DELETE USER] Email exception: {mail_err}")
         else:
-            print(f"[DELETE USER] WARNING: No valid email found for user {user_id} — skipping notification")
+            print(f"[DELETE USER] WARNING: No email for user {user_id}")
 
         return {"message": "User deleted successfully"}
 

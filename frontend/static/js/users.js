@@ -305,8 +305,9 @@ function renderTable() {
                    </button>`
                 : ``;
 
+            const userEmailForDelete = (u.email_original || u.display_email || u.email || '').trim();
             const deleteBtn = isAdmin
-                ? `<button class="btn btn-sm btn-outline-danger px-2 py-1" onclick="deleteUserPermanently(${u.id}, '${safeFullName.replace(/'/g, "\\'")}')" title="Delete User">
+                ? `<button class="btn btn-sm btn-outline-danger px-2 py-1" onclick="deleteUserPermanently(${u.id}, '${safeFullName.replace(/'/g, "\\'")}', '${userEmailForDelete.replace(/'/g, "\\'")}')" title="Delete User">
                     <i data-lucide="trash-2" style="width:11px;height:11px;"></i>Delete
                    </button>`
                 : ``;
@@ -371,56 +372,122 @@ function nextPage() {
     renderTable();
 }
 
-async function deleteUserPermanently(userId, userName) {
-    if (!confirm(`Are you sure you want to permanently delete user "${userName}"?\nThis action cannot be undone.`)) {
-        return;
-    }
+async function deleteUserPermanently(userId, userName, userEmail) {
+    // Create and show the delete confirmation modal with email field
+    return new Promise((resolve) => {
+        // Remove existing modal if any
+        const existingModal = document.getElementById('deleteUserModal');
+        if (existingModal) existingModal.remove();
 
-    // Show loading overlay
-    let overlay = document.getElementById('deleteLoadingOverlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'deleteLoadingOverlay';
-        overlay.innerHTML = `
-            <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;">
-                <div style="background:#fff;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-                    <div style="width:40px;height:40px;border:4px solid #e2e8f0;border-top:4px solid #6366f1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>
-                    <div style="font-size:15px;font-weight:600;color:#1e293b;">Deleting account...</div>
-                    <div style="font-size:12px;color:#94a3b8;margin-top:4px;">Please wait while we remove all associated data</div>
+        const modal = document.createElement('div');
+        modal.id = 'deleteUserModal';
+        modal.innerHTML = `
+            <div style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(4px);">
+                <div style="background:#fff;border-radius:16px;width:440px;max-width:92vw;box-shadow:0 24px 80px rgba(0,0,0,0.25);overflow:hidden;animation:modalSlideIn 0.25s ease-out;">
+                    <!-- Header -->
+                    <div style="background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);padding:20px 24px;text-align:center;">
+                        <div style="font-size:28px;margin-bottom:4px;">⚠️</div>
+                        <h3 style="margin:0;color:#fff;font-size:17px;font-weight:700;">Delete User Account</h3>
+                        <p style="margin:4px 0 0;color:#fecaca;font-size:12px;">This action is permanent and cannot be undone</p>
+                    </div>
+                    <!-- Body -->
+                    <div style="padding:24px;">
+                        <p style="margin:0 0 16px;font-size:14px;color:#334155;">
+                            You are about to permanently delete <strong>${userName}</strong>'s account. 
+                            A notification email will be sent to the address below.
+                        </p>
+                        <label style="display:block;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">
+                            User Email (notification will be sent here)
+                        </label>
+                        <input type="email" id="deleteUserEmailInput" value="${userEmail || ''}" 
+                            style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;color:#1e293b;outline:none;transition:border 0.2s;box-sizing:border-box;"
+                            onfocus="this.style.borderColor='#ef4444'" onblur="this.style.borderColor='#e2e8f0'"
+                            placeholder="user@example.com" />
+                        <div style="margin-top:6px;font-size:11px;color:#94a3b8;">
+                            📧 The user will receive an email that their account was deleted by you.
+                        </div>
+                    </div>
+                    <!-- Footer -->
+                    <div style="padding:0 24px 20px;display:flex;gap:10px;">
+                        <button id="deleteUserCancelBtn" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;"
+                            onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+                            Cancel
+                        </button>
+                        <button id="deleteUserConfirmBtn" style="flex:1;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(239,68,68,0.3);"
+                            onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                            🗑 Delete Permanently
+                        </button>
+                    </div>
                 </div>
             </div>
-            <style>@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>
+            <style>
+                @keyframes modalSlideIn{from{opacity:0;transform:translateY(-20px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+            </style>
         `;
-        document.body.appendChild(overlay);
-    }
-    overlay.style.display = 'block';
+        document.body.appendChild(modal);
 
-    try {
-        const adminName = (typeof CURRENT_USER_NAME !== 'undefined' && CURRENT_USER_NAME) ? CURRENT_USER_NAME : 'Administrator';
-        const res = await fetch(`/api/users/${userId}?admin_name=${encodeURIComponent(adminName)}`, { method: "DELETE" });
+        // Cancel button
+        document.getElementById('deleteUserCancelBtn').addEventListener('click', () => {
+            modal.remove();
+            resolve();
+        });
 
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.detail || "Failed to delete user");
-        }
+        // Confirm button
+        document.getElementById('deleteUserConfirmBtn').addEventListener('click', async () => {
+            const emailInput = document.getElementById('deleteUserEmailInput').value.trim();
+            modal.remove();
 
-        allUsers = allUsers.filter(u => u.id !== userId);
-        updateStats();
-        renderTable();
+            // Show loading overlay
+            let overlay = document.getElementById('deleteLoadingOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'deleteLoadingOverlay';
+                overlay.innerHTML = `
+                    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;">
+                        <div style="background:#fff;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                            <div style="width:40px;height:40px;border:4px solid #e2e8f0;border-top:4px solid #6366f1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>
+                            <div style="font-size:15px;font-weight:600;color:#1e293b;">Deleting account...</div>
+                            <div style="font-size:12px;color:#94a3b8;margin-top:4px;">Please wait while we remove all associated data</div>
+                        </div>
+                    </div>
+                    <style>@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>
+                `;
+                document.body.appendChild(overlay);
+            }
+            overlay.style.display = 'block';
 
-        if (typeof showCenterNotification === 'function') {
-            showCenterNotification("The account has been deleted successfully.", 'delete', '🗑 Account Deleted');
-        }
+            try {
+                const adminName = (typeof CURRENT_USER_NAME !== 'undefined' && CURRENT_USER_NAME) ? CURRENT_USER_NAME : 'Administrator';
+                const params = new URLSearchParams({ admin_name: adminName });
+                if (emailInput) params.append('user_email', emailInput);
 
-        await fetchUsers();
-    } catch (err) {
-        if (typeof showCenterNotification === 'function') {
-            showCenterNotification(err.message || "Failed to delete user", 'error', 'Error Deleting Account');
-        }
-    } finally {
-        // Always hide the loading overlay
-        if (overlay) overlay.style.display = 'none';
-    }
+                const res = await fetch(`/api/users/${userId}?${params.toString()}`, { method: "DELETE" });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.detail || "Failed to delete user");
+                }
+
+                allUsers = allUsers.filter(u => u.id !== userId);
+                updateStats();
+                renderTable();
+
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification("The account has been deleted successfully.", 'delete', '🗑 Account Deleted');
+                }
+
+                await fetchUsers();
+            } catch (err) {
+                if (typeof showCenterNotification === 'function') {
+                    showCenterNotification(err.message || "Failed to delete user", 'error', 'Error Deleting Account');
+                }
+            } finally {
+                if (overlay) overlay.style.display = 'none';
+            }
+
+            resolve();
+        });
+    });
 }
 
 let isSubmittingUser = false;

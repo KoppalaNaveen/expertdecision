@@ -264,9 +264,10 @@ def admin_create_user(
 def delete_user(
     user_id: int,
     admin_name: str = "Administrator",
+    user_email: str = None,
     db: Session = Depends(get_db)
 ):
-    return UserService.delete_user(db, user_id, admin_name=admin_name)
+    return UserService.delete_user(db, user_id, admin_name=admin_name, user_email=user_email)
 
 
 # -------------------------------
