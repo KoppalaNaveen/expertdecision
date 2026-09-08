@@ -710,7 +710,7 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
     IST = timezone(timedelta(hours=5, minutes=30))
     time_str = deletion_time or datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
     name_str = f" {recipient_name}" if recipient_name else ""
-    admin_display = admin_name or "an Administrator"
+    admin_display = f"Administrator ({admin_name})" if admin_name and admin_name != "Administrator" else "Administrator"
     subject = "Your EDRP account has been deleted"
     body_html = f"""
     <!DOCTYPE html>
