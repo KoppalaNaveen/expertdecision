@@ -786,11 +786,20 @@ def api_delete_user(user_id):
     if role not in ("Administrator", "Admin"):
         return jsonify({"detail": "Access Denied: Only Administrators can delete accounts."}), 403
 
+    # Forward query params (admin_name, user_email) to backend
+    from urllib.parse import urlencode
+    admin_name = request.args.get("admin_name") or session.get("full_name") or "Administrator"
+    user_email = request.args.get("user_email", "")
+    params = {"admin_name": admin_name}
+    if user_email:
+        params["user_email"] = user_email
+    backend_params = "?" + urlencode(params)
+
     try:
         headers = {}
         if "token" in session:
             headers["Authorization"] = f"Bearer {session['token']}"
-        response = make_backend_request("DELETE", f"/users/{user_id}", headers=headers, timeout=30)
+        response = make_backend_request("DELETE", f"/users/{user_id}{backend_params}", headers=headers, timeout=30)
         invalidate_cache_key("all_users")
         if response is not None:
             try:
