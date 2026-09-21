@@ -83,17 +83,23 @@ _TIMEZONE_DISPLAY_MAP = {
 
 def _parse_iana_timezone(tz_setting: str) -> str:
     """
-    Parses a timezone setting string like 'Asia/Kolkata (IST)' or 'America/New_York (EST)'
-    and returns the IANA timezone name (e.g. 'Asia/Kolkata').
+    Parses a timezone setting string like 'Asia/Kolkata (IST)', 'UTC (Coordinated Universal Time)',
+    or 'America/New_York (EST)' and returns the IANA timezone name.
     Falls back to 'Asia/Kolkata' if parsing fails.
     """
     if not tz_setting or not isinstance(tz_setting, str):
         return "Asia/Kolkata"
     s = tz_setting.strip()
-    # Try extracting IANA name before parentheses: "Asia/Kolkata (IST)" -> "Asia/Kolkata"
+    # Try extracting IANA name with '/' before parentheses: "Asia/Kolkata (IST)" -> "Asia/Kolkata"
     match = re.match(r'^([A-Za-z_]+/[A-Za-z_/]+)', s)
     if match:
         return match.group(1).strip()
+    # Handle bare timezone names without '/' like "UTC (Coordinated Universal Time)"
+    bare_match = re.match(r'^([A-Za-z_]+)\s*(?:\(|$)', s)
+    if bare_match:
+        candidate = bare_match.group(1).strip()
+        if candidate.upper() == "UTC":
+            return "UTC"
     # Try matching just the abbreviation in parentheses: "(IST)" -> look up in map
     abbr_match = re.search(r'\(([^)]+)\)', s)
     if abbr_match:
@@ -142,7 +148,7 @@ def _get_formatted_now() -> str:
     Example outputs:
       - DD / MM / YYYY + IST  ->  '21 / 09 / 2026, 03:05 PM IST'
       - MM / DD / YYYY + EST  ->  '09 / 21 / 2026, 05:35 AM EST'
-      - YYYY-MM-DD + IST      ->  '2026-09-21, 03:05 PM IST'
+      - YYYY-MM-DD + UTC      ->  '2026-09-21, 09:35 AM UTC'
     """
     from datetime import datetime, timezone as dt_timezone
     try:
@@ -156,8 +162,14 @@ def _get_formatted_now() -> str:
     iana_name = _parse_iana_timezone(tz_setting)                # e.g. "Asia/Kolkata"
 
     # Extract display abbreviation from parentheses if available
+    # Use short abbreviations (≤5 chars like IST, EST, GMT) directly;
+    # for long labels like "Coordinated Universal Time", use the IANA name instead
     abbr_match = re.search(r'\(([^)]+)\)', tz_setting)
-    display_abbr = abbr_match.group(1).strip() if abbr_match else iana_name.split("/")[-1]
+    if abbr_match:
+        extracted = abbr_match.group(1).strip()
+        display_abbr = extracted if len(extracted) <= 5 else (iana_name.split("/")[-1] if "/" in iana_name else iana_name)
+    else:
+        display_abbr = iana_name.split("/")[-1] if "/" in iana_name else iana_name
 
     # Build strftime pattern: date part from setting + fixed time part + timezone abbreviation
     date_pattern = _DATE_FORMAT_MAP.get(date_fmt_setting, "%d / %m / %Y")
