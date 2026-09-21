@@ -478,17 +478,21 @@ def end_login_session(req: EndSessionRequest, db: Session = Depends(get_db)):
 
 @router.post("/sessions/end-all")
 def end_all_user_sessions(req: EndSessionRequest, db: Session = Depends(get_db)):
-    """Mark all active sessions for a user as ended (used for logout-all)."""
+    """Mark all active sessions for a user as ended, excluding the current session."""
     try:
-        db.query(LoginSession).filter(
+        query = db.query(LoginSession).filter(
             LoginSession.user_id == req.user_id,
             LoginSession.is_active == True
-        ).update({
+        )
+        # Exclude current session if provided
+        if req.session_id and req.session_id > 0:
+            query = query.filter(LoginSession.id != req.session_id)
+        query.update({
             LoginSession.logged_out_at: func.now(),
             LoginSession.is_active: False
         }, synchronize_session='fetch')
         db.commit()
-        return {"message": "All sessions ended", "status": "ok"}
+        return {"message": "All other sessions ended", "status": "ok"}
     except Exception as e:
         print(f"[SESSIONS] End all sessions error: {e}")
         return {"message": "Error ending sessions", "status": "error"}

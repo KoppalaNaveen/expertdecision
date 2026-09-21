@@ -924,6 +924,7 @@
 <script>
     const API_URL = "/api";
     const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
+    const CURRENT_SESSION_ID = parseInt("{{ session.get('login_session_id', 0) }}", 10) || 0;
 
     document.addEventListener("DOMContentLoaded", () => {
         loadAllSettingsFromBackend();
@@ -1607,7 +1608,7 @@
         fetch(`${API_URL}/settings/sessions/end-all`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: 0, user_id: CURRENT_USER_ID })
+            body: JSON.stringify({ session_id: CURRENT_SESSION_ID, user_id: CURRENT_USER_ID })
         }).then(() => {
             alert('All other active sessions have been terminated successfully!');
         }).catch(() => {
@@ -1702,8 +1703,8 @@
                 return;
             }
 
-            // Get the current login_session_id from Flask session
-            const currentSessionId = parseInt('{{ session.get("login_session_id", 0) }}', 10) || 0;
+            // Use current login session ID to identify "Current" badge
+            const currentSessionId = CURRENT_SESSION_ID;
 
             let html = `<div class="sessions-table-wrap">
                 <table class="sessions-table">

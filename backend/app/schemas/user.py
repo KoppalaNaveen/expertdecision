@@ -107,6 +107,7 @@ class Token(BaseModel):
     team_name: Optional[str] = "Not Assigned"
     designation: Optional[str] = "Team Member"
     employee_id: Optional[str] = None
+    login_session_id: Optional[int] = None
 
 # -----------------------------
 # User Response
