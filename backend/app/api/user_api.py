@@ -1,5 +1,5 @@
 # pyrefly: ignore [missing-import]
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -188,9 +188,13 @@ def register_user(
 )
 def login_user(
     user: UserLogin,
+    request: Request,
     db: Session = Depends(get_db)
 ):
-    return UserService.login_user(db, user)
+    # Extract client IP and User-Agent for session tracking
+    client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (request.client.host if request.client else "Unknown")
+    user_agent = request.headers.get("User-Agent", "Unknown")
+    return UserService.login_user(db, user, ip_address=client_ip, user_agent=user_agent)
 
 
 class SuccessResponse(BaseModel):

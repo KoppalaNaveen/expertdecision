@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.sql import func
 from datetime import datetime
+from pydantic import BaseModel as BaseModel
 import json
 import threading
 
@@ -417,6 +419,80 @@ def delete_account(req: DeleteAccountRequest, db: Session = Depends(get_db)):
         "message": f"Account '{user_name}' and all associated data have been permanently deleted.",
         "status": "success"
     }
+
+
+# ─── Login Session History ──────────────────────────────────────────
+from app.models.login_session import LoginSession
+
+class EndSessionRequest(BaseModel):
+    session_id: int
+    user_id: int
+
+
+@router.get("/sessions/{user_id}")
+def get_user_sessions(user_id: int, db: Session = Depends(get_db)):
+    """Fetch all login sessions for a user, ordered by most recent first (max 50)."""
+    try:
+        sessions = db.query(LoginSession).filter(
+            LoginSession.user_id == user_id
+        ).order_by(LoginSession.logged_in_at.desc()).limit(50).all()
+
+        result = []
+        for s in sessions:
+            result.append({
+                "id": s.id,
+                "device_name": s.device_name or "Unknown Device",
+                "ip_address": s.ip_address or "Unknown",
+                "user_agent": s.user_agent or "",
+                "logged_in_at": s.logged_in_at.isoformat() if s.logged_in_at else None,
+                "logged_out_at": s.logged_out_at.isoformat() if s.logged_out_at else None,
+                "is_active": s.is_active if s.is_active is not None else False
+            })
+
+        return {"sessions": result, "total": len(result)}
+    except Exception as e:
+        print(f"[SESSIONS] Fetch error: {e}")
+        return {"sessions": [], "total": 0}
+
+
+@router.post("/sessions/end")
+def end_login_session(req: EndSessionRequest, db: Session = Depends(get_db)):
+    """Mark a login session as ended (set logged_out_at and is_active = False)."""
+    try:
+        sess = db.query(LoginSession).filter(
+            LoginSession.id == req.session_id,
+            LoginSession.user_id == req.user_id
+        ).first()
+
+        if sess:
+            sess.logged_out_at = func.now()
+            sess.is_active = False
+            db.commit()
+            return {"message": "Session ended", "status": "ok"}
+        else:
+            return {"message": "Session not found", "status": "not_found"}
+    except Exception as e:
+        print(f"[SESSIONS] End session error: {e}")
+        return {"message": "Error ending session", "status": "error"}
+
+
+@router.post("/sessions/end-all")
+def end_all_user_sessions(req: EndSessionRequest, db: Session = Depends(get_db)):
+    """Mark all active sessions for a user as ended (used for logout-all)."""
+    try:
+        db.query(LoginSession).filter(
+            LoginSession.user_id == req.user_id,
+            LoginSession.is_active == True
+        ).update({
+            LoginSession.logged_out_at: func.now(),
+            LoginSession.is_active: False
+        }, synchronize_session='fetch')
+        db.commit()
+        return {"message": "All sessions ended", "status": "ok"}
+    except Exception as e:
+        print(f"[SESSIONS] End all sessions error: {e}")
+        return {"message": "Error ending sessions", "status": "error"}
+
 
 @router.post("/reset", response_model=SystemSettingResponse)
 def reset_settings(db: Session = Depends(get_db)):

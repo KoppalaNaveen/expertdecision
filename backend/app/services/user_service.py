@@ -185,7 +185,56 @@ class UserService:
         return UserRepository.get_all_users(db)
 
     @staticmethod
-    def login_user(db: Session, user: UserLogin):
+    def _parse_device_name(user_agent: str) -> str:
+        """Parse a human-readable device name from User-Agent string."""
+        ua = (user_agent or "").strip()
+        if not ua:
+            return "Unknown Device"
+
+        # Detect OS
+        os_name = "Unknown OS"
+        if "Windows NT 10" in ua or "Windows NT 11" in ua:
+            os_name = "Windows 11 / 10"
+        elif "Windows NT 6.3" in ua:
+            os_name = "Windows 8.1"
+        elif "Windows NT 6.1" in ua:
+            os_name = "Windows 7"
+        elif "Windows" in ua:
+            os_name = "Windows"
+        elif "Macintosh" in ua or "Mac OS X" in ua:
+            os_name = "macOS"
+        elif "Android" in ua:
+            os_name = "Android"
+        elif "iPhone" in ua:
+            os_name = "iPhone (iOS)"
+        elif "iPad" in ua:
+            os_name = "iPad (iPadOS)"
+        elif "Linux" in ua:
+            os_name = "Linux"
+        elif "CrOS" in ua:
+            os_name = "Chrome OS"
+
+        # Detect Browser
+        browser = "Unknown Browser"
+        if "Edg/" in ua or "Edge/" in ua:
+            browser = "Microsoft Edge"
+        elif "OPR/" in ua or "Opera" in ua:
+            browser = "Opera"
+        elif "Brave" in ua:
+            browser = "Brave"
+        elif "Vivaldi" in ua:
+            browser = "Vivaldi"
+        elif "Chrome/" in ua and "Safari/" in ua:
+            browser = "Google Chrome"
+        elif "Firefox/" in ua:
+            browser = "Mozilla Firefox"
+        elif "Safari/" in ua and "Chrome/" not in ua:
+            browser = "Apple Safari"
+
+        return f"{os_name} · {browser}"
+
+    @staticmethod
+    def login_user(db: Session, user: UserLogin, ip_address: str = "Unknown", user_agent: str = "Unknown"):
         identifier = (user.employee_id or "").strip()
         
         # Look up user by employee_id, or fallback to email
@@ -241,6 +290,29 @@ class UserService:
         # Case 6: Approved -> generate JWT
         access_token = create_access_token({"sub": db_user.employee_id})
 
+        # Create LoginSession record for session tracking
+        login_session_id = None
+        try:
+            from app.models.login_session import LoginSession
+            device_name = UserService._parse_device_name(user_agent)
+            login_sess = LoginSession(
+                user_id=db_user.id,
+                device_name=device_name,
+                ip_address=ip_address or "Unknown",
+                user_agent=user_agent or "Unknown",
+                is_active=True
+            )
+            db.add(login_sess)
+            db.commit()
+            db.refresh(login_sess)
+            login_session_id = login_sess.id
+        except Exception as sess_err:
+            print(f"[LOGIN SESSION] Record creation note: {sess_err}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
         # Automated Security Email: New Login Notification via Original Gmail (Async)
         target_email = get_recipient_email(db_user)
         if target_email:
@@ -271,7 +343,8 @@ class UserService:
             "team_id": db_user.team_id,
             "team_name": db_user.team.team_name if db_user.team else "Not Assigned",
             "designation": db_user.designation or "Team Member",
-            "employee_id": db_user.employee_id or f"EMP-{db_user.id}"
+            "employee_id": db_user.employee_id or f"EMP-{db_user.id}",
+            "login_session_id": login_session_id
         }
 
     @staticmethod

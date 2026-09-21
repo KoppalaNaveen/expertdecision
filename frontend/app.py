@@ -529,6 +529,7 @@ def login():
             session["team_name"] = token.get("team_name", "Not Assigned")
             session["designation"] = token.get("designation") or "Team Member"
             session["employee_id"] = token.get("employee_id") or ""
+            session["login_session_id"] = token.get("login_session_id")
             full_name = token.get("full_name", "User")
             session["full_name"] = full_name
             
@@ -1852,10 +1853,14 @@ def email_service():
 def logout():
     uid = session.get("user_id")
     name = session.get("full_name", "User")
+    login_sess_id = session.get("login_session_id")
     if uid:
         try:
             log_platform_audit(f"User logged out: {name}", "User ended active session", module="Auth", severity="Info", user_id=uid)
             make_backend_request("POST", "/users/logout-presence", json={"user_id": uid}, timeout=2)
+            # End the login session record
+            if login_sess_id:
+                make_backend_request("POST", "/settings/sessions/end", json={"session_id": login_sess_id, "user_id": uid}, timeout=2)
         except Exception:
             pass
     session.clear()

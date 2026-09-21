@@ -95,6 +95,12 @@ SessionLocal = sessionmaker(
 from app.database.base import Base
 from app import models
 
+# Auto-create any new tables (e.g., login_sessions) that don't exist yet
+try:
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+except Exception as _create_err:
+    print(f"[DB] Auto-create tables note: {_create_err}")
+
 _SCHEMA_INITIALIZED = False
 
 def ensure_user_schema_columns():
