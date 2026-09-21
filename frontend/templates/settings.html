@@ -133,6 +133,85 @@
         justify-content: space-between;
         margin-top: 16px;
     }
+
+    /* Password Strength Indicator Styles */
+    .pwd-strength-checklist {
+        margin-top: 10px;
+        padding: 12px 14px;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+    }
+    .pwd-strength-checklist .pwd-strength-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748B;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+    .pwd-rule {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        font-weight: 600;
+        padding: 3px 0;
+        transition: all 0.25s ease;
+    }
+    .pwd-rule .pwd-rule-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+        transition: all 0.25s ease;
+        flex-shrink: 0;
+    }
+    .pwd-rule.invalid {
+        color: #94A3B8;
+    }
+    .pwd-rule.invalid .pwd-rule-icon {
+        background: #F1F5F9;
+        color: #94A3B8;
+        border: 1.5px solid #CBD5E1;
+    }
+    .pwd-rule.valid {
+        color: #16A34A;
+    }
+    .pwd-rule.valid .pwd-rule-icon {
+        background: #DCFCE7;
+        color: #16A34A;
+        border: 1.5px solid #86EFAC;
+    }
+    .pwd-match-status {
+        margin-top: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+    .pwd-match-status.match {
+        color: #16A34A;
+    }
+    .pwd-match-status.mismatch {
+        color: #DC2626;
+    }
+    .pwd-strength-bar {
+        height: 4px;
+        border-radius: 4px;
+        background: #E2E8F0;
+        margin-top: 10px;
+        overflow: hidden;
+    }
+    .pwd-strength-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.35s ease, background 0.35s ease;
+        width: 0%;
+    }
 </style>
 
 <div class="mb-4">
@@ -267,6 +346,7 @@
 
                 <div class="mb-4 p-3 bg-light rounded-3 border">
                     <h6 class="fw-bold text-dark mb-3">Change Password</h6>
+                    <div id="pwdChangeAlertContainer"></div>
                     <div class="row g-3" style="max-width:550px;">
                         <div class="col-12">
                             <label class="form-label small fw-semibold text-muted mb-1">Current Password</label>
@@ -280,24 +360,52 @@
                         <div class="col-12">
                             <label class="form-label small fw-semibold text-muted mb-1">New Password</label>
                             <div class="input-group input-group-sm">
-                                <input type="password" id="pwdNew" class="form-control" placeholder="••••••••••••••••">
+                                <input type="password" id="pwdNew" class="form-control" placeholder="••••••••••••••••" oninput="checkPasswordStrengthLive()">
                                 <button class="btn btn-outline-secondary" type="button" onclick="togglePwdVisibility('pwdNew')">
                                     <i data-lucide="eye" style="width:14px;height:14px;"></i>
                                 </button>
+                            </div>
+                            <!-- Live Password Strength Checklist -->
+                            <div class="pwd-strength-checklist" id="pwdStrengthChecklist" style="display:none;">
+                                <div class="pwd-strength-title">Password Requirements</div>
+                                <div class="pwd-rule invalid" id="ruleMinLength">
+                                    <span class="pwd-rule-icon">✗</span>
+                                    <span>At least 8 characters</span>
+                                </div>
+                                <div class="pwd-rule invalid" id="ruleUppercase">
+                                    <span class="pwd-rule-icon">✗</span>
+                                    <span>One uppercase letter (A–Z)</span>
+                                </div>
+                                <div class="pwd-rule invalid" id="ruleLowercase">
+                                    <span class="pwd-rule-icon">✗</span>
+                                    <span>One lowercase letter (a–z)</span>
+                                </div>
+                                <div class="pwd-rule invalid" id="ruleNumber">
+                                    <span class="pwd-rule-icon">✗</span>
+                                    <span>One number (0–9)</span>
+                                </div>
+                                <div class="pwd-rule invalid" id="ruleSpecial">
+                                    <span class="pwd-rule-icon">✗</span>
+                                    <span>One special character (!@#$%^&* etc.)</span>
+                                </div>
+                                <div class="pwd-strength-bar">
+                                    <div class="pwd-strength-bar-fill" id="pwdStrengthBarFill"></div>
+                                </div>
                             </div>
                         </div>
                         <div class="col-12">
                             <label class="form-label small fw-semibold text-muted mb-1">Confirm Password</label>
                             <div class="input-group input-group-sm">
-                                <input type="password" id="pwdConfirm" class="form-control" placeholder="••••••••••••••••">
+                                <input type="password" id="pwdConfirm" class="form-control" placeholder="••••••••••••••••" oninput="checkPasswordMatchLive()">
                                 <button class="btn btn-outline-secondary" type="button" onclick="togglePwdVisibility('pwdConfirm')">
                                     <i data-lucide="eye" style="width:14px;height:14px;"></i>
                                 </button>
                             </div>
+                            <div class="pwd-match-status" id="pwdMatchStatus"></div>
                         </div>
                         <div class="col-12 mt-3">
-                            <button type="button" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm" onclick="executePasswordChangeLive()">
-                                Update Password
+                            <button type="button" id="btnUpdatePassword" class="btn btn-primary btn-sm px-4 fw-bold shadow-sm" disabled onclick="executePasswordChangeLive()">
+                                <i data-lucide="lock" style="width:14px;height:14px;" class="me-1"></i> Update Password
                             </button>
                         </div>
                     </div>
@@ -647,6 +755,55 @@
     </div>
 </div>
 
+<!-- Password Change OTP Verification Modal -->
+<div class="modal fade" id="pwdChangeOtpModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header border-0 px-4 pt-4 pb-2" style="background: linear-gradient(135deg, #d97706 0%, #b45309 100%);">
+                <div class="w-100 text-center text-white">
+                    <div style="font-size: 32px; margin-bottom: 4px;">🔐</div>
+                    <h5 class="modal-title fw-bold mb-0" style="font-size: 17px;">Verify Password Change</h5>
+                    <p class="mb-0 mt-1" style="font-size: 12px; opacity: 0.9;">Email verification required for security</p>
+                </div>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-3">
+                    <p class="text-muted small mb-1">A 6-digit verification code was sent to:</p>
+                    <p class="fw-bold text-dark mb-0" id="otpEmailHint" style="font-size: 14px;">Loading...</p>
+                </div>
+
+                <div id="otpAlertContainer"></div>
+
+                <label class="form-label fw-bold text-dark small mb-2">Enter Verification Code</label>
+                <div class="d-flex gap-2 justify-content-center mb-3" id="otpInputGroup">
+                    <input type="text" class="form-control text-center fw-bold" id="otpDigit1" maxlength="1" style="width:46px;height:48px;font-size:20px;border-radius:10px;border:2px solid #E2E8F0;" oninput="onOtpDigitInput(this, 1)" onkeydown="onOtpDigitKeydown(event, 1)" autocomplete="off">
+                    <input type="text" class="form-control text-center fw-bold" id="otpDigit2" maxlength="1" style="width:46px;height:48px;font-size:20px;border-radius:10px;border:2px solid #E2E8F0;" oninput="onOtpDigitInput(this, 2)" onkeydown="onOtpDigitKeydown(event, 2)" autocomplete="off">
+                    <input type="text" class="form-control text-center fw-bold" id="otpDigit3" maxlength="1" style="width:46px;height:48px;font-size:20px;border-radius:10px;border:2px solid #E2E8F0;" oninput="onOtpDigitInput(this, 3)" onkeydown="onOtpDigitKeydown(event, 3)" autocomplete="off">
+                    <input type="text" class="form-control text-center fw-bold" id="otpDigit4" maxlength="1" style="width:46px;height:48px;font-size:20px;border-radius:10px;border:2px solid #E2E8F0;" oninput="onOtpDigitInput(this, 4)" onkeydown="onOtpDigitKeydown(event, 4)" autocomplete="off">
+                    <input type="text" class="form-control text-center fw-bold" id="otpDigit5" maxlength="1" style="width:46px;height:48px;font-size:20px;border-radius:10px;border:2px solid #E2E8F0;" oninput="onOtpDigitInput(this, 5)" onkeydown="onOtpDigitKeydown(event, 5)" autocomplete="off">
+                    <input type="text" class="form-control text-center fw-bold" id="otpDigit6" maxlength="1" style="width:46px;height:48px;font-size:20px;border-radius:10px;border:2px solid #E2E8F0;" oninput="onOtpDigitInput(this, 6)" onkeydown="onOtpDigitKeydown(event, 6)" autocomplete="off">
+                </div>
+
+                <div class="text-center mb-3">
+                    <span class="text-muted small" id="otpExpiryText">⏱ Code expires in <strong id="otpCountdown">2:00</strong></span>
+                </div>
+
+                <div class="text-center mb-2">
+                    <span class="text-muted small">Didn't receive the code? </span>
+                    <a href="#" class="small fw-bold" id="otpResendLink" style="color:#d97706; text-decoration:none;" onclick="resendPasswordChangeOtp(event)">Resend Code</a>
+                    <span class="small text-muted" id="otpResendTimer" style="display:none;"> (wait <span id="otpResendCountdown">60</span>s)</span>
+                </div>
+            </div>
+            <div class="modal-footer bg-light px-4 py-3 border-0 d-flex justify-content-between">
+                <button type="button" class="btn btn-secondary px-3 fw-semibold" onclick="cancelPasswordChangeOtp()">Cancel</button>
+                <button type="button" id="btnVerifyOtp" class="btn px-4 fw-bold shadow-sm" style="background: linear-gradient(135deg, #d97706, #b45309); color: #fff; border:0;" onclick="verifyPasswordChangeOtp()">
+                    <i data-lucide="shield-check" style="width:16px;height:16px;" class="me-1"></i> Verify & Update Password
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const API_URL = "/api";
     const CURRENT_USER_ID = parseInt("{{ session.get('user_id', 1) }}", 10);
@@ -970,30 +1127,133 @@
         }
     }
 
+    // ── Password Strength Real-Time Validation ──────────────────────────
+    function checkPasswordStrengthLive() {
+        const pwd = document.getElementById('pwdNew').value;
+        const checklist = document.getElementById('pwdStrengthChecklist');
+
+        // Show checklist when user starts typing
+        if (pwd.length > 0) {
+            checklist.style.display = 'block';
+        } else {
+            checklist.style.display = 'none';
+        }
+
+        const rules = [
+            { id: 'ruleMinLength',  test: pwd.length >= 8 },
+            { id: 'ruleUppercase',  test: /[A-Z]/.test(pwd) },
+            { id: 'ruleLowercase',  test: /[a-z]/.test(pwd) },
+            { id: 'ruleNumber',     test: /[0-9]/.test(pwd) },
+            { id: 'ruleSpecial',    test: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(pwd) }
+        ];
+
+        let passedCount = 0;
+        rules.forEach(rule => {
+            const el = document.getElementById(rule.id);
+            const iconEl = el.querySelector('.pwd-rule-icon');
+            if (rule.test) {
+                el.classList.remove('invalid');
+                el.classList.add('valid');
+                iconEl.textContent = '✓';
+                passedCount++;
+            } else {
+                el.classList.remove('valid');
+                el.classList.add('invalid');
+                iconEl.textContent = '✗';
+            }
+        });
+
+        // Strength bar
+        const barFill = document.getElementById('pwdStrengthBarFill');
+        const pct = (passedCount / 5) * 100;
+        barFill.style.width = pct + '%';
+        if (passedCount <= 1) barFill.style.background = '#EF4444';
+        else if (passedCount <= 2) barFill.style.background = '#F97316';
+        else if (passedCount <= 3) barFill.style.background = '#EAB308';
+        else if (passedCount <= 4) barFill.style.background = '#84CC16';
+        else barFill.style.background = '#22C55E';
+
+        checkPasswordMatchLive();
+        updatePasswordButtonState();
+    }
+
+    function checkPasswordMatchLive() {
+        const nxt = document.getElementById('pwdNew').value;
+        const cnf = document.getElementById('pwdConfirm').value;
+        const matchEl = document.getElementById('pwdMatchStatus');
+
+        if (!cnf) {
+            matchEl.textContent = '';
+            matchEl.className = 'pwd-match-status';
+        } else if (nxt === cnf) {
+            matchEl.textContent = '✓ Passwords match';
+            matchEl.className = 'pwd-match-status match';
+        } else {
+            matchEl.textContent = '✗ Passwords do not match';
+            matchEl.className = 'pwd-match-status mismatch';
+        }
+        updatePasswordButtonState();
+    }
+
+    function updatePasswordButtonState() {
+        const cur = document.getElementById('pwdCurrent').value;
+        const nxt = document.getElementById('pwdNew').value;
+        const cnf = document.getElementById('pwdConfirm').value;
+        const btn = document.getElementById('btnUpdatePassword');
+
+        const allRulesPassed = nxt.length >= 8 &&
+            /[A-Z]/.test(nxt) &&
+            /[a-z]/.test(nxt) &&
+            /[0-9]/.test(nxt) &&
+            /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(nxt);
+
+        const passwordsMatch = nxt && cnf && nxt === cnf;
+        const currentFilled = cur.length > 0;
+
+        btn.disabled = !(allRulesPassed && passwordsMatch && currentFilled);
+    }
+
+    // Listen for input on current password field too
+    document.addEventListener('DOMContentLoaded', () => {
+        const curPwdEl = document.getElementById('pwdCurrent');
+        if (curPwdEl) curPwdEl.addEventListener('input', updatePasswordButtonState);
+    });
+
+    // ── Two-Step Password Change Flow ───────────────────────────────────
+    let _pwdChangeOtpData = { currentPwd: '', newPwd: '' };
+    let _otpExpiryInterval = null;
+    let _otpResendInterval = null;
+
     async function executePasswordChangeLive() {
-        const cur = document.getElementById("pwdCurrent").value;
-        const nxt = document.getElementById("pwdNew").value;
-        const cnf = document.getElementById("pwdConfirm").value;
+        const cur = document.getElementById('pwdCurrent').value;
+        const nxt = document.getElementById('pwdNew').value;
+        const cnf = document.getElementById('pwdConfirm').value;
+        const alertBox = document.getElementById('pwdChangeAlertContainer');
+        const btn = document.getElementById('btnUpdatePassword');
 
         if (!cur || !nxt || !cnf) {
-            alert("Please fill in current, new, and confirm password fields.");
+            if (alertBox) alertBox.innerHTML = `<div class="alert alert-warning small fw-semibold py-2 mb-3">Please fill in all password fields.</div>`;
             return;
         }
-
         if (nxt !== cnf) {
-            alert("New password and confirm password do not match.");
+            if (alertBox) alertBox.innerHTML = `<div class="alert alert-danger small fw-semibold py-2 mb-3">New password and confirm password do not match.</div>`;
             return;
         }
 
-        if (nxt.length < 6) {
-            alert("New password must be at least 6 characters long.");
-            return;
+        // Store for Step 2
+        _pwdChangeOtpData = { currentPwd: cur, newPwd: nxt };
+
+        // Disable button and show spinner
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Sending verification code...`;
         }
+        if (alertBox) alertBox.innerHTML = '';
 
         try {
-            const res = await fetch(`${API_URL}/settings/change-password`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
+            const res = await fetch(`${API_URL}/settings/change-password/initiate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: CURRENT_USER_ID,
                     current_password: cur,
@@ -1003,17 +1263,226 @@
             });
 
             const data = await res.json();
-            if (res.ok) {
-                alert(data.message || "Password updated successfully!");
-                document.getElementById("pwdCurrent").value = "";
-                document.getElementById("pwdNew").value = "";
-                document.getElementById("pwdConfirm").value = "";
+            if (res.ok && data.status === 'otp_sent') {
+                // Show OTP modal
+                document.getElementById('otpEmailHint').textContent = data.email_hint || '***@***';
+                clearOtpInputs();
+                document.getElementById('otpAlertContainer').innerHTML = '';
+                startOtpCountdown(120);
+                startResendCooldown(60);
+
+                const modalEl = document.getElementById('pwdChangeOtpModal');
+                if (modalEl) {
+                    const modal = new bootstrap.Modal(modalEl);
+                    modal.show();
+                    if (window.lucide) lucide.createIcons();
+                    setTimeout(() => { document.getElementById('otpDigit1').focus(); }, 300);
+                }
+
+                if (alertBox) alertBox.innerHTML = `<div class="alert alert-info small fw-semibold py-2 mb-3 d-flex align-items-center gap-2"><i data-lucide="mail" style="width:16px;height:16px;"></i> Verification code sent to your email. Check your inbox.</div>`;
+                if (window.lucide) lucide.createIcons();
             } else {
-                alert(data.detail || "Failed to update password.");
+                if (alertBox) alertBox.innerHTML = `<div class="alert alert-danger small fw-semibold py-2 mb-3">${data.detail || 'Failed to initiate password change.'}</div>`;
             }
         } catch (e) {
-            alert("Network error while changing password.");
+            if (alertBox) alertBox.innerHTML = `<div class="alert alert-danger small fw-semibold py-2 mb-3">Network error. Please check your connection.</div>`;
         }
+
+        // Re-enable button
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="lock" style="width:14px;height:14px;" class="me-1"></i> Update Password`;
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+
+    // OTP digit input auto-advance
+    function onOtpDigitInput(el, idx) {
+        el.value = el.value.replace(/[^0-9]/g, '');
+        if (el.value && idx < 6) {
+            document.getElementById('otpDigit' + (idx + 1)).focus();
+        }
+    }
+    function onOtpDigitKeydown(e, idx) {
+        if (e.key === 'Backspace' && !e.target.value && idx > 1) {
+            document.getElementById('otpDigit' + (idx - 1)).focus();
+        }
+        // Allow paste on first digit
+        if (e.key === 'v' && (e.ctrlKey || e.metaKey) && idx === 1) {
+            setTimeout(() => {
+                const pasted = document.getElementById('otpDigit1').value;
+                if (pasted.length === 6 && /^\d{6}$/.test(pasted)) {
+                    for (let i = 1; i <= 6; i++) {
+                        document.getElementById('otpDigit' + i).value = pasted[i - 1];
+                    }
+                    document.getElementById('otpDigit6').focus();
+                }
+            }, 50);
+        }
+    }
+    function getOtpValue() {
+        let code = '';
+        for (let i = 1; i <= 6; i++) code += (document.getElementById('otpDigit' + i).value || '');
+        return code;
+    }
+    function clearOtpInputs() {
+        for (let i = 1; i <= 6; i++) document.getElementById('otpDigit' + i).value = '';
+    }
+
+    // OTP Expiry Countdown
+    function startOtpCountdown(seconds) {
+        if (_otpExpiryInterval) clearInterval(_otpExpiryInterval);
+        let remaining = seconds;
+        const countdownEl = document.getElementById('otpCountdown');
+        const expiryTextEl = document.getElementById('otpExpiryText');
+
+        function updateDisplay() {
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+            countdownEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+        }
+        updateDisplay();
+
+        _otpExpiryInterval = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(_otpExpiryInterval);
+                expiryTextEl.innerHTML = '<span class="text-danger fw-bold">⏱ Code has expired. Please request a new one.</span>';
+                return;
+            }
+            updateDisplay();
+            if (remaining <= 30) countdownEl.style.color = '#DC2626';
+        }, 1000);
+    }
+
+    // Resend Cooldown
+    function startResendCooldown(seconds) {
+        if (_otpResendInterval) clearInterval(_otpResendInterval);
+        let remaining = seconds;
+        const linkEl = document.getElementById('otpResendLink');
+        const timerEl = document.getElementById('otpResendTimer');
+        const countdownEl = document.getElementById('otpResendCountdown');
+
+        linkEl.style.pointerEvents = 'none';
+        linkEl.style.opacity = '0.5';
+        timerEl.style.display = 'inline';
+        countdownEl.textContent = remaining;
+
+        _otpResendInterval = setInterval(() => {
+            remaining--;
+            countdownEl.textContent = remaining;
+            if (remaining <= 0) {
+                clearInterval(_otpResendInterval);
+                linkEl.style.pointerEvents = 'auto';
+                linkEl.style.opacity = '1';
+                timerEl.style.display = 'none';
+            }
+        }, 1000);
+    }
+
+    // Resend OTP
+    async function resendPasswordChangeOtp(e) {
+        if (e) e.preventDefault();
+        const alertBox = document.getElementById('otpAlertContainer');
+
+        try {
+            const res = await fetch(`${API_URL}/settings/change-password/initiate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: CURRENT_USER_ID,
+                    current_password: _pwdChangeOtpData.currentPwd,
+                    new_password: _pwdChangeOtpData.newPwd,
+                    confirm_password: _pwdChangeOtpData.newPwd
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                clearOtpInputs();
+                startOtpCountdown(120);
+                startResendCooldown(60);
+                if (alertBox) alertBox.innerHTML = `<div class="alert alert-success small fw-semibold py-2 mb-2">✓ New verification code sent successfully!</div>`;
+            } else {
+                if (alertBox) alertBox.innerHTML = `<div class="alert alert-danger small fw-semibold py-2 mb-2">${data.detail || 'Failed to resend code.'}</div>`;
+            }
+        } catch (err) {
+            if (alertBox) alertBox.innerHTML = `<div class="alert alert-danger small fw-semibold py-2 mb-2">Network error while resending code.</div>`;
+        }
+    }
+
+    // Verify OTP and Apply Password Change
+    async function verifyPasswordChangeOtp() {
+        const code = getOtpValue();
+        const alertBox = document.getElementById('otpAlertContainer');
+        const btn = document.getElementById('btnVerifyOtp');
+
+        if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+            if (alertBox) alertBox.innerHTML = `<div class="alert alert-warning small fw-semibold py-2 mb-2">Please enter the complete 6-digit verification code.</div>`;
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Verifying...`;
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/settings/change-password/confirm`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: CURRENT_USER_ID,
+                    current_password: _pwdChangeOtpData.currentPwd,
+                    new_password: _pwdChangeOtpData.newPwd,
+                    verification_code: code
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                // Success! Close modal and clear form
+                const modalEl = document.getElementById('pwdChangeOtpModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                // Clear password fields
+                document.getElementById('pwdCurrent').value = '';
+                document.getElementById('pwdNew').value = '';
+                document.getElementById('pwdConfirm').value = '';
+                document.getElementById('pwdStrengthChecklist').style.display = 'none';
+                document.getElementById('pwdMatchStatus').textContent = '';
+                document.getElementById('btnUpdatePassword').disabled = true;
+
+                // Show success alert
+                const mainAlert = document.getElementById('pwdChangeAlertContainer');
+                if (mainAlert) mainAlert.innerHTML = `<div class="alert alert-success alert-dismissible fade show small fw-bold py-2 mb-3 d-flex align-items-center gap-2" role="alert"><i data-lucide="check-circle" style="width:16px;height:16px;"></i> ${data.message || 'Password changed successfully!'}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
+                if (window.lucide) lucide.createIcons();
+
+                // Cleanup timers
+                if (_otpExpiryInterval) clearInterval(_otpExpiryInterval);
+                if (_otpResendInterval) clearInterval(_otpResendInterval);
+            } else {
+                if (alertBox) alertBox.innerHTML = `<div class="alert alert-danger small fw-semibold py-2 mb-2">${data.detail || 'Verification failed.'}</div>`;
+            }
+        } catch (e) {
+            if (alertBox) alertBox.innerHTML = `<div class="alert alert-danger small fw-semibold py-2 mb-2">Network error during verification.</div>`;
+        }
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="shield-check" style="width:16px;height:16px;" class="me-1"></i> Verify & Update Password`;
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+
+    // Cancel and close OTP modal
+    function cancelPasswordChangeOtp() {
+        const modalEl = document.getElementById('pwdChangeOtpModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        if (_otpExpiryInterval) clearInterval(_otpExpiryInterval);
+        if (_otpResendInterval) clearInterval(_otpResendInterval);
     }
 
     function logoutOtherDevicesLive() {

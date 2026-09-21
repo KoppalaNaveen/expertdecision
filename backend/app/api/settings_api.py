@@ -25,9 +25,13 @@ from app.models.replay import Replay
 from app.models.support_ticket import SupportTicket
 from app.models.internal_email import InternalEmail
 from app.schemas.settings_schema import (
-    SystemSettingUpdate, SystemSettingResponse, ChangePasswordRequest, DeleteAccountRequest, TestEmailRequest
+    SystemSettingUpdate, SystemSettingResponse, ChangePasswordRequest, DeleteAccountRequest, TestEmailRequest,
+    InitiatePasswordChangeRequest, ConfirmPasswordChangeRequest
 )
-from app.services.email_service import _send_smtp_mail, send_password_changed_email, send_account_deleted_email, get_recipient_email
+from app.services.email_service import (
+    _send_smtp_mail, send_password_changed_email, send_account_deleted_email,
+    get_recipient_email, send_password_change_otp_email
+)
 from app.services.notification_service import NotificationService
 from app.core.security import verify_password, hash_password
 from app.models.category import Category
@@ -199,6 +203,188 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
         print(f"Password change audit log note: {e}")
 
     return {"message": "Password changed successfully! Please use your new password for future sign-ins.", "status": "success"}
+
+import re as _re
+import random as _random
+
+def _validate_password_strength(password: str) -> list:
+    """Returns a list of unmet password rules."""
+    errors = []
+    if len(password) < 8:
+        errors.append("Password must be at least 8 characters long.")
+    if not _re.search(r'[A-Z]', password):
+        errors.append("Password must contain at least one uppercase letter.")
+    if not _re.search(r'[a-z]', password):
+        errors.append("Password must contain at least one lowercase letter.")
+    if not _re.search(r'[0-9]', password):
+        errors.append("Password must contain at least one number.")
+    if not _re.search(r'[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?~`]', password):
+        errors.append("Password must contain at least one special character.")
+    return errors
+
+
+def _mask_email(email: str) -> str:
+    """Masks an email address for display: n***n@gmail.com"""
+    if not email or "@" not in email:
+        return "***@***"
+    local, domain = email.split("@", 1)
+    if len(local) <= 2:
+        masked_local = local[0] + "***"
+    else:
+        masked_local = local[0] + "***" + local[-1]
+    return f"{masked_local}@{domain}"
+
+
+@router.post("/change-password/initiate")
+def initiate_password_change(req: InitiatePasswordChangeRequest, db: Session = Depends(get_db)):
+    """
+    Step 1: Validate current password and new password strength,
+    then send a 6-digit verification code to the user's registered email.
+    """
+    if req.new_password != req.confirm_password:
+        raise HTTPException(status_code=400, detail="New password and confirm password do not match.")
+
+    # Validate password strength
+    strength_errors = _validate_password_strength(req.new_password)
+    if strength_errors:
+        raise HTTPException(status_code=400, detail=strength_errors[0])
+
+    user = db.query(User).filter(User.id == req.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    if not verify_password(req.current_password, user.password):
+        raise HTTPException(status_code=400, detail="Incorrect current password entered.")
+
+    # Get user's registered email
+    target_email = get_recipient_email(user)
+    if not target_email:
+        raise HTTPException(status_code=400, detail="No registered email address found for this account.")
+
+    # Generate 6-digit OTP code
+    code = str(_random.randint(100000, 999999))
+    expiry_seconds = 120  # 2 minutes
+    expires_at = int(time.time()) + expiry_seconds
+
+    # Delete any existing password_change codes for this user's email
+    db.query(VerificationCode).filter(
+        VerificationCode.email == target_email,
+        VerificationCode.purpose == "password_change"
+    ).delete(synchronize_session='fetch')
+
+    vc = VerificationCode(
+        email=target_email,
+        code=code,
+        expires_at=expires_at,
+        purpose="password_change"
+    )
+    db.add(vc)
+    db.commit()
+
+    # Send verification email asynchronously
+    def _async_send_otp(email_addr, otp_code, name):
+        try:
+            send_password_change_otp_email(email_addr, otp_code, name)
+        except Exception as e:
+            print(f"[PASSWORD CHANGE OTP] Email dispatch error: {e}")
+
+    threading.Thread(
+        target=_async_send_otp,
+        args=(target_email, code, user.full_name),
+        daemon=True
+    ).start()
+
+    # Log audit
+    try:
+        log = ActivityLog(user_id=user.id, action="Password change initiated", details="Verification code sent to registered email")
+        db.add(log)
+        db.commit()
+    except Exception:
+        pass
+
+    return {
+        "message": "Verification code sent to your registered email.",
+        "email_hint": _mask_email(target_email),
+        "status": "otp_sent"
+    }
+
+
+@router.post("/change-password/confirm")
+def confirm_password_change(req: ConfirmPasswordChangeRequest, db: Session = Depends(get_db)):
+    """
+    Step 2: Verify the 6-digit OTP code and apply the password change.
+    """
+    user = db.query(User).filter(User.id == req.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    if not verify_password(req.current_password, user.password):
+        raise HTTPException(status_code=400, detail="Incorrect current password entered.")
+
+    # Get user's registered email
+    target_email = get_recipient_email(user)
+    if not target_email:
+        raise HTTPException(status_code=400, detail="No registered email address found for this account.")
+
+    # Verify the OTP code
+    vc = db.query(VerificationCode).filter(
+        VerificationCode.email == target_email,
+        VerificationCode.code == req.verification_code,
+        VerificationCode.purpose == "password_change"
+    ).first()
+
+    if not vc:
+        raise HTTPException(status_code=400, detail="Invalid verification code. Please check and try again.")
+
+    if vc.expires_at < int(time.time()):
+        db.delete(vc)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
+
+    # Code is valid — delete it and apply the password change
+    db.delete(vc)
+
+    # Validate password strength one more time (server-side)
+    strength_errors = _validate_password_strength(req.new_password)
+    if strength_errors:
+        db.commit()
+        raise HTTPException(status_code=400, detail=strength_errors[0])
+
+    user.password = hash_password(req.new_password)
+    db.commit()
+
+    # 1. In-App Notification
+    try:
+        NotificationService.create_notification(
+            db,
+            user_id=user.id,
+            message="Your account password was changed successfully via email verification.",
+            notification_type="Security Alert"
+        )
+    except Exception as notif_err:
+        print(f"Password change notification error: {notif_err}")
+
+    # 2. Automated Security Email (Async)
+    if target_email:
+        threading.Thread(
+            target=send_password_changed_email,
+            args=(target_email, user.full_name),
+            daemon=True
+        ).start()
+
+    # Log security audit
+    try:
+        log = ActivityLog(user_id=user.id, action="Password changed (verified)", details="Password updated with email verification from Settings")
+        db.add(log)
+        db.commit()
+    except Exception:
+        pass
+
+    return {
+        "message": "Password changed successfully! Please use your new password for future sign-ins.",
+        "status": "success"
+    }
+
 
 @router.post("/delete-account")
 def delete_account(req: DeleteAccountRequest, db: Session = Depends(get_db)):

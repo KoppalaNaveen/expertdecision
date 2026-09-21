@@ -89,6 +89,18 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
     confirm_password: str
 
+class InitiatePasswordChangeRequest(BaseModel):
+    user_id: int
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+class ConfirmPasswordChangeRequest(BaseModel):
+    user_id: int
+    current_password: str
+    new_password: str
+    verification_code: str
+
 class DeleteAccountRequest(BaseModel):
     user_id: int
     password: str

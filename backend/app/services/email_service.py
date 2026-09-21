@@ -706,6 +706,67 @@ def send_password_changed_email(to_email: str, recipient_name: str, change_time:
     return _dispatch_resend_email(to_email, subject, body_html, body_text, "EDRP Security")
 
 
+def send_password_change_otp_email(to_email: str, otp: str, recipient_name: str = "") -> bool:
+    """
+    Sends a 6-digit verification code to the user's email to confirm
+    that the account owner is the one changing the password.
+    """
+    clean_email = (to_email or "").strip()
+    if not clean_email or "@" not in clean_email:
+        return False
+
+    name_str = f" {recipient_name}" if recipient_name else ""
+    subject = "EDRP Password Change Verification Code"
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #1e293b; line-height: 1.6; background-color: #f8fafc; margin: 0; padding: 20px; }}
+            .card {{ max-width: 540px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }}
+            .header {{ background: linear-gradient(135deg, #d97706 0%, #b45309 100%); color: #ffffff; padding: 24px; text-align: center; }}
+            .content {{ padding: 28px 24px; }}
+            .otp-box {{ background: #fffbeb; border: 2px dashed #f59e0b; border-radius: 8px; padding: 18px; text-align: center; margin: 20px 0; }}
+            .otp-code {{ font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #b45309; font-family: monospace; }}
+            .expiry-note {{ font-size: 12.5px; color: #64748b; margin-top: 6px; }}
+            .warning-box {{ background: #fef2f2; border-left: 4px solid #dc2626; padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-size: 13px; color: #991b1b; }}
+            .footer {{ border-top: 1px solid #f1f5f9; padding: 16px 24px; background: #f8fafc; font-size: 12px; color: #64748b; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="header">
+                <div style="font-size: 28px; margin-bottom: 6px;">🔐</div>
+                <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #ffffff;">Password Change Verification</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9; color: #fef3c7;">Expert Decision Replay Platform</p>
+            </div>
+            <div class="content">
+                <p style="font-size: 15px; margin-top: 0;">Hello{name_str},</p>
+                <p>A password change was requested for your <strong>Expert Decision Replay Platform (EDRP)</strong> account.</p>
+                <p>Please enter the following 6-digit verification code to confirm this change:</p>
+
+                <div class="otp-box">
+                    <div class="otp-code">{otp}</div>
+                    <div class="expiry-note">⏱ This code will expire in <strong>2 minutes</strong>.</div>
+                </div>
+
+                <div class="warning-box">
+                    <strong>⚠ Security Warning:</strong> If you did not request this password change, please ignore this email and immediately contact your System Administrator to secure your account.
+                </div>
+            </div>
+            <div class="footer">
+                <p style="margin: 0;">&copy; 2026 Expert Decision Replay Platform (EDRP). All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    body_text = f"Hello{name_str},\n\nA password change was requested for your EDRP account.\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 2 minutes.\n\nIf you did not request this change, please ignore this email and contact your Administrator immediately.\n\nRegards,\nEDRP Security Team"
+
+    return send_email(clean_email, subject, body_html, body_text)
+
+
 def send_password_reset_confirmation_email(to_email: str, recipient_name: str, reset_time: str = None) -> bool:
     """
     Automated Security Email -> Sent after successful password reset completion.
