@@ -263,10 +263,10 @@
         flex: 0 0 50% !important;
         max-width: 50% !important;
     }
-    /* Table: remove fixed layout, allow horizontal scroll */
+    /* Table: remove fixed layout, allow horizontal scroll with enough room for all action buttons */
     .user-mgmt-table {
         table-layout: auto !important;
-        min-width: 800px !important;
+        min-width: 1050px !important;
     }
     .user-mgmt-table th,
     .user-mgmt-table td {
@@ -279,7 +279,12 @@
     .user-mgmt-table th:nth-child(5), .user-mgmt-table td:nth-child(5) { width: auto !important; min-width: 100px !important; }
     .user-mgmt-table th:nth-child(6), .user-mgmt-table td:nth-child(6) { width: auto !important; min-width: 70px !important; }
     .user-mgmt-table th:nth-child(7), .user-mgmt-table td:nth-child(7) { width: auto !important; min-width: 75px !important; }
-    .user-mgmt-table th:nth-child(8), .user-mgmt-table td:nth-child(8) { width: auto !important; min-width: 200px !important; }
+    .user-mgmt-table th:nth-child(8), .user-mgmt-table td:nth-child(8) { width: auto !important; min-width: 320px !important; }
+    /* Ensure action buttons never wrap or clip */
+    .action-btn-group {
+        min-width: 300px !important;
+        overflow: visible !important;
+    }
     /* Pagination footer */
     .card-footer .d-flex.justify-content-between {
         flex-direction: column !important;

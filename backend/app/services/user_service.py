@@ -22,7 +22,8 @@ from app.services.email_service import (
     send_role_changed_email,
     send_account_status_email,
     send_credentials_updated_email,
-    get_recipient_email
+    get_recipient_email,
+    _get_formatted_now
 )
 from app.services.notification_service import NotificationService
 
@@ -246,7 +247,7 @@ class UserService:
             def _async_login_email(email_addr, name):
                 try:
                     from datetime import datetime, timezone
-                    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+                    now_str = _get_formatted_now()
                     send_new_login_email(email_addr, name, login_time=now_str, device_info="Web Browser Session")
                 except Exception as log_err:
                     print(f"New login email dispatch note: {log_err}")
@@ -1018,7 +1019,7 @@ class UserService:
 
         # 4. Update user record
         from datetime import datetime, timezone
-        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        now_str = _get_formatted_now()
         
         user.role_id = new_role_id
         user.employee_id = new_emp_id
@@ -1133,7 +1134,7 @@ class UserService:
 
         # 5. Update user record
         from datetime import datetime, timezone
-        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        now_str = _get_formatted_now()
         
         user.role_id = new_role_id
         user.employee_id = new_emp_id

@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
@@ -50,6 +51,127 @@ _BLOCKED_TLDS = (
     ".test", ".invalid", ".localhost", ".example", ".local", ".internal",
     ".mock", ".fake", ".dummy", ".sample", ".localdomain", ".lan"
 )
+
+# ── Timezone-aware timestamp formatting ──────────────────────────────────────
+# Maps common display timezone labels to IANA timezone names for zoneinfo
+_TIMEZONE_DISPLAY_MAP = {
+    "IST": "Asia/Kolkata",
+    "EST": "America/New_York",
+    "CST": "America/Chicago",
+    "MST": "America/Denver",
+    "PST": "America/Los_Angeles",
+    "GMT": "Europe/London",
+    "BST": "Europe/London",
+    "CET": "Europe/Berlin",
+    "CEST": "Europe/Berlin",
+    "JST": "Asia/Tokyo",
+    "KST": "Asia/Seoul",
+    "CST (China)": "Asia/Shanghai",
+    "AEST": "Australia/Sydney",
+    "AEDT": "Australia/Sydney",
+    "NZST": "Pacific/Auckland",
+    "SGT": "Asia/Singapore",
+    "HKT": "Asia/Hong_Kong",
+    "PKT": "Asia/Karachi",
+    "GST": "Asia/Dubai",
+    "EAT": "Africa/Nairobi",
+    "WAT": "Africa/Lagos",
+    "BRT": "America/Sao_Paulo",
+    "ART": "America/Argentina/Buenos_Aires",
+}
+
+
+def _parse_iana_timezone(tz_setting: str) -> str:
+    """
+    Parses a timezone setting string like 'Asia/Kolkata (IST)' or 'America/New_York (EST)'
+    and returns the IANA timezone name (e.g. 'Asia/Kolkata').
+    Falls back to 'Asia/Kolkata' if parsing fails.
+    """
+    if not tz_setting or not isinstance(tz_setting, str):
+        return "Asia/Kolkata"
+    s = tz_setting.strip()
+    # Try extracting IANA name before parentheses: "Asia/Kolkata (IST)" -> "Asia/Kolkata"
+    match = re.match(r'^([A-Za-z_]+/[A-Za-z_/]+)', s)
+    if match:
+        return match.group(1).strip()
+    # Try matching just the abbreviation in parentheses: "(IST)" -> look up in map
+    abbr_match = re.search(r'\(([^)]+)\)', s)
+    if abbr_match:
+        abbr = abbr_match.group(1).strip()
+        if abbr in _TIMEZONE_DISPLAY_MAP:
+            return _TIMEZONE_DISPLAY_MAP[abbr]
+    # If string itself is a known abbreviation
+    if s.upper() in _TIMEZONE_DISPLAY_MAP:
+        return _TIMEZONE_DISPLAY_MAP[s.upper()]
+    return "Asia/Kolkata"
+
+
+def _get_system_settings() -> dict:
+    """
+    Reads the timezone and date_format settings from the SystemSetting table.
+    Returns a dict with 'timezone' and 'date_format' keys.
+    Falls back to defaults on any error.
+    """
+    defaults = {"timezone": "Asia/Kolkata (IST)", "date_format": "DD / MM / YYYY"}
+    try:
+        from app.database.connection import SessionLocal
+        from app.models.system_setting import SystemSetting
+        db = SessionLocal()
+        setting = db.query(SystemSetting).first()
+        if setting:
+            defaults["timezone"] = setting.timezone or "Asia/Kolkata (IST)"
+            defaults["date_format"] = setting.date_format or "DD / MM / YYYY"
+        db.close()
+    except Exception:
+        pass
+    return defaults
+
+
+# Maps the user-facing date format strings to Python strftime patterns
+_DATE_FORMAT_MAP = {
+    "DD / MM / YYYY": "%d / %m / %Y",
+    "MM / DD / YYYY": "%m / %d / %Y",
+    "YYYY-MM-DD":     "%Y-%m-%d",
+}
+
+
+def _get_formatted_now() -> str:
+    """
+    Returns the current date/time formatted in the user's configured timezone
+    AND date format preference from SystemSetting.
+    Example outputs:
+      - DD / MM / YYYY + IST  ->  '21 / 09 / 2026, 03:05 PM IST'
+      - MM / DD / YYYY + EST  ->  '09 / 21 / 2026, 05:35 AM EST'
+      - YYYY-MM-DD + IST      ->  '2026-09-21, 03:05 PM IST'
+    """
+    from datetime import datetime, timezone as dt_timezone
+    try:
+        from zoneinfo import ZoneInfo
+    except ImportError:
+        from backports.zoneinfo import ZoneInfo  # Python < 3.9 fallback
+
+    settings = _get_system_settings()
+    tz_setting = settings["timezone"]                          # e.g. "Asia/Kolkata (IST)"
+    date_fmt_setting = settings["date_format"]                 # e.g. "DD / MM / YYYY"
+    iana_name = _parse_iana_timezone(tz_setting)                # e.g. "Asia/Kolkata"
+
+    # Extract display abbreviation from parentheses if available
+    abbr_match = re.search(r'\(([^)]+)\)', tz_setting)
+    display_abbr = abbr_match.group(1).strip() if abbr_match else iana_name.split("/")[-1]
+
+    # Build strftime pattern: date part from setting + fixed time part + timezone abbreviation
+    date_pattern = _DATE_FORMAT_MAP.get(date_fmt_setting, "%d / %m / %Y")
+    full_pattern = f"{date_pattern}, %I:%M %p {display_abbr}"
+
+    try:
+        tz = ZoneInfo(iana_name)
+        now = datetime.now(tz)
+        return now.strftime(full_pattern)
+    except Exception:
+        # Ultimate fallback: UTC
+        now = datetime.now(dt_timezone.utc)
+        return now.strftime(f"{date_pattern}, %I:%M %p UTC")
+
 
 
 def _has_valid_mx_records(domain: str) -> bool:
@@ -540,8 +662,7 @@ def send_password_changed_email(to_email: str, recipient_name: str, change_time:
         print(f"[PASSWORD CHANGED LOG - SILENCED] Password change email skipped for {to_email}")
         return True
 
-    from datetime import datetime, timezone
-    time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    time_str = change_time or _get_formatted_now()
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = "Your EDRP account password was changed"
     body_html = f"""
@@ -581,8 +702,7 @@ def send_password_reset_confirmation_email(to_email: str, recipient_name: str, r
         print(f"[PASSWORD RESET LOG - SILENCED] Password reset email skipped for {to_email}")
         return True
 
-    from datetime import datetime, timezone
-    time_str = reset_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    time_str = reset_time or _get_formatted_now()
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = "Your EDRP password was reset"
     body_html = f"""
@@ -622,8 +742,7 @@ def send_new_login_email(to_email: str, recipient_name: str, login_time: str = N
         print(f"[LOGIN ALERT SILENCED] Login notification email skipped for {to_email}")
         return True
 
-    from datetime import datetime, timezone
-    time_str = login_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    time_str = login_time or _get_formatted_now()
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = "New login detected on your EDRP account"
     ip_line = f"<div><strong>IP Address:</strong> {ip_address}</div>" if ip_address else ""
@@ -706,9 +825,7 @@ def send_account_deleted_email(to_email: str, recipient_name: str, deletion_time
     of ENABLE_ROUTINE_EMAILS setting.
     """
 
-    from datetime import datetime, timezone, timedelta
-    IST = timezone(timedelta(hours=5, minutes=30))
-    time_str = deletion_time or datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
+    time_str = deletion_time or _get_formatted_now()
     name_str = f" {recipient_name}" if recipient_name else ""
     admin_display = f"Administrator ({admin_name})" if admin_name and admin_name != "Administrator" else "Administrator"
     subject = "Your EDRP account has been deleted"
@@ -748,8 +865,7 @@ def send_role_changed_email(to_email: str, recipient_name: str, prev_role: str, 
         print(f"[ROLE CHANGED LOG - SILENCED] Role changed email skipped for {to_email} ({prev_role} -> {new_role})")
         return True
 
-    from datetime import datetime, timezone
-    time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    time_str = change_time or _get_formatted_now()
     name_str = f" {recipient_name}" if recipient_name else ""
     subject = f"Role Updated - Your New Employee ID is {new_emp_id}" if new_emp_id else "Your EDRP account role has been updated"
 
@@ -813,8 +929,7 @@ def send_decision_outcome_email(to_email: str, recipient_name: str, decision_id:
     if not clean_email or "@" not in clean_email:
         return False
 
-    from datetime import datetime, timezone
-    time_str = decision_date or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    time_str = decision_date or _get_formatted_now()
     name_str = f" {recipient_name}" if recipient_name else ""
     is_accepted = str(status).strip().lower() in ["approved", "accepted"]
 
@@ -905,8 +1020,7 @@ def send_account_status_email(to_email: str, recipient_name: str, is_active: boo
         print(f"[ACCOUNT STATUS LOG - SILENCED] Status email skipped for {to_email} (Active={is_active})")
         return True
 
-    from datetime import datetime, timezone
-    time_str = change_time or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    time_str = change_time or _get_formatted_now()
     name_str = f" {recipient_name}" if recipient_name else ""
     status_label = "Activated" if is_active else "Deactivated"
     subject = f"Your EDRP account has been {status_label.lower()}"
