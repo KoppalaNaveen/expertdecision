@@ -510,7 +510,14 @@ def login():
 
         response = None
         try:
-            response = make_backend_request("POST", "/users/login", json=payload, timeout=15)
+            # Forward real client headers so backend can record accurate device/IP
+            client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.headers.get("X-Real-Ip", "") or request.remote_addr or "Unknown"
+            client_ua = request.headers.get("User-Agent", "Unknown")
+            login_headers = {
+                "X-Forwarded-For": client_ip,
+                "User-Agent": client_ua
+            }
+            response = make_backend_request("POST", "/users/login", json=payload, headers=login_headers, timeout=15)
         except Exception as e:
             print(f"Login connection error note: {e}")
 

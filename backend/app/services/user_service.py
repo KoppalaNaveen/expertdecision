@@ -191,9 +191,15 @@ class UserService:
         if not ua:
             return "Unknown Device"
 
-        # Detect OS
+        # Detect OS (iPhone/iPad must be checked before macOS — their UAs contain 'Mac OS X')
         os_name = "Unknown OS"
-        if "Windows NT 10" in ua or "Windows NT 11" in ua:
+        if "iPhone" in ua:
+            os_name = "iPhone (iOS)"
+        elif "iPad" in ua:
+            os_name = "iPad (iPadOS)"
+        elif "Android" in ua:
+            os_name = "Android"
+        elif "Windows NT 10" in ua or "Windows NT 11" in ua:
             os_name = "Windows 11 / 10"
         elif "Windows NT 6.3" in ua:
             os_name = "Windows 8.1"
@@ -203,16 +209,10 @@ class UserService:
             os_name = "Windows"
         elif "Macintosh" in ua or "Mac OS X" in ua:
             os_name = "macOS"
-        elif "Android" in ua:
-            os_name = "Android"
-        elif "iPhone" in ua:
-            os_name = "iPhone (iOS)"
-        elif "iPad" in ua:
-            os_name = "iPad (iPadOS)"
-        elif "Linux" in ua:
-            os_name = "Linux"
         elif "CrOS" in ua:
             os_name = "Chrome OS"
+        elif "Linux" in ua:
+            os_name = "Linux"
 
         # Detect Browser
         browser = "Unknown Browser"
