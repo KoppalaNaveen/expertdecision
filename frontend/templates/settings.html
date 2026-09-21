@@ -213,73 +213,87 @@
         width: 0%;
     }
 
-    /* Session History Card Styles */
-    .session-card {
-        padding: 14px 16px;
-        background: #FFFFFF;
+    /* Session History Table Styles */
+    .sessions-table-wrap {
         border: 1px solid #E2E8F0;
-        border-radius: 12px;
-        margin-bottom: 10px;
-        transition: all 0.2s ease;
-    }
-    .session-card:hover {
-        border-color: #CBD5E1;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    }
-    .session-card.active-session {
-        border-left: 3px solid #22C55E;
-        background: #F0FDF4;
-    }
-    .session-card .session-device-icon {
-        width: 36px;
-        height: 36px;
         border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        flex-shrink: 0;
+        overflow: hidden;
     }
-    .session-card .session-device-icon.windows { background: #EFF6FF; color: #2563EB; }
-    .session-card .session-device-icon.mac { background: #F5F3FF; color: #7C3AED; }
-    .session-card .session-device-icon.android { background: #ECFDF5; color: #059669; }
-    .session-card .session-device-icon.ios { background: #FFF7ED; color: #EA580C; }
-    .session-card .session-device-icon.linux { background: #FEF9C3; color: #CA8A04; }
-    .session-card .session-device-icon.unknown { background: #F1F5F9; color: #64748B; }
-    .session-status-badge {
-        font-size: 10.5px;
+    .sessions-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+    }
+    .sessions-table thead th {
+        background: #F8FAFC;
+        color: #64748B;
         font-weight: 700;
-        padding: 3px 10px;
-        border-radius: 20px;
-        letter-spacing: 0.3px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 10px 14px;
+        border-bottom: 2px solid #E2E8F0;
         white-space: nowrap;
     }
-    .session-status-badge.active {
-        background: #DCFCE7;
-        color: #16A34A;
+    .sessions-table tbody td {
+        padding: 10px 14px;
+        border-bottom: 1px solid #F1F5F9;
+        vertical-align: middle;
+        color: #334155;
     }
-    .session-status-badge.ended {
-        background: #F1F5F9;
-        color: #64748B;
+    .sessions-table tbody tr:last-child td {
+        border-bottom: none;
     }
-    .session-time-label {
-        font-size: 11px;
-        color: #94A3B8;
-        font-weight: 600;
-    }
-    .session-time-value {
-        font-size: 11.5px;
-        color: #475569;
-        font-weight: 600;
-    }
-    .session-ip {
-        font-size: 11px;
-        color: #64748B;
-        font-family: 'Courier New', monospace;
+    .sessions-table tbody tr:hover {
         background: #F8FAFC;
-        padding: 2px 8px;
-        border-radius: 4px;
-        border: 1px solid #E2E8F0;
+    }
+    .sessions-table .device-cell {
+        font-weight: 700;
+        color: #1E293B;
+        font-size: 12.5px;
+    }
+    .sessions-table .device-sub {
+        font-weight: 500;
+        color: #94A3B8;
+        font-size: 11px;
+        display: block;
+        margin-top: 1px;
+    }
+    .sessions-table .time-cell {
+        font-size: 12px;
+        color: #475569;
+        white-space: nowrap;
+    }
+    .sessions-table .ip-cell {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #64748B;
+        font-weight: 600;
+    }
+    .btn-invalidate {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 14px;
+        border-radius: 5px;
+        border: 1.5px solid #FDA4AF;
+        color: #E11D48;
+        background: #FFF1F2;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+    .btn-invalidate:hover {
+        background: #FFE4E6;
+        border-color: #FB7185;
+    }
+    .btn-invalidate:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .btn-invalidate.current-badge {
+        border-color: #86EFAC;
+        color: #16A34A;
+        background: #F0FDF4;
+        cursor: default;
     }
 </style>
 
@@ -880,16 +894,18 @@
 
 <!-- All Sessions History Modal -->
 <div class="modal fade" id="allSessionsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 620px;">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-            <div class="modal-header border-0 px-4 pt-4 pb-2" style="background: linear-gradient(135deg, #1E40AF 0%, #1E3A8A 100%);">
-                <div class="w-100 text-center text-white">
-                    <div style="font-size: 28px; margin-bottom: 4px;">🖥️</div>
-                    <h5 class="modal-title fw-bold mb-0" style="font-size: 17px;">All Login Sessions</h5>
-                    <p class="mb-0 mt-1" style="font-size: 12px; opacity: 0.85;">Complete history of account logins & logouts</p>
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 880px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+            <div class="modal-header bg-white px-4 pt-4 pb-3 border-bottom">
+                <div>
+                    <h5 class="modal-title fw-bold text-dark mb-0" style="font-size: 20px;">Active Sessions</h5>
+                    <p class="text-muted mb-0" style="font-size: 12px;">Review browsers and devices currently signed in to your account.</p>
                 </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3 fw-semibold ms-auto" onclick="viewAllSessions()" style="font-size:12px;">
+                    <i data-lucide="refresh-cw" style="width:13px;height:13px;" class="me-1"></i> Refresh
+                </button>
             </div>
-            <div class="modal-body p-4" style="max-height: 450px; overflow-y: auto;">
+            <div class="modal-body p-0" style="max-height: 480px; overflow-y: auto;">
                 <div id="allSessionsContent">
                     <div class="text-center py-5">
                         <div class="spinner-border text-primary" role="status"></div>
@@ -897,7 +913,7 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer bg-light px-4 py-3 border-0">
+            <div class="modal-footer bg-light px-4 py-3 border-top">
                 <span class="text-muted small me-auto" id="sessionsTotalCount"></span>
                 <button type="button" class="btn btn-secondary px-3 fw-semibold" data-bs-dismiss="modal">Close</button>
             </div>
@@ -1600,50 +1616,69 @@
     }
 
     // ── View All Sessions ────────────────────────────────────────────────
-    function _getDeviceIconClass(deviceName) {
+    function _getDevicePlatform(deviceName) {
         const d = (deviceName || '').toLowerCase();
-        if (d.includes('windows')) return 'windows';
-        if (d.includes('mac')) return 'mac';
-        if (d.includes('android')) return 'android';
-        if (d.includes('iphone') || d.includes('ipad') || d.includes('ios')) return 'ios';
-        if (d.includes('linux') || d.includes('chrome os')) return 'linux';
-        return 'unknown';
+        if (d.includes('windows')) return 'Windows · Desktop';
+        if (d.includes('mac')) return 'macOS · Desktop';
+        if (d.includes('android')) return 'Android · Mobile';
+        if (d.includes('iphone')) return 'iOS · Mobile';
+        if (d.includes('ipad')) return 'iPadOS · Tablet';
+        if (d.includes('linux')) return 'Linux · Desktop';
+        if (d.includes('chrome os')) return 'ChromeOS · Desktop';
+        return 'Unknown · Device';
     }
 
-    function _getDeviceEmoji(deviceName) {
-        const d = (deviceName || '').toLowerCase();
-        if (d.includes('windows')) return '💻';
-        if (d.includes('mac')) return '🍎';
-        if (d.includes('android')) return '📱';
-        if (d.includes('iphone') || d.includes('ipad')) return '📱';
-        if (d.includes('linux')) return '🐧';
-        return '🖥️';
+    function _getBrowserName(deviceName) {
+        const d = (deviceName || '');
+        // Extract browser part after the dot separator
+        if (d.includes('·')) {
+            return d.split('·').pop().trim();
+        }
+        return d || 'Unknown Browser';
     }
 
-    function _formatSessionTime(isoStr) {
+    function _formatSessionDateTime(isoStr) {
         if (!isoStr) return '—';
         try {
             const d = new Date(isoStr);
-            const now = new Date();
-            const isToday = d.toDateString() === now.toDateString();
-            const yesterday = new Date(now);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const isYesterday = d.toDateString() === yesterday.toDateString();
-
-            const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-            if (isToday) return `Today, ${timeStr}`;
-            if (isYesterday) return `Yesterday, ${timeStr}`;
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + `, ${timeStr}`;
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const mon = months[d.getMonth()];
+            const day = d.getDate();
+            const year = d.getFullYear();
+            const h = String(d.getHours()).padStart(2, '0');
+            const m = String(d.getMinutes()).padStart(2, '0');
+            const s = String(d.getSeconds()).padStart(2, '0');
+            return `${mon} ${day}, ${year} ${h}:${m}:${s}`;
         } catch (e) {
             return isoStr;
+        }
+    }
+
+    async function invalidateSession(sessionId) {
+        if (!confirm('Are you sure you want to invalidate this session?')) return;
+        try {
+            const res = await fetch(`${API_URL}/settings/sessions/end`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, user_id: CURRENT_USER_ID })
+            });
+            if (res.ok) {
+                viewAllSessions(); // Refresh the table
+            } else {
+                alert('Failed to invalidate session.');
+            }
+        } catch (e) {
+            alert('Error invalidating session.');
         }
     }
 
     async function viewAllSessions() {
         // Open modal immediately with loading spinner
         const modalEl = document.getElementById('allSessionsModal');
-        const modal = new bootstrap.Modal(modalEl);
+        let modal = bootstrap.Modal.getInstance(modalEl);
+        if (!modal) {
+            modal = new bootstrap.Modal(modalEl);
+        }
         modal.show();
         if (window.lucide) lucide.createIcons();
 
@@ -1658,7 +1693,7 @@
 
             if (sessions.length === 0) {
                 container.innerHTML = `
-                    <div class="text-center py-5">
+                    <div class="text-center py-5 px-4">
                         <div style="font-size:40px;margin-bottom:8px;">📋</div>
                         <p class="text-muted small fw-semibold mb-0">No login sessions recorded yet.</p>
                         <p class="text-muted small">Sessions will appear here after your next login.</p>
@@ -1667,47 +1702,56 @@
                 return;
             }
 
-            let html = '';
+            // Get the current login_session_id from Flask session
+            const currentSessionId = parseInt('{{ session.get("login_session_id", 0) }}', 10) || 0;
+
+            let html = `<div class="sessions-table-wrap">
+                <table class="sessions-table">
+                    <thead>
+                        <tr>
+                            <th>Browser / Device</th>
+                            <th>Session Started</th>
+                            <th>Last Accessed</th>
+                            <th>IP Address</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
             sessions.forEach(s => {
-                const iconClass = _getDeviceIconClass(s.device_name);
-                const emoji = _getDeviceEmoji(s.device_name);
+                const browserName = _getBrowserName(s.device_name);
+                const platform = _getDevicePlatform(s.device_name);
                 const isActive = s.is_active;
-                const cardClass = isActive ? 'session-card active-session' : 'session-card';
-                const badgeClass = isActive ? 'session-status-badge active' : 'session-status-badge ended';
-                const badgeText = isActive ? '● Active' : 'Ended';
+                const isCurrent = s.id === currentSessionId;
+
+                let actionBtn = '';
+                if (isCurrent) {
+                    actionBtn = `<span class="btn-invalidate current-badge">Current</span>`;
+                } else if (isActive) {
+                    actionBtn = `<button class="btn-invalidate" onclick="invalidateSession(${s.id})">Invalidate</button>`;
+                } else {
+                    actionBtn = `<span class="btn-invalidate" style="opacity:0.4;border-color:#E2E8F0;color:#94A3B8;background:#F8FAFC;cursor:default;">Ended</span>`;
+                }
 
                 html += `
-                <div class="${cardClass}">
-                    <div class="d-flex align-items-start gap-3">
-                        <div class="session-device-icon ${iconClass}">${emoji}</div>
-                        <div class="flex-grow-1">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <span class="fw-bold text-dark" style="font-size:13px;">${s.device_name || 'Unknown Device'}</span>
-                                <span class="${badgeClass}">${badgeText}</span>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <span class="session-ip">${s.ip_address || 'Unknown IP'}</span>
-                            </div>
-                            <div class="d-flex flex-wrap gap-3">
-                                <div>
-                                    <span class="session-time-label">Login:</span>
-                                    <span class="session-time-value">${_formatSessionTime(s.logged_in_at)}</span>
-                                </div>
-                                <div>
-                                    <span class="session-time-label">Logout:</span>
-                                    <span class="session-time-value">${isActive ? '<span class="text-success fw-bold">Still Active</span>' : _formatSessionTime(s.logged_out_at)}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
+                    <tr>
+                        <td class="device-cell">
+                            ${browserName}
+                            <span class="device-sub">${platform}</span>
+                        </td>
+                        <td class="time-cell">${_formatSessionDateTime(s.logged_in_at)}</td>
+                        <td class="time-cell">${isActive ? '<span class="text-success fw-bold" style="font-size:11px;">● Active Now</span>' : _formatSessionDateTime(s.logged_out_at)}</td>
+                        <td class="ip-cell">${s.ip_address || 'Unknown'}</td>
+                        <td>${actionBtn}</td>
+                    </tr>`;
             });
 
+            html += `</tbody></table></div>`;
             container.innerHTML = html;
             countEl.textContent = `${sessions.length} session${sessions.length !== 1 ? 's' : ''} found`;
         } catch (err) {
             container.innerHTML = `
-                <div class="text-center py-5">
+                <div class="text-center py-5 px-4">
                     <div style="font-size:40px;margin-bottom:8px;">⚠️</div>
                     <p class="text-danger small fw-semibold mb-0">Failed to load session history.</p>
                     <p class="text-muted small">Please check your network connection and try again.</p>
