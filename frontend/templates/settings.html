@@ -780,7 +780,9 @@
                 const langVal = data.language || "English (US)";
                 document.getElementById("cfgLanguage").value = langVal;
                 onLanguageChange(langVal);
-                document.getElementById("cfgTimezone").value = data.timezone || "Asia/Kolkata (IST)";
+                const savedTz = data.timezone || localStorage.getItem('edrp_timezone') || "Asia/Kolkata (IST)";
+                document.getElementById("cfgTimezone").value = savedTz;
+                localStorage.setItem('edrp_timezone', savedTz);
                 document.getElementById("cfgDateFormat").value = data.date_format || "DD / MM / YYYY";
                 
                 const themeVal = data.theme || "Light";
@@ -879,6 +881,7 @@
         // Immediately update localStorage for instant platform-wide effect
         localStorage.setItem('edrp_language', langVal);
         localStorage.setItem('edrp_theme', themeVal);
+        localStorage.setItem('edrp_timezone', document.getElementById("cfgTimezone").value);
         localStorage.setItem('edrp_date_format', dateFormatVal);
         localStorage.setItem('edrp_auto_logout', String(autoLogoutVal));
         localStorage.setItem('edrp_accessibility', accessVal ? 'true' : 'false');
@@ -1027,6 +1030,7 @@
             const res = await fetch(`${API_URL}/settings/reset`, { method: "POST" });
             if (res.ok) {
                 localStorage.removeItem('edrp_theme');
+                localStorage.removeItem('edrp_timezone');
                 localStorage.removeItem('edrp_date_format');
                 localStorage.removeItem('edrp_accessibility');
                 localStorage.removeItem('edrp_shortcuts');
