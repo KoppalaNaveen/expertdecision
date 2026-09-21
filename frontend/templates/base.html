@@ -93,7 +93,7 @@
     </script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260831_sidebar_ui_v4">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260921_mobile_fix_v5">
 
     <style>
         html, body {
@@ -102,11 +102,12 @@
             margin: 0;
             padding: 0;
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
         }
         
         /* ── Sidebar Layout Styling ─────────────────────────── */
-        .app-wrapper { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+        .app-wrapper { display: flex; height: 100vh; height: 100dvh; width: 100vw; overflow: hidden; }
         
         /* ── Sidebar (Exact Dark Midnight Navy UI) ──────────── */
         .sidebar {
@@ -117,6 +118,7 @@
             flex-direction: column;
             position: fixed;
             height: 100vh;
+            height: 100dvh;
             top: 0; bottom: 0; left: 0;
             z-index: 1050;
             box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
@@ -237,6 +239,7 @@
             gap: 12px;
             text-decoration: none;
             transition: background 0.15s;
+            flex-shrink: 0;
         }
         .user-profile-bottom:hover { background: rgba(255, 255, 255, 0.04); }
         .user-avatar {
@@ -282,6 +285,7 @@
             display: flex; 
             flex-direction: column; 
             height: 100vh;
+            height: 100dvh;
             overflow-y: auto;
             background-color: #F8FAFC;
             transition: margin-right 0.32s cubic-bezier(0.16, 1, 0.3, 1), margin-left 0.3s ease;
@@ -317,6 +321,42 @@
             .content-area {
                 padding: 1.25rem 1rem 5.5rem 1rem !important;
             }
+        }
+
+        /* ── Pull to Refresh (Mobile) ── */
+        .pull-to-refresh-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, rgba(37,99,235,0.12) 0%, transparent 100%);
+            z-index: 1060;
+            overflow: hidden;
+            transition: height 0.2s ease;
+            pointer-events: none;
+        }
+        .pull-to-refresh-indicator .ptr-spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #E2E8F0;
+            border-top-color: #2563EB;
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        .pull-to-refresh-indicator.pulling .ptr-spinner {
+            opacity: 1;
+        }
+        .pull-to-refresh-indicator.refreshing .ptr-spinner {
+            opacity: 1;
+            animation: ptr-spin 0.7s linear infinite;
+        }
+        @keyframes ptr-spin {
+            to { transform: rotate(360deg); }
         }
         
         .header-bar {
@@ -589,6 +629,11 @@
 {% set current_role_css = (session.get('role_name') or 'Employee') | string | lower %}
 <body data-role-theme="{% if 'manager' in current_role_css or 'lead' in current_role_css %}manager{% elif 'admin' in current_role_css %}admin{% elif 'reviewer' in current_role_css %}reviewer{% else %}employee{% endif %}">
 
+    <!-- Pull to Refresh Indicator (Mobile) -->
+    <div id="pullToRefreshIndicator" class="pull-to-refresh-indicator">
+        <div class="ptr-spinner"></div>
+    </div>
+
     <div class="app-wrapper">
         
         <!-- Mobile Sidebar Backdrop Overlay -->
@@ -783,6 +828,70 @@
                     }
                 });
             });
+
+            // ── Pull to Refresh (Mobile Touch) ──
+            (function initPullToRefresh() {
+                if (!('ontouchstart' in window)) return; // Only on touch devices
+
+                const indicator = document.getElementById('pullToRefreshIndicator');
+                if (!indicator) return;
+
+                const mainContent = document.querySelector('.main-content');
+                if (!mainContent) return;
+
+                let startY = 0;
+                let pulling = false;
+                const THRESHOLD = 80; // px to drag before triggering refresh
+                const MAX_PULL = 120;
+
+                mainContent.addEventListener('touchstart', function(e) {
+                    if (mainContent.scrollTop <= 0) {
+                        startY = e.touches[0].clientY;
+                        pulling = true;
+                    }
+                }, { passive: true });
+
+                mainContent.addEventListener('touchmove', function(e) {
+                    if (!pulling) return;
+                    const currentY = e.touches[0].clientY;
+                    const diff = currentY - startY;
+
+                    if (diff > 0 && mainContent.scrollTop <= 0) {
+                        const pullDist = Math.min(diff * 0.5, MAX_PULL);
+                        indicator.style.height = pullDist + 'px';
+                        indicator.classList.add('pulling');
+                        indicator.classList.remove('refreshing');
+
+                        // Rotate spinner based on pull distance
+                        const spinner = indicator.querySelector('.ptr-spinner');
+                        if (spinner) {
+                            spinner.style.transform = 'rotate(' + (pullDist / MAX_PULL * 360) + 'deg)';
+                        }
+                    }
+                }, { passive: true });
+
+                mainContent.addEventListener('touchend', function(e) {
+                    if (!pulling) return;
+                    pulling = false;
+
+                    const h = parseInt(indicator.style.height) || 0;
+                    if (h >= THRESHOLD * 0.5) {
+                        // Trigger refresh
+                        indicator.style.height = '50px';
+                        indicator.classList.remove('pulling');
+                        indicator.classList.add('refreshing');
+                        const spinner = indicator.querySelector('.ptr-spinner');
+                        if (spinner) spinner.style.transform = '';
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 400);
+                    } else {
+                        // Cancel
+                        indicator.style.height = '0';
+                        indicator.classList.remove('pulling', 'refreshing');
+                    }
+                }, { passive: true });
+            })();
         });
 
         lucide.createIcons();

@@ -237,6 +237,55 @@
     align-items: center !important;
     gap: 3px !important;
 }
+
+/* ── Mobile Responsive: User Management ── */
+@media (max-width: 767.98px) {
+    /* Stack header: title on top, controls below */
+    .d-flex.justify-content-between.align-items-center.mb-3 {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+    .d-flex.justify-content-between.align-items-center.mb-3 > .d-flex.gap-2 {
+        flex-wrap: wrap !important;
+        width: 100% !important;
+    }
+    .d-flex.justify-content-between.align-items-center.mb-3 .input-group {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    .d-flex.justify-content-between.align-items-center.mb-3 select#roleFilter {
+        width: auto !important;
+        flex: 0 0 auto !important;
+    }
+    /* Stats cards: 2 columns on mobile */
+    .row.g-2.mb-3 > .col-md-3 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+    }
+    /* Table: remove fixed layout, allow horizontal scroll */
+    .user-mgmt-table {
+        table-layout: auto !important;
+        min-width: 800px !important;
+    }
+    .user-mgmt-table th,
+    .user-mgmt-table td {
+        white-space: nowrap !important;
+    }
+    .user-mgmt-table th:nth-child(1), .user-mgmt-table td:nth-child(1) { width: auto !important; min-width: 140px !important; }
+    .user-mgmt-table th:nth-child(2), .user-mgmt-table td:nth-child(2) { width: auto !important; min-width: 90px !important; }
+    .user-mgmt-table th:nth-child(3), .user-mgmt-table td:nth-child(3) { width: auto !important; min-width: 85px !important; }
+    .user-mgmt-table th:nth-child(4), .user-mgmt-table td:nth-child(4) { width: auto !important; min-width: 100px !important; }
+    .user-mgmt-table th:nth-child(5), .user-mgmt-table td:nth-child(5) { width: auto !important; min-width: 100px !important; }
+    .user-mgmt-table th:nth-child(6), .user-mgmt-table td:nth-child(6) { width: auto !important; min-width: 70px !important; }
+    .user-mgmt-table th:nth-child(7), .user-mgmt-table td:nth-child(7) { width: auto !important; min-width: 75px !important; }
+    .user-mgmt-table th:nth-child(8), .user-mgmt-table td:nth-child(8) { width: auto !important; min-width: 200px !important; }
+    /* Pagination footer */
+    .card-footer .d-flex.justify-content-between {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+}
 </style>
 
 

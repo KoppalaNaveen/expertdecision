@@ -41,6 +41,7 @@
         }
         .quick-action-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
         .quick-action-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+        .quick-actions-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
 
         .sec-event-item {
             padding: 10px 12px; border-radius: 8px; border: 1px solid transparent; margin-bottom: 4px;
@@ -75,10 +76,16 @@
             .grid-4col { grid-template-columns: repeat(2, 1fr); }
             .dashboard-grid-2 { grid-template-columns: 1fr; }
             .dashboard-grid-3 { grid-template-columns: 1fr; }
+            .quick-actions-grid { grid-template-columns: repeat(4, 1fr); }
         }
         @media (max-width: 768px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
             .grid-4col { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 576px) {
+            .content-area { padding: 16px 12px !important; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .quick-actions-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
         }
     </style>
 {% endblock %}
@@ -442,7 +449,7 @@
         <!-- ── Quick Actions Section ── -->
         <div style="margin-bottom:12px;">
             <div style="font-size:14.5px;font-weight:800;color:#1E293B;margin-bottom:14px;">Quick Actions</div>
-            <div style="display:grid;grid-template-columns:repeat(6, 1fr);gap:16px;">
+            <div class="quick-actions-grid">
                 <a href="{{ url_for('users') }}" class="quick-action-card">
                     <div class="quick-action-icon bg-blueL"><i data-lucide="user-plus" style="width:20px;height:20px;color:#2563EB;"></i></div>
                     <span style="font-size:12px;font-weight:700;color:#1E293B;">Add User</span>
