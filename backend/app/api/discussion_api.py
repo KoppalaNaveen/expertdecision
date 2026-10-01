@@ -114,6 +114,101 @@ def get_threads(decision_id: int, db: Session = Depends(get_db)):
 def get_all_threads(db: Session = Depends(get_db)):
     return db.query(DiscussionThread).all()
 
+@router.get("/threads/all-rich")
+def get_all_threads_rich(
+    status: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Return all threads with rich metadata: creator, decision, comment count, participants."""
+    query = db.query(DiscussionThread)
+    if status and status != "All":
+        query = query.filter(DiscussionThread.status == status)
+    if q:
+        query = query.filter(DiscussionThread.topic.ilike(f"%{q}%"))
+
+    threads = query.order_by(DiscussionThread.id.desc()).all()
+
+    result = []
+    for t in threads:
+        # Creator info
+        creator = db.query(User).filter(User.id == t.created_by).first()
+        creator_name = creator.full_name if creator else "Unknown"
+        creator_initials = "".join([p[0].upper() for p in creator_name.split()])[:2] if creator_name else "U"
+        creator_role = creator.role.role_name if (creator and creator.role) else "Employee"
+
+        # Decision info
+        decision_title = None
+        decision_dept = None
+        decision_category = None
+        if t.decision_id:
+            dec = db.query(Decision).filter(Decision.id == t.decision_id).first()
+            if dec:
+                decision_title = dec.title
+                decision_dept = dec.department
+                if dec.category:
+                    decision_category = dec.category.name
+
+        # Apply category filter
+        if category and category != "All":
+            cat_match = (
+                (decision_category and category.lower() in decision_category.lower()) or
+                (decision_dept and category.lower() in decision_dept.lower())
+            )
+            if not cat_match:
+                continue
+
+        # Comment count & summary
+        comments = db.query(Comment).filter(Comment.thread_id == t.id, Comment.is_deleted == False).all()
+        comment_count = len(comments)
+        summary = comments[-1].content if comments else None
+
+        # Unique participants from comments
+        participants = []
+        seen_ids = set()
+        if creator:
+            seen_ids.add(creator.id)
+            participants.append({
+                "id": creator.id,
+                "initials": creator_initials,
+                "name": creator_name
+            })
+        for c in comments:
+            if c.user_id not in seen_ids:
+                seen_ids.add(c.user_id)
+                u = db.query(User).filter(User.id == c.user_id).first()
+                if u:
+                    inits = "".join([p[0].upper() for p in u.full_name.split()])[:2] if u.full_name else "U"
+                    participants.append({"id": u.id, "initials": inits, "name": u.full_name})
+                if len(participants) >= 5:
+                    break
+
+        # Updated time
+        last_comment_time = comments[-1].created_at if comments else None
+        updated_at = last_comment_time or t.created_at
+
+        result.append({
+            "id": t.id,
+            "topic": t.topic,
+            "status": t.status,
+            "decision_id": t.decision_id,
+            "decision_title": decision_title,
+            "decision_dept": decision_dept,
+            "decision_category": decision_category,
+            "created_by": t.created_by,
+            "creator_name": creator_name,
+            "creator_initials": creator_initials,
+            "creator_role": creator_role,
+            "comment_count": comment_count,
+            "summary": summary,
+            "participants": participants,
+            "created_at": t.created_at,
+            "updated_at": updated_at,
+        })
+
+    return result
+
 @router.patch("/threads/{thread_id}/status")
 def update_thread_status(thread_id: int, status: str = Query(...), user_id: int = Query(...), db: Session = Depends(get_db)):
     thread = db.query(DiscussionThread).filter(DiscussionThread.id == thread_id).first()
