@@ -59,6 +59,12 @@ else:
     DATABASE_URL = DEFAULT_SUPABASE_URL
     print("[DB] Using default production Supabase IPv4 Connection Pooler")
 
+# Force psycopg2 dialect - prevents SQLAlchemy 2.x from trying psycopg (v3) on Python 3.14
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+
 # Create PostgreSQL engine - ALWAYS (never fall back to SQLite in production)
 print(f"[DB] Connecting to PostgreSQL database...")
 engine = create_engine(
