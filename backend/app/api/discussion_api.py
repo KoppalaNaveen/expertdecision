@@ -1,9 +1,10 @@
 import json
+import threading
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_, func
 
 from app.database.connection import get_db
 from app.schemas.decision import (
@@ -121,7 +122,7 @@ def get_all_threads_rich(
     q: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Return all threads with rich metadata: creator, decision, comment count, participants."""
+    """Return all threads with rich metadata — optimized with batch queries."""
     query = db.query(DiscussionThread)
     if status and status != "All":
         query = query.filter(DiscussionThread.status == status)
@@ -129,13 +130,43 @@ def get_all_threads_rich(
         query = query.filter(DiscussionThread.topic.ilike(f"%{q}%"))
 
     threads = query.order_by(DiscussionThread.id.desc()).all()
+    if not threads:
+        return []
+
+    # Batch-load all related data in a few queries instead of N+1
+    thread_ids = [t.id for t in threads]
+    creator_ids = {t.created_by for t in threads}
+    decision_ids = {t.decision_id for t in threads if t.decision_id}
+
+    # Preload users (creators + comment authors)
+    all_comments = db.query(Comment).filter(
+        Comment.thread_id.in_(thread_ids), Comment.is_deleted == False
+    ).order_by(Comment.id.asc()).all()
+
+    commenter_ids = {c.user_id for c in all_comments}
+    all_user_ids = creator_ids | commenter_ids
+    users_list = db.query(User).options(joinedload(User.role)).filter(User.id.in_(all_user_ids)).all() if all_user_ids else []
+    users_map = {u.id: u for u in users_list}
+
+    # Preload decisions
+    decisions_list = db.query(Decision).options(joinedload(Decision.category)).filter(Decision.id.in_(decision_ids)).all() if decision_ids else []
+    decisions_map = {d.id: d for d in decisions_list}
+
+    # Group comments by thread
+    comments_by_thread = {}
+    for c in all_comments:
+        comments_by_thread.setdefault(c.thread_id, []).append(c)
+
+    def _user_initials(name):
+        if not name:
+            return "U"
+        return "".join([p[0].upper() for p in name.split()])[:2]
 
     result = []
     for t in threads:
-        # Creator info
-        creator = db.query(User).filter(User.id == t.created_by).first()
+        creator = users_map.get(t.created_by)
         creator_name = creator.full_name if creator else "Unknown"
-        creator_initials = "".join([p[0].upper() for p in creator_name.split()])[:2] if creator_name else "U"
+        creator_initials = _user_initials(creator_name)
         creator_role = creator.role.role_name if (creator and creator.role) else "Employee"
 
         # Decision info
@@ -143,7 +174,7 @@ def get_all_threads_rich(
         decision_dept = None
         decision_category = None
         if t.decision_id:
-            dec = db.query(Decision).filter(Decision.id == t.decision_id).first()
+            dec = decisions_map.get(t.decision_id)
             if dec:
                 decision_title = dec.title
                 decision_dept = dec.department
@@ -159,34 +190,27 @@ def get_all_threads_rich(
             if not cat_match:
                 continue
 
-        # Comment count & summary
-        comments = db.query(Comment).filter(Comment.thread_id == t.id, Comment.is_deleted == False).all()
-        comment_count = len(comments)
-        summary = comments[-1].content if comments else None
+        # Comment count & summary from pre-grouped data
+        thread_comments = comments_by_thread.get(t.id, [])
+        comment_count = len(thread_comments)
+        summary = thread_comments[-1].content if thread_comments else None
 
-        # Unique participants from comments
+        # Unique participants from preloaded users
         participants = []
         seen_ids = set()
         if creator:
             seen_ids.add(creator.id)
-            participants.append({
-                "id": creator.id,
-                "initials": creator_initials,
-                "name": creator_name
-            })
-        for c in comments:
+            participants.append({"id": creator.id, "initials": creator_initials, "name": creator_name})
+        for c in thread_comments:
             if c.user_id not in seen_ids:
                 seen_ids.add(c.user_id)
-                u = db.query(User).filter(User.id == c.user_id).first()
+                u = users_map.get(c.user_id)
                 if u:
-                    inits = "".join([p[0].upper() for p in u.full_name.split()])[:2] if u.full_name else "U"
-                    participants.append({"id": u.id, "initials": inits, "name": u.full_name})
+                    participants.append({"id": u.id, "initials": _user_initials(u.full_name), "name": u.full_name})
                 if len(participants) >= 5:
                     break
 
-        # Updated time
-        last_comment_time = comments[-1].created_at if comments else None
-        updated_at = last_comment_time or t.created_at
+        updated_at = thread_comments[-1].created_at if thread_comments else t.created_at
 
         result.append({
             "id": t.id,
@@ -307,24 +331,57 @@ def create_comment(thread_id: int, comment: CommentCreate, db: Session = Depends
     except Exception as e:
         print("Error logging comment activity:", e)
 
-    try:
-        NotificationService.notify_discussion(db, db_thread.decision_id, comment.user_id, comment.content)
-    except Exception as e:
-        print("Error sending discussion notification:", e)
+    # Dispatch notifications in background thread to avoid blocking the response
+    _decision_id = db_thread.decision_id
+    _user_id = comment.user_id
+    _content = comment.content
+    def _async_notify():
+        try:
+            from app.database.connection import SessionLocal
+            notify_db = SessionLocal()
+            try:
+                NotificationService.notify_discussion(notify_db, _decision_id, _user_id, _content)
+            finally:
+                notify_db.close()
+        except Exception as e:
+            print("Error sending discussion notification:", e)
+    threading.Thread(target=_async_notify, daemon=True).start()
 
     return db_comment
 
 @router.get("/threads/{thread_id}/comments")
 def get_thread_comments(thread_id: int, offset: int = 0, limit: int = 50, db: Session = Depends(get_db)):
     comments = db.query(Comment).filter(Comment.thread_id == thread_id).order_by(Comment.id.asc()).offset(offset).limit(limit).all()
+    if not comments:
+        return []
+
+    # Batch-load all authors in one query instead of per-comment
+    user_ids = {c.user_id for c in comments}
+    reply_ids = {c.reply_to_id for c in comments if c.reply_to_id}
+
+    # Preload parent comments for replies
+    parent_comments = {}
+    if reply_ids:
+        parents = db.query(Comment).filter(Comment.id.in_(reply_ids)).all()
+        parent_comments = {p.id: p for p in parents}
+        user_ids |= {p.user_id for p in parents}
+
+    users_list = db.query(User).options(joinedload(User.role)).filter(User.id.in_(user_ids)).all()
+    users_map = {u.id: u for u in users_list}
+
+    def _initials(name):
+        if not name:
+            return "U"
+        return "".join([p[0].upper() for p in name.split()])[:2]
+
     res = []
     for c in comments:
-        author = db.query(User).filter(User.id == c.user_id).first()
+        author = users_map.get(c.user_id)
         parent_text = None
         if c.reply_to_id:
-            parent = db.query(Comment).filter(Comment.id == c.reply_to_id).first()
+            parent = parent_comments.get(c.reply_to_id)
             if parent:
-                parent_author = db.query(User).filter(User.id == parent.user_id).first()
+                parent_author = users_map.get(parent.user_id)
                 parent_name = parent_author.full_name if parent_author else "User"
                 parent_text = f"{parent_name}: {parent.content[:40]}"
 
@@ -344,7 +401,7 @@ def get_thread_comments(thread_id: int, offset: int = 0, limit: int = 50, db: Se
             "created_at": c.created_at,
             "author_name": author.full_name if author else "User",
             "author_role": author.role.role_name if (author and author.role) else "Employee",
-            "author_initials": "".join([p[0].upper() for p in author.full_name.split()])[:2] if (author and author.full_name) else "U"
+            "author_initials": _initials(author.full_name if author else None)
         })
     return res
 
